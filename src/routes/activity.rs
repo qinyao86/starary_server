@@ -79,6 +79,76 @@ pub async fn list_activity(
     }))
 }
 
+pub async fn list_server_activity(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<ListActivityQuery>,
+) -> AppResult<Json<ActivityListResponse>> {
+    let limit = query.limit.clamp(1, 500);
+    let offset = query.offset.max(0);
+
+    let items = if user.role.can_manage_server() {
+        let sql = activity_select_sql("TRUE");
+        sqlx::query_as::<_, ActivityLogRecord>(&sql)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&state.pool)
+            .await?
+    } else {
+        let sql = activity_select_sql(
+            "a.library_id IN (
+                SELECT library_id
+                FROM library_memberships
+                WHERE user_id = $3
+            )",
+        );
+        sqlx::query_as::<_, ActivityLogRecord>(&sql)
+            .bind(limit)
+            .bind(offset)
+            .bind(user.id)
+            .fetch_all(&state.pool)
+            .await?
+    };
+
+    Ok(Json(ActivityListResponse {
+        items,
+        limit,
+        offset,
+    }))
+}
+
+fn activity_select_sql(where_clause: &str) -> String {
+    format!(
+        r#"
+        SELECT
+            a.id,
+            a.library_id,
+            a.actor_user_id,
+            actor.display_name AS actor_display_name,
+            actor.email AS actor_email,
+            a.action,
+            a.target_type,
+            a.target_id,
+            COALESCE(
+                target_user.display_name,
+                target_library.name,
+                target_root.name,
+                a.details->>'name'
+            ) AS target_name,
+            a.details,
+            a.created_at
+        FROM activity_log a
+        LEFT JOIN users actor ON actor.id = a.actor_user_id
+        LEFT JOIN users target_user ON a.target_type = 'user' AND target_user.id = a.target_id
+        LEFT JOIN team_libraries target_library ON a.target_type = 'library' AND target_library.id = a.target_id
+        LEFT JOIN storage_roots target_root ON a.target_type = 'storage_root' AND target_root.id = a.target_id
+        WHERE {where_clause}
+        ORDER BY a.created_at DESC, a.id DESC
+        LIMIT $1 OFFSET $2
+        "#
+    )
+}
+
 fn default_limit() -> i64 {
     100
 }

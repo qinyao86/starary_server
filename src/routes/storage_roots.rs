@@ -136,6 +136,7 @@ pub async fn create_storage_root(
             "storage root name is required".to_string(),
         ));
     }
+    ensure_storage_root_name_available(&state, request.library_id, name, None).await?;
 
     validate_storage_root(request.kind, &request.canonical_uri)?;
     validate_aliases(&request.windows_mapped_drive_aliases)?;
@@ -195,14 +196,15 @@ pub async fn create_storage_root(
 
     sqlx::query(
         r#"
-        INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id)
-        VALUES ($1, $2, $3, 'storage_root.created', 'storage_root', $4)
+        INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id, details)
+        VALUES ($1, $2, $3, 'storage_root.created', 'storage_root', $4, $5::jsonb)
         "#,
     )
     .bind(Uuid::new_v4())
     .bind(request.library_id)
     .bind(user.id)
     .bind(root_id)
+    .bind(serde_json::json!({ "name": root.name }))
     .execute(&mut *tx)
     .await?;
 
@@ -229,6 +231,7 @@ pub async fn update_storage_root(
             "storage root name is required".to_string(),
         ));
     }
+    ensure_storage_root_name_available(&state, existing.library_id, name, Some(root_id)).await?;
 
     let canonical_uri = request.canonical_uri.trim();
     validate_storage_root(request.kind, canonical_uri)?;
@@ -294,7 +297,7 @@ pub async fn update_storage_root(
     .bind(existing.library_id)
     .bind(user.id)
     .bind(root_id)
-    .bind(serde_json::json!({ "enabled": root.enabled, "kind": root.kind }))
+    .bind(serde_json::json!({ "name": root.name, "enabled": root.enabled, "kind": root.kind }))
     .execute(&mut *tx)
     .await?;
 
@@ -385,4 +388,32 @@ async fn get_storage_root_record(state: &AppState, root_id: Uuid) -> AppResult<S
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("storage root not found".to_string()))
+}
+
+async fn ensure_storage_root_name_available(
+    state: &AppState,
+    library_id: Uuid,
+    name: &str,
+    except_root_id: Option<Uuid>,
+) -> AppResult<()> {
+    let existing: Option<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT id
+        FROM storage_roots
+        WHERE library_id = $1 AND lower(name) = lower($2) AND ($3::uuid IS NULL OR id <> $3)
+        "#,
+    )
+    .bind(library_id)
+    .bind(name)
+    .bind(except_root_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    if existing.is_some() {
+        return Err(AppError::Conflict(
+            "storage root name already exists in this library".to_string(),
+        ));
+    }
+
+    Ok(())
 }

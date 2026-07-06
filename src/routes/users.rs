@@ -70,6 +70,13 @@ pub async fn create_user(
     if email.is_empty() || !email.contains('@') {
         return Err(AppError::BadRequest("valid email is required".to_string()));
     }
+    let existing_user: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
+        .bind(&email)
+        .fetch_optional(&state.pool)
+        .await?;
+    if existing_user.is_some() {
+        return Err(AppError::Conflict("email already exists".to_string()));
+    }
     if request.password.len() < 8 {
         return Err(AppError::BadRequest(
             "password must be at least 8 characters".to_string(),
@@ -144,7 +151,9 @@ pub async fn update_user(
         .parse::<Role>()
         .map_err(|_| AppError::Internal(anyhow::anyhow!("stored user role is invalid")))?;
 
-    if actor.role != Role::Owner && (current_role == Role::Owner || request.role == Some(Role::Owner)) {
+    if actor.role != Role::Owner
+        && (current_role == Role::Owner || request.role == Some(Role::Owner))
+    {
         return Err(AppError::Forbidden);
     }
 

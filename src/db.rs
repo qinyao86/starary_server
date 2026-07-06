@@ -121,10 +121,14 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
 
     // Existing installed databases may have been created by an older build. Keep
     // these schema additions idempotent so startup upgrades them in place.
-    tx.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;")
-        .await?;
-    tx.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
-        .await?;
+    tx.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;",
+    )
+    .await?;
+    tx.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();",
+    )
+    .await?;
     tx.execute("ALTER TABLE team_libraries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
         .await?;
     tx.execute("ALTER TABLE team_libraries ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;")
@@ -135,8 +139,10 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
         .await?;
     tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS macos_mount_aliases JSONB NOT NULL DEFAULT '[]'::jsonb;")
         .await?;
-    tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;")
-        .await?;
+    tx.execute(
+        "ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;",
+    )
+    .await?;
     tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
         .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS storage_key TEXT;")
@@ -145,14 +151,20 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
         .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS relative_path TEXT;")
         .await?;
-    tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;")
-        .await?;
+    tx.execute(
+        "ALTER TABLE assets ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;",
+    )
+    .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS imported_by_user_id UUID REFERENCES users(id);")
         .await?;
-    tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS updated_by_user_id UUID REFERENCES users(id);")
-        .await?;
-    tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS deleted_by_user_id UUID REFERENCES users(id);")
-        .await?;
+    tx.execute(
+        "ALTER TABLE assets ADD COLUMN IF NOT EXISTS updated_by_user_id UUID REFERENCES users(id);",
+    )
+    .await?;
+    tx.execute(
+        "ALTER TABLE assets ADD COLUMN IF NOT EXISTS deleted_by_user_id UUID REFERENCES users(id);",
+    )
+    .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS restored_by_user_id UUID REFERENCES users(id);")
         .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS imported_at TIMESTAMPTZ;")

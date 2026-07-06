@@ -52,7 +52,6 @@ import {
 } from "./api";
 import { createTranslator, type Language, type TranslationKey } from "./i18n";
 import {
-  activity as mockActivity,
   assetBreakdown,
   libraries as designLibraries,
   permissions,
@@ -114,6 +113,7 @@ export function App() {
   const [selectedLibraryId, setSelectedLibraryId] = useState("");
   const [assetTotal, setAssetTotal] = useState(0);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [libraryActivityItems, setLibraryActivityItems] = useState<ActivityItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
@@ -175,48 +175,57 @@ export function App() {
     }
   }, []);
 
-  const loadLibraryScopedState = useCallback(async (nextToken: string | null, libraryId: string) => {
+  const loadLibraryScopedState = useCallback(async (nextToken: string | null, libraryId: string, canManageLibrary = true) => {
     if (!nextToken || !libraryId) {
       setStorageRoots([]);
       setLibraryMembers([]);
       setAssetTotal(0);
-      setActivityItems([]);
+      setLibraryActivityItems([]);
       return;
     }
 
     const [roots, members, assets, activity] = await Promise.all([
       api.listStorageRoots(nextToken, libraryId),
-      api.listLibraryMembers(nextToken, libraryId),
+      canManageLibrary ? api.listLibraryMembers(nextToken, libraryId) : Promise.resolve([]),
       api.listAssets(nextToken, libraryId),
       api.listActivity(nextToken, libraryId)
     ]);
     setStorageRoots(roots);
     setLibraryMembers(members);
     setAssetTotal(assets.total);
-    setActivityItems(activity.items);
+    setLibraryActivityItems(activity.items);
   }, []);
 
   const loadPrivateState = useCallback(
     async (nextToken = token) => {
       if (!nextToken) return;
       try {
-        const [me, nextLibraries, nextUsers] = await Promise.all([
-          api.me(nextToken),
+        const me = await api.me(nextToken);
+        const [nextLibraries, nextUsers, nextActivity] = await Promise.all([
           api.listLibraries(nextToken),
-          api.listUsers(nextToken)
+          canManageServerRole(me.role) ? api.listUsers(nextToken) : Promise.resolve([]),
+          api.listServerActivity(nextToken)
         ]);
         setCurrentUser(me);
         setLibraries(nextLibraries);
         setUsers(nextUsers);
+        setActivityItems(nextActivity.items);
         const nextLibraryId = nextLibraries.some((item) => item.id === selectedLibraryId)
           ? selectedLibraryId
           : nextLibraries[0]?.id || "";
         setSelectedLibraryId(nextLibraryId);
-        await loadLibraryScopedState(nextToken, nextLibraryId);
+        const nextLibrary = nextLibraries.find((item) => item.id === nextLibraryId);
+        await loadLibraryScopedState(
+          nextToken,
+          nextLibraryId,
+          isLibraryManagerRole(nextLibrary?.currentUserRole ?? me.role)
+        );
       } catch (error) {
         clearStoredToken();
         setToken(null);
         setCurrentUser(null);
+        setActivityItems([]);
+        setLibraryActivityItems([]);
         setMessage(error instanceof Error ? error.message : String(error));
       }
     },
@@ -241,7 +250,8 @@ export function App() {
   const selectLibrary = (id: string) => {
     setSelectedLibraryId(id);
     if (token) {
-      void loadLibraryScopedState(token, id).catch((error) => {
+      const library = libraries.find((item) => item.id === id);
+      void loadLibraryScopedState(token, id, isLibraryManagerRole(library?.currentUserRole ?? currentUser?.role ?? "")).catch((error) => {
         setMessage(error instanceof Error ? error.message : String(error));
       });
     }
@@ -263,6 +273,7 @@ export function App() {
     setUsers([]);
     setStorageRoots([]);
     setActivityItems([]);
+    setLibraryActivityItems([]);
   };
 
   const toggleColorTheme = () => {
@@ -330,6 +341,7 @@ export function App() {
     token: token ?? "",
     assetTotal: effectiveAssetTotal,
     activityItems,
+    libraryActivityItems,
     refreshAll,
     setMessage,
     previewMode
@@ -600,7 +612,9 @@ function LibrariesPage({
   token,
   libraries,
   users,
+  storageRoots,
   libraryMembers,
+  libraryActivityItems,
   selectedLibraryId,
   setSelectedLibraryId,
   refreshAll,
@@ -617,6 +631,7 @@ function LibrariesPage({
   const [memberRole, setMemberRole] = useState("viewer");
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const activeLibrary = libraries.find((item) => item.id === viewLibraryId) ?? null;
+  const libraryManagerCount = libraryMembers.filter((member) => isLibraryManagerRole(member.role)).length;
   const availableUsers = useMemo(
     () => users.filter((user) => !libraryMembers.some((member) => member.userId === user.id)),
     [libraryMembers, users]
@@ -771,6 +786,7 @@ function LibrariesPage({
   };
 
   if (activeLibrary) {
+    const visibleMemberCount = Math.max(libraryMembers.length, activeLibrary.memberNames?.length ?? 0);
     return (
       <PageFrame
         title={t("libraries")}
@@ -803,7 +819,7 @@ function LibrariesPage({
           </CardHeader>
           <CardContent className="library-detail-stats p-0">
             <LibraryDetailStat label={t("totalSize")} value={formatBytes(activeLibrary.totalSizeBytes)} />
-            <LibraryDetailStat label={t("members")} value={formatCount(libraryMembers.length)} />
+            <LibraryDetailStat label={t("members")} value={formatCount(visibleMemberCount)} />
             <LibraryDetailStat label={t("assets")} value={formatCount(activeLibrary.assetCount)} />
             <LibraryDetailStat label={t("tags")} value={formatCount(activeLibrary.tagCount)} />
             <LibraryDetailStat label={t("creator")} value={activeLibrary.creatorName || "-"} />
@@ -827,24 +843,71 @@ function LibrariesPage({
             }
           >
             {libraryMembers.length === 0 ? (
-              <div className="placeholder-box">{t("noMembers")}</div>
+              activeLibrary.memberNames && activeLibrary.memberNames.length > 0 ? (
+                <div className="member-list">
+                  {activeLibrary.memberNames.map((name) => (
+                    <div className="member-row is-readonly" key={name}>
+                      <div>
+                        <strong>{name}</strong>
+                        <span>{t("readOnly")}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="placeholder-box">{t("noMembers")}</div>
+              )
             ) : (
               <div className="member-list">
-                {libraryMembers.map((member) => (
-                  <div className="member-row" key={member.userId}>
-                    <div>
-                      <strong>{member.displayName}</strong>
-                      <span>{member.email}</span>
+                {libraryMembers.map((member) => {
+                  const removingWouldOrphanLibrary = isLibraryManagerRole(member.role) && libraryManagerCount <= 1;
+                  return (
+                    <div className="member-row" key={member.userId}>
+                      <div>
+                        <strong>{member.displayName}</strong>
+                        <span>{member.email}</span>
+                      </div>
+                      <UiBadge className="member-role-badge" variant="secondary">{roleLabel(t, member.role)}</UiBadge>
+                      <Button
+                        className="member-action-button"
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => void removeMember(member)}
+                        disabled={removingWouldOrphanLibrary}
+                      >
+                        <Trash2 size={15} />
+                        <span>{t("remove")}</span>
+                      </Button>
                     </div>
-                    <UiBadge className="member-role-badge" variant="secondary">{roleLabel(t, member.role)}</UiBadge>
-                    <Button className="member-action-button" size="sm" type="button" variant="outline" onClick={() => void removeMember(member)}>
-                      <Trash2 size={15} />
-                      <span>{t("remove")}</span>
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
+          </Panel>
+          <Panel
+            title={t("libraryStorage")}
+            icon={Network}
+            className="span-6"
+            action={<Badge>{storageRoots.length ? t("realData") : t("empty")}</Badge>}
+          >
+            <DataTable
+              emptyLabel={t("noSharedRoots")}
+              columns={[t("name"), t("provider"), t("status")]}
+              rows={storageRoots.map((root) => [
+                root.name,
+                root.kind,
+                root.enabled ? t("enabled") : t("disabled")
+              ])}
+            />
+          </Panel>
+          <Panel
+            title={t("libraryActivity")}
+            icon={ListChecks}
+            className="span-6"
+            action={<Badge>{libraryActivityItems.length ? t("realData") : t("empty")}</Badge>}
+          >
+            <ActivityList t={t} activityItems={libraryActivityItems} compact />
           </Panel>
         </div>
       </div>
@@ -1239,6 +1302,7 @@ function UsersPage({ t, token, users, currentUser, refreshAll, setMessage }: Pag
   const [isActive, setIsActive] = useState(true);
   const [query, setQuery] = useState("");
 
+  const canManageUsers = canManageServerRole(currentUser?.role ?? "");
   const canAssignOwner = currentUser?.role === "owner";
   const filteredUsers = useMemo(() => {
     const value = query.trim().toLocaleLowerCase();
@@ -1352,7 +1416,7 @@ function UsersPage({ t, token, users, currentUser, refreshAll, setMessage }: Pag
         icon={Users}
         className="span-12"
         action={
-          <Button className="panel-action-button" size="sm" type="button" onClick={openCreateDialog}>
+          <Button className="panel-action-button" size="sm" type="button" onClick={openCreateDialog} disabled={!canManageUsers}>
             <UserPlus size={15} />
             <span>{t("createUser")}</span>
           </Button>
@@ -1384,7 +1448,7 @@ function UsersPage({ t, token, users, currentUser, refreshAll, setMessage }: Pag
               ) : (
                 filteredUsers.map((item) => {
                   const isOwnerUser = item.globalRole === "owner";
-                  const canEditUser = canAssignOwner || !isOwnerUser;
+                  const canEditUser = canManageUsers && (canAssignOwner || !isOwnerUser);
                   return (
                     <tr key={item.id}>
                       <td>{item.displayName}</td>
@@ -2054,6 +2118,7 @@ type PageContext = TranslatorContext & {
   token: string;
   assetTotal: number;
   activityItems: ActivityItem[];
+  libraryActivityItems: ActivityItem[];
   refreshAll: () => Promise<void>;
   setMessage: (message: string | null) => void;
   previewMode: boolean;
@@ -2151,37 +2216,34 @@ function DataTable({ columns, rows, emptyLabel }: { columns: string[]; rows: str
 }
 
 function ActivityList({ t, activityItems, compact = false }: TranslatorContext & { activityItems: ActivityItem[]; compact?: boolean }) {
-  const rows = activityItems.length
-    ? activityItems.map((item) => ({
-        actor: item.actorDisplayName ?? item.actorEmail ?? item.actorUserId ?? t("system"),
-        action: activityActionLabel(t, item.action),
-        target: item.targetName ?? item.targetType ?? t("unknownTarget"),
-        time: new Date(item.createdAt).toLocaleString()
-      }))
-    : mockActivity.map((item) => ({
-        actor: item.actor === "system" ? t("system") : item.actor,
-        action: t(item.action),
-        target: item.target,
-        time: item.time === "yesterday" ? t("yesterday") : item.time
-      }));
+  const rows = activityItems.map((item) => ({
+    actor: item.actorDisplayName ?? item.actorEmail ?? item.actorUserId ?? t("system"),
+    action: activityActionLabel(t, item.action),
+    target: item.targetName ?? item.targetType ?? t("unknownTarget"),
+    time: new Date(item.createdAt).toLocaleString()
+  }));
 
   return (
     <div className={`activity-list${compact ? " is-compact" : ""}`}>
-      {rows.map((item) => (
-        <div className="activity-item" key={`${item.actor}-${item.time}-${item.action}`}>
-          <div className="activity-avatar">{item.actor.slice(0, 1).toUpperCase()}</div>
-          <div className="activity-main">
-            <div className="activity-action">{item.action}</div>
-            <div className="activity-meta">
-              {item.actor} / {item.target}
+      {rows.length === 0 ? (
+        <div className="activity-empty">{t("empty")}</div>
+      ) : (
+        rows.map((item) => (
+          <div className="activity-item" key={`${item.actor}-${item.time}-${item.action}`}>
+            <div className="activity-avatar">{item.actor.slice(0, 1).toUpperCase()}</div>
+            <div className="activity-main">
+              <div className="activity-action">{item.action}</div>
+              <div className="activity-meta">
+                {item.actor} / {item.target}
+              </div>
             </div>
+            <div className="activity-time">{item.time}</div>
           </div>
-          <div className="activity-time">{item.time}</div>
-        </div>
-      ))}
+        ))
+      )}
       {!compact && (
         <div className="activity-footer">
-          <StatusDot label={activityItems.length ? t("realData") : t("placeholderData")} tone={activityItems.length ? "good" : "muted"} />
+          <StatusDot label={activityItems.length ? t("realData") : t("empty")} tone={activityItems.length ? "good" : "muted"} />
         </div>
       )}
     </div>
@@ -2344,8 +2406,18 @@ function roleLabel(t: ReturnType<typeof createTranslator>, role: string) {
   return role;
 }
 
+function isLibraryManagerRole(role: string) {
+  return role === "owner" || role === "admin" || role === "library_manager" || role === "manager";
+}
+
+function canManageServerRole(role: string) {
+  return role === "owner" || role === "admin";
+}
+
 function activityActionLabel(t: ReturnType<typeof createTranslator>, action: string) {
   switch (action) {
+    case "server.owner_created":
+      return t("ownerCreated");
     case "library.created":
       return t("libraryCreated");
     case "library.updated":

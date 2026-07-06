@@ -1,6 +1,6 @@
 use crate::{
     auth::AuthUser,
-    error::AppResult,
+    error::{AppError, AppResult},
     models::{LibraryMemberRecord, Role},
     routes::access::ensure_library_manager,
     state::AppState,
@@ -56,6 +56,23 @@ pub async fn upsert_member(
     Json(request): Json<UpsertMemberRequest>,
 ) -> AppResult<Json<LibraryMemberRecord>> {
     ensure_library_manager(&state, &actor, library_id).await?;
+
+    let target_is_active: Option<bool> =
+        sqlx::query_scalar("SELECT is_active FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&state.pool)
+            .await?;
+    match target_is_active {
+        Some(true) => {}
+        Some(false) => return Err(AppError::BadRequest("user is disabled".to_string())),
+        None => return Err(AppError::NotFound("user not found".to_string())),
+    }
+
+    if let Some(current_role) = current_library_role(&state, library_id, user_id).await? {
+        if current_role.can_manage_library() && !request.role.can_manage_library() {
+            ensure_another_library_manager(&state, library_id, user_id).await?;
+        }
+    }
 
     let mut tx = state.pool.begin().await?;
 
@@ -119,6 +136,12 @@ pub async fn remove_member(
 ) -> AppResult<StatusCode> {
     ensure_library_manager(&state, &actor, library_id).await?;
 
+    if let Some(current_role) = current_library_role(&state, library_id, user_id).await? {
+        if current_role.can_manage_library() {
+            ensure_another_library_manager(&state, library_id, user_id).await?;
+        }
+    }
+
     let mut tx = state.pool.begin().await?;
 
     let deleted = sqlx::query(
@@ -133,9 +156,7 @@ pub async fn remove_member(
     .await?;
 
     if deleted.rows_affected() == 0 {
-        return Err(crate::error::AppError::NotFound(
-            "library member not found".to_string(),
-        ));
+        return Err(AppError::NotFound("library member not found".to_string()));
     }
 
     sqlx::query(
@@ -154,4 +175,54 @@ pub async fn remove_member(
     tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn current_library_role(
+    state: &AppState,
+    library_id: Uuid,
+    user_id: Uuid,
+) -> AppResult<Option<Role>> {
+    let role_value: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT role
+        FROM library_memberships
+        WHERE library_id = $1 AND user_id = $2
+        "#,
+    )
+    .bind(library_id)
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    role_value
+        .map(|value| value.parse::<Role>().map_err(|_| AppError::Forbidden))
+        .transpose()
+}
+
+async fn ensure_another_library_manager(
+    state: &AppState,
+    library_id: Uuid,
+    user_id: Uuid,
+) -> AppResult<()> {
+    let count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM library_memberships
+        WHERE library_id = $1
+            AND user_id <> $2
+            AND role IN ('owner', 'admin', 'library_manager')
+        "#,
+    )
+    .bind(library_id)
+    .bind(user_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    if count == 0 {
+        return Err(AppError::Conflict(
+            "at least one library manager is required".to_string(),
+        ));
+    }
+
+    Ok(())
 }

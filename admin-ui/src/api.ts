@@ -261,6 +261,8 @@ export const api = {
     }),
   listAssets: (token: string, libraryId: string) =>
     request<AssetListResponse>(`/api/v1/libraries/${libraryId}/assets?limit=1&offset=0`, { token }),
+  listServerActivity: (token: string) =>
+    request<ActivityListResponse>("/api/v1/activity?limit=20&offset=0", { token }),
   listActivity: (token: string, libraryId: string) =>
     request<ActivityListResponse>(`/api/v1/libraries/${libraryId}/activity?limit=10&offset=0`, { token })
 };

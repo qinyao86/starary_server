@@ -61,6 +61,7 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/libraries/:library_id/activity",
             get(activity::list_activity),
         )
+        .route("/api/v1/activity", get(activity::list_server_activity))
         .route(
             "/api/v1/storage-roots",
             get(storage_roots::list_storage_roots).post(storage_roots::create_storage_root),
