@@ -3,7 +3,7 @@ export type Language = "en" | "zh";
 export const dictionaries = {
   en: {
     appName: "Mad Library Server",
-    admin: "Admin",
+    admin: "Console",
     local: "Local",
     cloud: "Cloud",
     online: "Online",
@@ -204,6 +204,7 @@ export const dictionaries = {
     formRequiredHint: "Required fields are missing.",
     saved: "Saved",
     addMember: "Add Member",
+    addMemberHint: "Choose a server user and assign their role in this library.",
     remove: "Remove",
     noAvailableUsers: "No available users",
     noDescription: "No description",
@@ -222,7 +223,7 @@ export const dictionaries = {
   },
   zh: {
     appName: "Mad Library \u670d\u52a1\u7aef",
-    admin: "\u7ba1\u7406\u53f0",
+    admin: "\u63a7\u5236\u53f0",
     local: "\u672c\u5730",
     cloud: "\u7ebf\u4e0a",
     online: "\u5728\u7ebf",
@@ -423,6 +424,7 @@ export const dictionaries = {
     formRequiredHint: "\u8bf7\u586b\u5199\u5fc5\u586b\u9879\u3002",
     saved: "\u5df2\u4fdd\u5b58",
     addMember: "\u6dfb\u52a0\u6210\u5458",
+    addMemberHint: "\u9009\u62e9\u670d\u52a1\u7aef\u7528\u6237\uff0c\u5e76\u5206\u914d\u4ed6\u5728\u8fd9\u4e2a\u8d44\u6e90\u5e93\u4e2d\u7684\u89d2\u8272\u3002",
     remove: "\u79fb\u9664",
     noAvailableUsers: "\u6ca1\u6709\u53ef\u6dfb\u52a0\u7684\u7528\u6237",
     noDescription: "\u6682\u65e0\u63cf\u8ff0",

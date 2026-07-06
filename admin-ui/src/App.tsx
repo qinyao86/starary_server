@@ -429,7 +429,7 @@ export function App() {
         </header>
 
         {message && (
-          <div className="message-bar">
+          <div className="message-bar" role="status" aria-live="polite">
             <span>{message}</span>
             <button type="button" onClick={() => setMessage(null)}>
               x
@@ -470,18 +470,20 @@ function renderSection(section: Section, context: PageContext) {
 
 function PageFrame({
   title,
+  titleSlot,
   action,
   children
 }: {
   title: string;
   description: string;
+  titleSlot?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="page-frame">
       <div className="page-intro">
-        <h2>{title}</h2>
+        {titleSlot ?? <h2>{title}</h2>}
         {action && <div className="page-intro-action">{action}</div>}
       </div>
       {children}
@@ -614,6 +616,7 @@ function LibrariesPage({
   const [editDescription, setEditDescription] = useState("");
   const [memberUserId, setMemberUserId] = useState("");
   const [memberRole, setMemberRole] = useState("viewer");
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const activeLibrary = libraries.find((item) => item.id === viewLibraryId) ?? null;
   const availableUsers = useMemo(
     () => users.filter((user) => !libraryMembers.some((member) => member.userId === user.id)),
@@ -627,6 +630,16 @@ function LibrariesPage({
       setMemberUserId(availableUsers[0]?.id ?? "");
     }
   }, [availableUsers, memberUserId]);
+
+  const openMemberDialog = () => {
+    setMemberUserId(availableUsers[0]?.id ?? "");
+    setMemberRole("viewer");
+    setMemberDialogOpen(true);
+  };
+
+  const closeMemberDialog = () => {
+    setMemberDialogOpen(false);
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -736,6 +749,7 @@ function LibrariesPage({
     }
     try {
       await api.upsertLibraryMember(token, selectedLibraryId, memberUserId, { role: memberRole });
+      closeMemberDialog();
       setMessage(t("saved"));
       await refreshAll();
     } catch (error) {
@@ -762,15 +776,26 @@ function LibrariesPage({
       <PageFrame
         title={t("libraries")}
         description={t("libraryPageHint")}
-       
-        action={
-          <Button type="button" variant="outline" onClick={() => setViewLibraryId(null)}>
+        titleSlot={
+          <button className="page-back-button" type="button" onClick={() => setViewLibraryId(null)}>
             <ArrowLeft size={16} />
             <span>{t("backToLibraries")}</span>
-          </Button>
+          </button>
         }
       >
       <div className="library-page">
+        <MemberDialog
+          open={memberDialogOpen}
+          t={t}
+          users={availableUsers}
+          memberUserId={memberUserId}
+          memberRole={memberRole}
+          onClose={closeMemberDialog}
+          onRoleChange={setMemberRole}
+          onSubmit={submitMember}
+          onUserChange={setMemberUserId}
+        />
+
         <Card className="library-detail-hero">
           <CardHeader className="p-0">
             <CardDescription>{t("libraryDetails")}</CardDescription>
@@ -778,48 +803,30 @@ function LibrariesPage({
             <CardDescription>{activeLibrary.description || t("noDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="library-detail-stats p-0">
-            <div>
-              <span>{t("role")}</span>
-              <strong>{roleLabel(t, activeLibrary.currentUserRole ?? "owner")}</strong>
-            </div>
-            <div>
-              <span>{t("members")}</span>
-              <strong>{libraryMembers.length}</strong>
-            </div>
+            <LibraryDetailStat label={t("totalSize")} value={formatBytes(activeLibrary.totalSizeBytes)} />
+            <LibraryDetailStat label={t("members")} value={formatCount(libraryMembers.length)} />
+            <LibraryDetailStat label={t("assets")} value={formatCount(activeLibrary.assetCount)} />
+            <LibraryDetailStat label={t("tags")} value={formatCount(activeLibrary.tagCount)} />
+            <LibraryDetailStat label={t("creator")} value={activeLibrary.creatorName || "-"} />
+            <LibraryDetailStat label={t("role")} value={roleLabel(t, activeLibrary.currentUserRole ?? "owner")} />
           </CardContent>
         </Card>
 
         <div className="page-grid">
-          <Panel title={t("addMember")} icon={UserPlus} className="span-4">
-            <form className="form-stack" onSubmit={submitMember}>
-              <label className="field">
-                <span>{t("users")}</span>
-                <select value={memberUserId} onChange={(event) => setMemberUserId(event.target.value)}>
-                  {availableUsers.length === 0 ? (
-                    <option value="">{t("noAvailableUsers")}</option>
-                  ) : (
-                    availableUsers.map((item) => (
-                      <option key={item.id} value={item.id}>{item.displayName} ({item.email})</option>
-                    ))
-                  )}
-                </select>
-              </label>
-              <label className="field">
-                <span>{t("role")}</span>
-                <select value={memberRole} onChange={(event) => setMemberRole(event.target.value)}>
-                  <option value="library_manager">{t("manager")}</option>
-                  <option value="editor">{t("editor")}</option>
-                  <option value="viewer">{t("viewer")}</option>
-                </select>
-              </label>
-              <Button type="submit" disabled={!memberUserId}>
-                <UserPlus size={16} />
-                <span>{t("addMember")}</span>
-              </Button>
-            </form>
-          </Panel>
-
-          <Panel title={t("libraryMembers")} icon={Users} className="span-8" action={<UiBadge>{libraryMembers.length ? t("realData") : t("empty")}</UiBadge>}>
+          <Panel
+            title={t("libraryMembers")}
+            icon={Users}
+            className="span-12"
+            action={
+              <div className="panel-actions">
+                <UiBadge className="control-badge" variant="secondary">{libraryMembers.length ? t("realData") : t("empty")}</UiBadge>
+                <Button className="panel-action-button" size="sm" type="button" onClick={openMemberDialog} disabled={availableUsers.length === 0}>
+                  <UserPlus size={15} />
+                  <span>{t("addMember")}</span>
+                </Button>
+              </div>
+            }
+          >
             {libraryMembers.length === 0 ? (
               <div className="placeholder-box">{t("noMembers")}</div>
             ) : (
@@ -830,8 +837,8 @@ function LibrariesPage({
                       <strong>{member.displayName}</strong>
                       <span>{member.email}</span>
                     </div>
-                    <UiBadge variant="secondary">{roleLabel(t, member.role)}</UiBadge>
-                    <Button size="sm" type="button" variant="outline" onClick={() => void removeMember(member)}>
+                    <UiBadge className="member-role-badge" variant="secondary">{roleLabel(t, member.role)}</UiBadge>
+                    <Button className="member-action-button" size="sm" type="button" variant="outline" onClick={() => void removeMember(member)}>
                       <Trash2 size={15} />
                       <span>{t("remove")}</span>
                     </Button>
@@ -1002,9 +1009,104 @@ function LibraryDialog({
   );
 }
 
+function MemberDialog({
+  open,
+  t,
+  users,
+  memberUserId,
+  memberRole,
+  onClose,
+  onRoleChange,
+  onSubmit,
+  onUserChange
+}: TranslatorContext & {
+  open: boolean;
+  users: TeamUser[];
+  memberUserId: string;
+  memberRole: string;
+  onClose: () => void;
+  onRoleChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void | Promise<void>;
+  onUserChange: (value: string) => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="dialog-panel member-dialog" role="dialog" aria-modal="true" aria-labelledby="member-dialog-title">
+        <div className="dialog-header">
+          <div>
+            <h2 className="dialog-title" id="member-dialog-title">{t("addMember")}</h2>
+            <p className="dialog-subtitle">{t("addMemberHint")}</p>
+          </div>
+          <Button className="dialog-close" type="button" variant="ghost" size="icon" aria-label={t("cancel")} onClick={onClose}>
+            <X size={16} />
+          </Button>
+        </div>
+        <form className="dialog-form" onSubmit={onSubmit}>
+          <div className="dialog-body">
+            {users.length === 0 ? (
+              <div className="placeholder-box">{t("noAvailableUsers")}</div>
+            ) : (
+              <>
+                <label className="field">
+                  <span>{t("users")}</span>
+                  <select value={memberUserId} onChange={(event) => onUserChange(event.target.value)}>
+                    {users.map((item) => (
+                      <option key={item.id} value={item.id}>{item.displayName} ({item.email})</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>{t("role")}</span>
+                  <select value={memberRole} onChange={(event) => onRoleChange(event.target.value)}>
+                    <option value="library_manager">{t("manager")}</option>
+                    <option value="editor">{t("editor")}</option>
+                    <option value="viewer">{t("viewer")}</option>
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
+          <div className="dialog-footer">
+            <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>
+            <Button type="submit" disabled={!memberUserId || users.length === 0}>{t("submit")}</Button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 function LibraryStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="library-card-stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function LibraryDetailStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="library-detail-stat">
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
