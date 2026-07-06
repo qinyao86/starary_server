@@ -91,9 +91,12 @@ export type ActivityItem = {
   id: string;
   libraryId?: string | null;
   actorUserId?: string | null;
+  actorDisplayName?: string | null;
+  actorEmail?: string | null;
   action: string;
   targetType: string;
   targetId?: string | null;
+  targetName?: string | null;
   details: Record<string, unknown>;
   createdAt: string;
 };
@@ -171,6 +174,16 @@ export const api = {
       token,
       body: JSON.stringify(payload)
     }),
+  updateUser: (
+    token: string,
+    userId: string,
+    payload: { displayName?: string; role?: string; isActive?: boolean; password?: string }
+  ) =>
+    request<TeamUser>(`/api/v1/users/${userId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload)
+    }),
   listLibraries: (token: string) => request<TeamLibrary[]>("/api/v1/libraries", { token }),
   createLibrary: (token: string, payload: { name: string; description?: string }) =>
     request<TeamLibrary>("/api/v1/libraries", {
@@ -221,6 +234,30 @@ export const api = {
       method: "POST",
       token,
       body: JSON.stringify(payload)
+    }),
+  updateStorageRoot: (
+    token: string,
+    rootId: string,
+    payload: {
+      name: string;
+      kind: string;
+      canonicalUri: string;
+      windowsUncPath?: string;
+      windowsMappedDriveAliases?: string[];
+      macosSmbUrl?: string;
+      macosMountAliases?: string[];
+      enabled: boolean;
+    }
+  ) =>
+    request<StorageRoot>(`/api/v1/storage-roots/${rootId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload)
+    }),
+  deleteStorageRoot: (token: string, rootId: string) =>
+    request<void>(`/api/v1/storage-roots/${rootId}`, {
+      method: "DELETE",
+      token
     }),
   listAssets: (token: string, libraryId: string) =>
     request<AssetListResponse>(`/api/v1/libraries/${libraryId}/assets?limit=1&offset=0`, { token }),

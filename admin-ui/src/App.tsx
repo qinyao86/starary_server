@@ -56,7 +56,6 @@ import {
   assetBreakdown,
   libraries as designLibraries,
   permissions,
-  sharedRoots as mockSharedRoots,
   users as designUsers
 } from "./mockData";
 
@@ -1113,15 +1112,172 @@ function LibraryDetailStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function UsersPage({ t, token, users, refreshAll, setMessage }: PageContext) {
+function UserDialog({
+  canAssignOwner,
+  displayName,
+  editingUser,
+  email,
+  isActive,
+  open,
+  password,
+  role,
+  t,
+  onClose,
+  onDisplayNameChange,
+  onEmailChange,
+  onIsActiveChange,
+  onPasswordChange,
+  onRoleChange,
+  onSubmit
+}: TranslatorContext & {
+  canAssignOwner: boolean;
+  displayName: string;
+  editingUser: TeamUser | null;
+  email: string;
+  isActive: boolean;
+  open: boolean;
+  password: string;
+  role: string;
+  onClose: () => void;
+  onDisplayNameChange: (value: string) => void;
+  onEmailChange: (value: string) => void;
+  onIsActiveChange: (value: boolean) => void;
+  onPasswordChange: (value: string) => void;
+  onRoleChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void | Promise<void>;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
+  if (!open) return null;
+
+  const title = editingUser ? t("editUser") : t("createUser");
+
+  return (
+    <div
+      className="dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="dialog-panel user-dialog" role="dialog" aria-modal="true" aria-labelledby="user-dialog-title">
+        <div className="dialog-header">
+          <div>
+            <h2 className="dialog-title" id="user-dialog-title">{title}</h2>
+            <p className="dialog-subtitle">{t("usersPageHint")}</p>
+          </div>
+          <Button className="dialog-close" type="button" variant="ghost" size="icon" aria-label={t("cancel")} onClick={onClose}>
+            <X size={16} />
+          </Button>
+        </div>
+        <form className="dialog-form" onSubmit={onSubmit}>
+          <div className="dialog-body">
+            {editingUser ? (
+              <div className="readonly-field">
+                <span>{t("email")}</span>
+                <strong>{email}</strong>
+              </div>
+            ) : (
+              <TextField autoFocus required label={t("email")} value={email} onChange={onEmailChange} />
+            )}
+            <TextField label={t("displayName")} value={displayName} onChange={onDisplayNameChange} />
+            <label className="field">
+              <span>{t("role")}</span>
+              <select value={role} onChange={(event) => onRoleChange(event.target.value)}>
+                {canAssignOwner && <option value="owner">{t("owner")}</option>}
+                <option value="admin">{t("adminRole")}</option>
+                <option value="library_manager">{t("manager")}</option>
+                <option value="editor">{t("editor")}</option>
+                <option value="viewer">{t("viewer")}</option>
+              </select>
+            </label>
+            {editingUser && (
+              <label className="field">
+                <span>{t("status")}</span>
+                <select value={isActive ? "enabled" : "disabled"} onChange={(event) => onIsActiveChange(event.target.value === "enabled")}>
+                  <option value="enabled">{t("enabled")}</option>
+                  <option value="disabled">{t("disabled")}</option>
+                </select>
+              </label>
+            )}
+            <TextField
+              label={editingUser ? t("newPassword") : t("password")}
+              value={password}
+              onChange={onPasswordChange}
+              type="password"
+              required={!editingUser}
+              placeholder={editingUser ? t("passwordOptional") : undefined}
+            />
+            {editingUser && <p className="dialog-hint">{t("passwordOptional")}</p>}
+          </div>
+          <div className="dialog-footer">
+            <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>
+            <Button type="submit">{t("submit")}</Button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function UsersPage({ t, token, users, currentUser, refreshAll, setMessage }: PageContext) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<TeamUser | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState("viewer");
+  const [isActive, setIsActive] = useState(true);
+  const [query, setQuery] = useState("");
 
-  const submit = async (event: React.FormEvent) => {
+  const canAssignOwner = currentUser?.role === "owner";
+  const filteredUsers = useMemo(() => {
+    const value = query.trim().toLocaleLowerCase();
+    if (!value) return users;
+    return users.filter((item) =>
+      [item.displayName, item.email, roleLabel(t, item.globalRole), item.isActive ? t("enabled") : t("disabled")]
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(value)
+    );
+  }, [query, t, users]);
+
+  const openCreateDialog = () => {
+    setEditingUser(null);
+    setEmail("");
+    setPassword("");
+    setDisplayName("");
+    setRole("viewer");
+    setIsActive(true);
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (user: TeamUser) => {
+    setEditingUser(user);
+    setEmail(user.email);
+    setPassword("");
+    setDisplayName(user.displayName);
+    setRole(user.globalRole);
+    setIsActive(user.isActive);
+    setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+  };
+
+  const submitUser = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!email.trim() || !password.trim()) {
+    if (!editingUser && (!email.trim() || !password.trim())) {
       setMessage(t("formRequiredHint"));
       return;
     }
@@ -1130,16 +1286,40 @@ function UsersPage({ t, token, users, refreshAll, setMessage }: PageContext) {
       return;
     }
     try {
-      await api.createUser(token, {
-        email: email.trim(),
-        password,
-        displayName: displayName.trim() || undefined,
-        role
+      if (editingUser) {
+        await api.updateUser(token, editingUser.id, {
+          displayName: displayName.trim() || undefined,
+          role,
+          isActive,
+          password: password.trim() || undefined
+        });
+      } else {
+        await api.createUser(token, {
+          email: email.trim(),
+          password,
+          displayName: displayName.trim() || undefined,
+          role
+        });
+      }
+      closeDialog();
+      setMessage(t("saved"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const toggleUserActive = async (user: TeamUser) => {
+    if (!token) {
+      setMessage(t("plannedNote"));
+      return;
+    }
+    try {
+      await api.updateUser(token, user.id, {
+        displayName: user.displayName,
+        role: user.globalRole,
+        isActive: !user.isActive
       });
-      setEmail("");
-      setPassword("");
-      setDisplayName("");
-      setRole("viewer");
       setMessage(t("saved"));
       await refreshAll();
     } catch (error) {
@@ -1149,36 +1329,87 @@ function UsersPage({ t, token, users, refreshAll, setMessage }: PageContext) {
 
   return (
     <div className="page-grid">
-      <Panel title={t("createUser")} icon={Users} className="span-4">
-        <form className="form-stack" onSubmit={submit}>
-          <TextField label={t("email")} value={email} onChange={setEmail} />
-          <TextField label={t("password")} value={password} onChange={setPassword} type="password" />
-          <TextField label={t("displayName")} value={displayName} onChange={setDisplayName} />
-          <label className="field">
-            <span>{t("role")}</span>
-            <select value={role} onChange={(event) => setRole(event.target.value)}>
-              <option value="admin">{t("adminRole")}</option>
-              <option value="library_manager">{t("manager")}</option>
-              <option value="editor">{t("editor")}</option>
-              <option value="viewer">{t("viewer")}</option>
-            </select>
-          </label>
-          <button className="primary-button" type="submit">{t("submit")}</button>
-        </form>
-      </Panel>
-      <Panel title={t("users")} icon={Users} className="span-8">
+      <UserDialog
+        canAssignOwner={canAssignOwner}
+        displayName={displayName}
+        editingUser={editingUser}
+        email={email}
+        isActive={isActive}
+        open={dialogOpen}
+        password={password}
+        role={role}
+        t={t}
+        onClose={closeDialog}
+        onDisplayNameChange={setDisplayName}
+        onEmailChange={setEmail}
+        onIsActiveChange={setIsActive}
+        onPasswordChange={setPassword}
+        onRoleChange={setRole}
+        onSubmit={submitUser}
+      />
+      <Panel
+        title={t("users")}
+        icon={Users}
+        className="span-12"
+        action={
+          <Button className="panel-action-button" size="sm" type="button" onClick={openCreateDialog}>
+            <UserPlus size={15} />
+            <span>{t("createUser")}</span>
+          </Button>
+        }
+      >
         <div className="toolbar-strip">
           <div className="search-box">
             <Search size={16} />
-            <span>{t("search")}</span>
+            <input value={query} placeholder={t("search")} onChange={(event) => setQuery(event.target.value)} />
           </div>
           <StatusDot label={`${t("seatUsage")} ${users.length}`} tone="good" />
         </div>
-        <DataTable
-          emptyLabel={t("empty")}
-          columns={[t("name"), t("email"), t("role"), t("status")]}
-          rows={users.map((item) => [item.displayName, item.email, roleLabel(t, item.globalRole), item.isActive ? t("enabled") : t("disabled")])}
-        />
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t("name")}</th>
+                <th>{t("email")}</th>
+                <th>{t("role")}</th>
+                <th>{t("status")}</th>
+                <th>{t("action")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>{t("empty")}</td>
+                </tr>
+              ) : (
+                filteredUsers.map((item) => {
+                  const isOwnerUser = item.globalRole === "owner";
+                  const canEditUser = canAssignOwner || !isOwnerUser;
+                  return (
+                    <tr key={item.id}>
+                      <td>{item.displayName}</td>
+                      <td>{item.email}</td>
+                      <td>{roleLabel(t, item.globalRole)}</td>
+                      <td><span className={`status-pill${item.isActive ? " is-on" : " is-off"}`}>{item.isActive ? t("enabled") : t("disabled")}</span></td>
+                      <td>
+                        <div className="table-actions">
+                          <Button className="table-action-button" size="sm" type="button" variant="outline" onClick={() => openEditDialog(item)} disabled={!canEditUser}>
+                            <Pencil size={14} />
+                            <span>{t("edit")}</span>
+                          </Button>
+                          <Button className="table-action-button" size="sm" type="button" variant="outline" onClick={() => void toggleUserActive(item)} disabled={!canEditUser}>
+                            <Power size={14} />
+                            <span>{item.isActive ? t("deactivate") : t("activate")}</span>
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </Panel>
     </div>
   );
@@ -1216,7 +1447,147 @@ function PermissionsPage({ t }: TranslatorContext) {
   );
 }
 
+function StorageRootDialog({
+  canonicalUri,
+  editingRoot,
+  enabled,
+  kind,
+  libraries,
+  macosAliases,
+  macosSmbUrl,
+  name,
+  open,
+  selectedLibraryId,
+  t,
+  windowsAliases,
+  windowsUncPath,
+  onCanonicalUriChange,
+  onClose,
+  onEnabledChange,
+  onKindChange,
+  onLibraryChange,
+  onMacosAliasesChange,
+  onMacosSmbUrlChange,
+  onNameChange,
+  onSubmit,
+  onWindowsAliasesChange,
+  onWindowsUncPathChange
+}: TranslatorContext & {
+  canonicalUri: string;
+  editingRoot: StorageRoot | null;
+  enabled: boolean;
+  kind: string;
+  libraries: TeamLibrary[];
+  macosAliases: string;
+  macosSmbUrl: string;
+  name: string;
+  open: boolean;
+  selectedLibraryId: string;
+  windowsAliases: string;
+  windowsUncPath: string;
+  onCanonicalUriChange: (value: string) => void;
+  onClose: () => void;
+  onEnabledChange: (value: boolean) => void;
+  onKindChange: (value: string) => void;
+  onLibraryChange: (value: string) => void;
+  onMacosAliasesChange: (value: string) => void;
+  onMacosSmbUrlChange: (value: string) => void;
+  onNameChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void | Promise<void>;
+  onWindowsAliasesChange: (value: string) => void;
+  onWindowsUncPathChange: (value: string) => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="dialog-panel storage-dialog" role="dialog" aria-modal="true" aria-labelledby="storage-dialog-title">
+        <div className="dialog-header">
+          <div>
+            <h2 className="dialog-title" id="storage-dialog-title">{editingRoot ? t("editStorageRoot") : t("createStorageRoot")}</h2>
+            <p className="dialog-subtitle">{t("storagePageHint")}</p>
+          </div>
+          <Button className="dialog-close" type="button" variant="ghost" size="icon" aria-label={t("cancel")} onClick={onClose}>
+            <X size={16} />
+          </Button>
+        </div>
+        <form className="dialog-form" onSubmit={onSubmit}>
+          <div className="dialog-body dialog-grid">
+            <label className="field">
+              <span>{t("selectLibrary")}</span>
+              <select value={selectedLibraryId} onChange={(event) => onLibraryChange(event.target.value)} disabled={Boolean(editingRoot)}>
+                {libraries.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+            <TextField autoFocus required label={t("name")} value={name} onChange={onNameChange} />
+            <label className="field">
+              <span>{t("kind")}</span>
+              <select value={kind} onChange={(event) => onKindChange(event.target.value)}>
+                <option value="smb">SMB</option>
+                <option value="server_filesystem">Filesystem</option>
+                <option value="s3">S3</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>{t("status")}</span>
+              <select value={enabled ? "enabled" : "disabled"} onChange={(event) => onEnabledChange(event.target.value === "enabled")}>
+                <option value="enabled">{t("enabled")}</option>
+                <option value="disabled">{t("disabled")}</option>
+              </select>
+            </label>
+            <div className="span-field">
+              <TextField required label={t("canonicalUri")} value={canonicalUri} onChange={onCanonicalUriChange} />
+            </div>
+            <TextField label={t("windowsUncPath")} value={windowsUncPath} onChange={onWindowsUncPathChange} />
+            <TextField label={t("windowsAliases")} value={windowsAliases} onChange={onWindowsAliasesChange} placeholder={t("commaSeparated")} />
+            <TextField label={t("macosSmbUrl")} value={macosSmbUrl} onChange={onMacosSmbUrlChange} />
+            <TextField label={t("macosAliases")} value={macosAliases} onChange={onMacosAliasesChange} placeholder={t("commaSeparated")} />
+          </div>
+          <div className="dialog-footer">
+            <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>
+            <Button type="submit">{t("submit")}</Button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function storageRootPayloadFromRecord(root: StorageRoot, enabled = root.enabled) {
+  return {
+    name: root.name,
+    kind: root.kind,
+    canonicalUri: root.canonicalUri,
+    windowsUncPath: root.windowsUncPath ?? undefined,
+    windowsMappedDriveAliases: root.windowsMappedDriveAliases,
+    macosSmbUrl: root.macosSmbUrl ?? undefined,
+    macosMountAliases: root.macosMountAliases,
+    enabled
+  };
+}
+
 function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibraryId, storageRoots, deploymentMode, refreshAll, setMessage }: PageContext) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingRoot, setEditingRoot] = useState<StorageRoot | null>(null);
   const [name, setName] = useState("");
   const [kind, setKind] = useState("smb");
   const [canonicalUri, setCanonicalUri] = useState("");
@@ -1224,8 +1595,44 @@ function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibrar
   const [windowsAliases, setWindowsAliases] = useState("");
   const [macosSmbUrl, setMacosSmbUrl] = useState("");
   const [macosAliases, setMacosAliases] = useState("");
+  const [rootEnabled, setRootEnabled] = useState(true);
 
-  const submit = async (event: React.FormEvent) => {
+  const resetRootForm = () => {
+    setName("");
+    setKind("smb");
+    setCanonicalUri("");
+    setWindowsUncPath("");
+    setWindowsAliases("");
+    setMacosSmbUrl("");
+    setMacosAliases("");
+    setRootEnabled(true);
+  };
+
+  const openCreateDialog = () => {
+    setEditingRoot(null);
+    resetRootForm();
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (root: StorageRoot) => {
+    setEditingRoot(root);
+    setSelectedLibraryId(root.libraryId);
+    setName(root.name);
+    setKind(root.kind);
+    setCanonicalUri(root.canonicalUri);
+    setWindowsUncPath(root.windowsUncPath ?? "");
+    setWindowsAliases(root.windowsMappedDriveAliases.join(", "));
+    setMacosSmbUrl(root.macosSmbUrl ?? "");
+    setMacosAliases(root.macosMountAliases.join(", "));
+    setRootEnabled(root.enabled);
+    setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+  };
+
+  const submitRoot = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedLibraryId || !name.trim() || !canonicalUri.trim()) {
       setMessage(t("formRequiredHint"));
@@ -1236,22 +1643,25 @@ function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibrar
       return;
     }
     try {
-      await api.createStorageRoot(token, {
-        libraryId: selectedLibraryId,
+      const payload = {
         name: name.trim(),
         kind,
         canonicalUri: canonicalUri.trim(),
         windowsUncPath: windowsUncPath.trim() || undefined,
         windowsMappedDriveAliases: splitList(windowsAliases),
         macosSmbUrl: macosSmbUrl.trim() || undefined,
-        macosMountAliases: splitList(macosAliases)
-      });
-      setName("");
-      setCanonicalUri("");
-      setWindowsUncPath("");
-      setWindowsAliases("");
-      setMacosSmbUrl("");
-      setMacosAliases("");
+        macosMountAliases: splitList(macosAliases),
+        enabled: rootEnabled
+      };
+      if (editingRoot) {
+        await api.updateStorageRoot(token, editingRoot.id, payload);
+      } else {
+        await api.createStorageRoot(token, {
+          libraryId: selectedLibraryId,
+          ...payload
+        });
+      }
+      closeDialog();
       setMessage(t("saved"));
       await refreshAll();
     } catch (error) {
@@ -1259,19 +1669,63 @@ function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibrar
     }
   };
 
-  const rows = storageRoots.length
-    ? storageRoots.map((item) => [
-        item.name,
-        item.kind,
-        item.canonicalUri,
-        item.windowsUncPath ?? item.windowsMappedDriveAliases.join(", "),
-        item.macosSmbUrl ?? item.macosMountAliases.join(", "),
-        item.enabled ? t("enabled") : t("disabled")
-      ])
-    : mockSharedRoots.map((item) => [item.name, item.provider, item.canonicalUri, item.windowsHint, item.macosHint, t("placeholderData")]);
+  const toggleStorageRoot = async (root: StorageRoot) => {
+    if (!token) {
+      setMessage(t("plannedNote"));
+      return;
+    }
+    try {
+      await api.updateStorageRoot(token, root.id, storageRootPayloadFromRecord(root, !root.enabled));
+      setMessage(t("saved"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const deleteStorageRoot = async (root: StorageRoot) => {
+    if (!window.confirm(t("deleteStorageRootConfirm"))) return;
+    if (!token) {
+      setMessage(t("plannedNote"));
+      return;
+    }
+    try {
+      await api.deleteStorageRoot(token, root.id);
+      setMessage(t("saved"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   return (
     <div className="page-grid">
+      <StorageRootDialog
+        canonicalUri={canonicalUri}
+        enabled={rootEnabled}
+        editingRoot={editingRoot}
+        kind={kind}
+        libraries={libraries}
+        macosAliases={macosAliases}
+        macosSmbUrl={macosSmbUrl}
+        name={name}
+        open={dialogOpen}
+        selectedLibraryId={selectedLibraryId}
+        t={t}
+        windowsAliases={windowsAliases}
+        windowsUncPath={windowsUncPath}
+        onCanonicalUriChange={setCanonicalUri}
+        onClose={closeDialog}
+        onEnabledChange={setRootEnabled}
+        onKindChange={setKind}
+        onLibraryChange={setSelectedLibraryId}
+        onMacosAliasesChange={setMacosAliases}
+        onMacosSmbUrlChange={setMacosSmbUrl}
+        onNameChange={setName}
+        onSubmit={submitRoot}
+        onWindowsAliasesChange={setWindowsAliases}
+        onWindowsUncPathChange={setWindowsUncPath}
+      />
       <Panel title={t("storage")} icon={HardDrive} className="span-4">
         <InfoStack
           items={[
@@ -1281,9 +1735,19 @@ function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibrar
           ]}
         />
       </Panel>
-      <Panel title={t("createStorageRoot")} icon={Network} className="span-8">
-        <form className="form-grid" onSubmit={submit}>
-          <label className="field">
+      <Panel
+        title={t("sharedRoots")}
+        icon={Network}
+        className="span-8"
+        action={
+          <Button className="panel-action-button" size="sm" type="button" onClick={openCreateDialog} disabled={libraries.length === 0}>
+            <Plus size={15} />
+            <span>{t("createStorageRoot")}</span>
+          </Button>
+        }
+      >
+        <div className="toolbar-strip">
+          <label className="field compact-select-field">
             <span>{t("selectLibrary")}</span>
             <select value={selectedLibraryId} onChange={(event) => setSelectedLibraryId(event.target.value)}>
               {libraries.map((item) => (
@@ -1291,29 +1755,53 @@ function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibrar
               ))}
             </select>
           </label>
-          <TextField label={t("name")} value={name} onChange={setName} />
-          <label className="field">
-            <span>{t("kind")}</span>
-            <select value={kind} onChange={(event) => setKind(event.target.value)}>
-              <option value="smb">SMB</option>
-              <option value="server_filesystem">Filesystem</option>
-              <option value="s3">S3</option>
-            </select>
-          </label>
-          <TextField label={t("canonicalUri")} value={canonicalUri} onChange={setCanonicalUri} />
-          <TextField label={t("windowsUncPath")} value={windowsUncPath} onChange={setWindowsUncPath} />
-          <TextField label={t("windowsAliases")} value={windowsAliases} onChange={setWindowsAliases} placeholder={t("commaSeparated")} />
-          <TextField label={t("macosSmbUrl")} value={macosSmbUrl} onChange={setMacosSmbUrl} />
-          <TextField label={t("macosAliases")} value={macosAliases} onChange={setMacosAliases} placeholder={t("commaSeparated")} />
-          <button className="primary-button" type="submit">{t("submit")}</button>
-        </form>
-      </Panel>
-      <Panel title={t("sharedRoots")} icon={Network} className="span-12" action={<Badge>{storageRoots.length ? t("realData") : t("placeholderData")}</Badge>}>
-        <DataTable
-          emptyLabel={t("noSharedRoots")}
-          columns={[t("name"), t("provider"), t("canonicalUri"), t("windowsHint"), t("macosHint"), t("status")]}
-          rows={rows}
-        />
+          <StatusDot label={storageRoots.length ? t("realData") : t("empty")} tone={storageRoots.length ? "good" : "muted"} />
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t("name")}</th>
+                <th>{t("provider")}</th>
+                <th>{t("canonicalUri")}</th>
+                <th>{t("status")}</th>
+                <th>{t("action")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {storageRoots.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>{t("noSharedRoots")}</td>
+                </tr>
+              ) : (
+                storageRoots.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.name}</td>
+                    <td>{item.kind}</td>
+                    <td>{item.canonicalUri}</td>
+                    <td><span className={`status-pill${item.enabled ? " is-on" : " is-off"}`}>{item.enabled ? t("enabled") : t("disabled")}</span></td>
+                    <td>
+                      <div className="table-actions">
+                        <Button className="table-action-button" size="sm" type="button" variant="outline" onClick={() => openEditDialog(item)}>
+                          <Pencil size={14} />
+                          <span>{t("edit")}</span>
+                        </Button>
+                        <Button className="table-action-button" size="sm" type="button" variant="outline" onClick={() => void toggleStorageRoot(item)}>
+                          <Power size={14} />
+                          <span>{item.enabled ? t("deactivate") : t("activate")}</span>
+                        </Button>
+                        <Button className="table-action-button is-danger" size="sm" type="button" variant="outline" onClick={() => void deleteStorageRoot(item)}>
+                          <Trash2 size={14} />
+                          <span>{t("delete")}</span>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </Panel>
     </div>
   );
@@ -1665,9 +2153,9 @@ function DataTable({ columns, rows, emptyLabel }: { columns: string[]; rows: str
 function ActivityList({ t, activityItems, compact = false }: TranslatorContext & { activityItems: ActivityItem[]; compact?: boolean }) {
   const rows = activityItems.length
     ? activityItems.map((item) => ({
-        actor: item.actorUserId ?? t("system"),
-        action: item.action,
-        target: item.targetType,
+        actor: item.actorDisplayName ?? item.actorEmail ?? item.actorUserId ?? t("system"),
+        action: activityActionLabel(t, item.action),
+        target: item.targetName ?? item.targetType ?? t("unknownTarget"),
         time: new Date(item.createdAt).toLocaleString()
       }))
     : mockActivity.map((item) => ({
@@ -1854,6 +2342,33 @@ function roleLabel(t: ReturnType<typeof createTranslator>, role: string) {
   if (role === "editor") return t("editor");
   if (role === "viewer") return t("viewer");
   return role;
+}
+
+function activityActionLabel(t: ReturnType<typeof createTranslator>, action: string) {
+  switch (action) {
+    case "library.created":
+      return t("libraryCreated");
+    case "library.updated":
+      return t("libraryUpdated");
+    case "library.deleted":
+      return t("libraryDeleted");
+    case "library.member_upserted":
+      return t("memberUpdated");
+    case "library.member_removed":
+      return t("memberRemoved");
+    case "user.created":
+      return t("userCreated");
+    case "user.updated":
+      return t("userUpdated");
+    case "storage_root.created":
+      return t("storageRootCreated");
+    case "storage_root.updated":
+      return t("storageRootUpdated");
+    case "storage_root.deleted":
+      return t("storageRootDeleted");
+    default:
+      return action;
+  }
 }
 
 function deploymentModeLabel(t: ReturnType<typeof createTranslator>, mode: DeploymentMode) {

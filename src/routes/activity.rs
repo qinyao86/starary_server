@@ -39,10 +39,30 @@ pub async fn list_activity(
 
     let items = sqlx::query_as::<_, ActivityLogRecord>(
         r#"
-        SELECT id, library_id, actor_user_id, action, target_type, target_id, details, created_at
-        FROM activity_log
-        WHERE library_id = $1
-        ORDER BY created_at DESC, id DESC
+        SELECT
+            a.id,
+            a.library_id,
+            a.actor_user_id,
+            actor.display_name AS actor_display_name,
+            actor.email AS actor_email,
+            a.action,
+            a.target_type,
+            a.target_id,
+            COALESCE(
+                target_user.display_name,
+                target_library.name,
+                target_root.name,
+                a.details->>'name'
+            ) AS target_name,
+            a.details,
+            a.created_at
+        FROM activity_log a
+        LEFT JOIN users actor ON actor.id = a.actor_user_id
+        LEFT JOIN users target_user ON a.target_type = 'user' AND target_user.id = a.target_id
+        LEFT JOIN team_libraries target_library ON a.target_type = 'library' AND target_library.id = a.target_id
+        LEFT JOIN storage_roots target_root ON a.target_type = 'storage_root' AND target_root.id = a.target_id
+        WHERE a.library_id = $1
+        ORDER BY a.created_at DESC, a.id DESC
         LIMIT $2 OFFSET $3
         "#,
     )

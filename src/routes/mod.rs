@@ -36,6 +36,7 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/users",
             get(users::list_users).post(users::create_user),
         )
+        .route("/api/v1/users/:id", patch(users::update_user))
         .route(
             "/api/v1/libraries",
             get(libraries::list_libraries).post(libraries::create_library),
@@ -66,7 +67,9 @@ pub fn router(state: AppState) -> Router {
         )
         .route(
             "/api/v1/storage-roots/:id",
-            get(storage_roots::get_storage_root),
+            get(storage_roots::get_storage_root)
+                .patch(storage_roots::update_storage_root)
+                .delete(storage_roots::delete_storage_root),
         )
         .with_state(state)
 }

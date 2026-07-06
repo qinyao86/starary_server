@@ -207,9 +207,12 @@ pub struct ActivityLogRecord {
     pub id: Uuid,
     pub library_id: Option<Uuid>,
     pub actor_user_id: Option<Uuid>,
+    pub actor_display_name: Option<String>,
+    pub actor_email: Option<String>,
     pub action: String,
     pub target_type: String,
     pub target_id: Option<Uuid>,
+    pub target_name: Option<String>,
     pub details: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
