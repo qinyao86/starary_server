@@ -1,0 +1,88 @@
+.theme-dark .field input,
+.theme-dark .field select,
+.theme-dark .readonly-field strong,
+.theme-dark .search-box,
+.theme-dark .select-button,
+.theme-dark .power-button,
+.theme-dark .secondary-button,
+.theme-dark .icon-text-button,
+.theme-dark .segmented,
+.theme-dark .bar-track {
+  border-color: #3f3f46;
+  background: #23232a;
+  color: #fafafa;
+}
+
+.theme-dark .field input:focus,
+.theme-dark .field select:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+}
+
+.theme-dark .field input::placeholder,
+.theme-dark .search-box::placeholder {
+  color: #b8bcc6;
+}
+
+.theme-dark .dialog-hint,
+.theme-dark .readonly-field {
+  color: #c4c7cf;
+}
+
+.theme-dark .segmented button {
+  color: #d4d4d8;
+}
+
+.theme-dark .segmented button.is-active {
+  color: #fafafa;
+  background: #27272a;
+}
+
+.theme-dark .primary-button,
+.theme-dark .bar-track span {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.theme-dark .primary-button:hover {
+  background: #2563eb;
+}
+
+.theme-dark .select-button:hover,
+.theme-dark .power-button:hover,
+.theme-dark .secondary-button:hover,
+.theme-dark .sidebar-theme-switch:hover,
+.theme-dark .icon-text-button:hover {
+  background: #27272a;
+  color: #fafafa;
+}
+
+.theme-dark .sidebar-theme-switch,
+.theme-dark .sidebar-logout-button {
+  color: #d4d4d8;
+  background: rgba(39, 39, 42, 0.62);
+}
+
+.theme-dark .sidebar-theme-switch {
+  color: #c4c7cf;
+}
+
+.theme-dark .sidebar-theme-switch-thumb {
+  background: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.24), 0 8px 18px rgba(59, 130, 246, 0.24);
+}
+
+.theme-dark .sidebar-theme-switch-icon.is-light {
+  color: #71717a;
+}
+
+.theme-dark .sidebar-theme-switch-icon.is-dark {
+  color: #dbeafe;
+}
+
+.theme-dark .sidebar-logout-button:hover {
+  border-color: rgba(248, 113, 113, 0.42);
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.2);
+}

@@ -1,0 +1,85 @@
+.panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-badge,
+.member-role-badge,
+.panel-action-button,
+.member-action-button {
+  height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.control-badge,
+.member-role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 0 10px;
+}
+
+.control-badge {
+  color: #2563eb;
+  background: #edf4ff;
+}
+
+.member-role-badge {
+  min-width: 58px;
+  color: #526071;
+  background: #f3f6fa;
+}
+
+.panel-action-button,
+.member-action-button {
+  padding: 0 10px;
+}
+
+.panel-action-button span,
+.member-action-button span,
+.library-card-footer button span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.panel-action-button:disabled {
+  opacity: 1;
+  color: #7a8697;
+  background: #eef3f7;
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+.member-action-button:disabled,
+.table-action-button:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.member-action-button {
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #526071;
+  background: transparent;
+}
+
+.member-action-button:hover {
+  border-color: #f2b8b5;
+  color: #a3261f;
+  background: #fff7f7;
+}
+
+.member-action-button svg,
+.panel-action-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.panel-body {
+  padding: 14px 15px 16px;
+}

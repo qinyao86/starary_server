@@ -22,10 +22,24 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
 
     tx.execute(
         r#"
-        CREATE TABLE IF NOT EXISTS team_libraries (
+        DO $$
+        BEGIN
+            IF to_regclass('public.libraries') IS NULL
+               AND to_regclass('public.team_libraries') IS NOT NULL THEN
+                ALTER TABLE team_libraries RENAME TO libraries;
+            END IF;
+        END $$;
+        "#,
+    )
+    .await?;
+
+    tx.execute(
+        r#"
+        CREATE TABLE IF NOT EXISTS libraries (
             id UUID PRIMARY KEY,
-            name TEXT NOT NULL,
+            display_name TEXT NOT NULL,
             description TEXT,
+            icon_url TEXT,
             created_by_user_id UUID NOT NULL REFERENCES users(id),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -37,8 +51,39 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
 
     tx.execute(
         r#"
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'libraries'
+                  AND column_name = 'name'
+            ) AND NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'libraries'
+                  AND column_name = 'display_name'
+            ) THEN
+                ALTER TABLE libraries RENAME COLUMN name TO display_name;
+            END IF;
+        END $$;
+        "#,
+    )
+    .await?;
+
+    tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS display_name TEXT;")
+        .await?;
+    tx.execute(
+        "UPDATE libraries SET display_name = 'Untitled Library' WHERE display_name IS NULL OR btrim(display_name) = '';",
+    )
+    .await?;
+    tx.execute("ALTER TABLE libraries ALTER COLUMN display_name SET NOT NULL;")
+        .await?;
+
+    tx.execute(
+        r#"
         CREATE TABLE IF NOT EXISTS library_memberships (
-            library_id UUID NOT NULL REFERENCES team_libraries(id) ON DELETE CASCADE,
+            library_id UUID NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'library_manager', 'editor', 'viewer')),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -53,7 +98,7 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
         r#"
         CREATE TABLE IF NOT EXISTS storage_roots (
             id UUID PRIMARY KEY,
-            library_id UUID NOT NULL REFERENCES team_libraries(id) ON DELETE CASCADE,
+            library_id UUID NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
             name TEXT NOT NULL,
             kind TEXT NOT NULL CHECK (kind IN ('server_filesystem', 'smb', 's3')),
             canonical_uri TEXT NOT NULL,
@@ -75,8 +120,8 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
         r#"
         CREATE TABLE IF NOT EXISTS assets (
             id UUID PRIMARY KEY,
-            library_id UUID NOT NULL REFERENCES team_libraries(id) ON DELETE CASCADE,
-            title TEXT NOT NULL,
+            library_id UUID NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
             asset_kind TEXT NOT NULL,
             import_mode TEXT NOT NULL CHECK (import_mode IN ('copy', 'reference')),
             storage_key TEXT,
@@ -105,9 +150,53 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
 
     tx.execute(
         r#"
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'assets'
+                  AND column_name = 'title'
+            ) AND NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'assets'
+                  AND column_name = 'name'
+            ) THEN
+                ALTER TABLE assets RENAME COLUMN title TO name;
+            END IF;
+        END $$;
+        "#,
+    )
+    .await?;
+
+    tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS name TEXT;")
+        .await?;
+    tx.execute(
+        "ALTER TABLE assets ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;",
+    )
+    .await?;
+    tx.execute(
+        r#"
+        UPDATE assets
+        SET name = COALESCE(
+            NULLIF(btrim(name), ''),
+            NULLIF(btrim(metadata->>'name'), ''),
+            NULLIF(btrim(metadata->>'title'), ''),
+            id::text
+        )
+        WHERE name IS NULL OR btrim(name) = '';
+        "#,
+    )
+    .await?;
+    tx.execute("ALTER TABLE assets ALTER COLUMN name SET NOT NULL;")
+        .await?;
+
+    tx.execute(
+        r#"
         CREATE TABLE IF NOT EXISTS activity_log (
             id UUID PRIMARY KEY,
-            library_id UUID REFERENCES team_libraries(id) ON DELETE CASCADE,
+            library_id UUID REFERENCES libraries(id) ON DELETE CASCADE,
             actor_user_id UUID REFERENCES users(id),
             action TEXT NOT NULL,
             target_type TEXT NOT NULL,
@@ -129,10 +218,20 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();",
     )
     .await?;
-    tx.execute("ALTER TABLE team_libraries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
+    tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
         .await?;
-    tx.execute("ALTER TABLE team_libraries ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;")
+    tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS icon_url TEXT;")
         .await?;
+    tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;")
+        .await?;
+    tx.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;")
+        .await?;
+    tx.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;")
+        .await?;
+    tx.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_library_id UUID REFERENCES libraries(id) ON DELETE SET NULL;",
+    )
+    .await?;
     tx.execute("ALTER TABLE library_memberships ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
         .await?;
     tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS windows_mapped_drive_aliases JSONB NOT NULL DEFAULT '[]'::jsonb;")
@@ -186,6 +285,12 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
         .await?;
     tx.execute(
         "CREATE INDEX IF NOT EXISTS idx_activity_log_library_id ON activity_log(library_id);",
+    )
+    .await?;
+    tx.execute("CREATE INDEX IF NOT EXISTS idx_users_last_seen_at ON users(last_seen_at);")
+        .await?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS idx_users_last_seen_library_id ON users(last_seen_library_id);",
     )
     .await?;
 

@@ -78,8 +78,8 @@ pub async fn create_owner(
 
     let user = sqlx::query_as::<_, UserRecord>(
         r#"
-        INSERT INTO users (id, email, display_name, password_hash, global_role)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO users (id, email, display_name, password_hash, global_role, last_login_at, last_seen_at)
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
         RETURNING id, email, display_name, global_role, is_active, created_at, updated_at
         "#,
     )
@@ -93,7 +93,7 @@ pub async fn create_owner(
 
     sqlx::query(
         r#"
-        INSERT INTO team_libraries (id, name, description, created_by_user_id)
+        INSERT INTO libraries (id, display_name, description, created_by_user_id)
         VALUES ($1, 'Default Team Library', 'Created during first server setup.', $2)
         "#,
     )

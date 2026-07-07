@@ -57,7 +57,7 @@ pub async fn list_assets(
         SELECT
             id,
             library_id,
-            title,
+            name,
             asset_kind,
             import_mode,
             storage_key,

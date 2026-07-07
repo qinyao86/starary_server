@@ -2,16 +2,32 @@ use crate::{
     auth::{issue_token, verify_password, AuthUser},
     error::{AppError, AppResult},
     models::UserWithPassword,
+    routes::users::guards::ensure_unique_display_name,
     state::AppState,
 };
-use axum::{extract::State, Json};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use super::access::ensure_library_access;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginRequest {
     email: String,
     password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceRequest {
+    library_id: Option<Uuid>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCurrentUserRequest {
+    display_name: String,
 }
 
 #[derive(Serialize)]
@@ -54,6 +70,17 @@ pub async fn login(
 
     let token = issue_token(&state, &user)?;
 
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET last_login_at = NOW(), last_seen_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(user.id)
+    .execute(&state.pool)
+    .await?;
+
     Ok(Json(LoginResponse {
         access_token: token,
         token_type: "Bearer",
@@ -73,4 +100,65 @@ pub async fn me(user: AuthUser) -> Json<CurrentUserResponse> {
         display_name: user.display_name,
         role: user.role.to_string(),
     })
+}
+
+pub async fn update_me(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(request): Json<UpdateCurrentUserRequest>,
+) -> AppResult<Json<CurrentUserResponse>> {
+    let display_name = request.display_name.trim();
+    if display_name.is_empty() {
+        return Err(AppError::BadRequest(
+            "display name is required".to_string(),
+        ));
+    }
+
+    ensure_unique_display_name(&state, display_name, Some(user.id)).await?;
+
+    let display_name: String = sqlx::query_scalar(
+        r#"
+        UPDATE users
+        SET display_name = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING display_name
+        "#,
+    )
+    .bind(user.id)
+    .bind(display_name)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(CurrentUserResponse {
+        id: user.id.to_string(),
+        email: user.email,
+        display_name,
+        role: user.role.to_string(),
+    }))
+}
+
+pub async fn update_presence(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(request): Json<PresenceRequest>,
+) -> AppResult<StatusCode> {
+    if let Some(library_id) = request.library_id {
+        ensure_library_access(&state, &user, library_id).await?;
+    }
+
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET
+            last_seen_at = NOW(),
+            last_seen_library_id = COALESCE($2, last_seen_library_id)
+        WHERE id = $1
+        "#,
+    )
+    .bind(user.id)
+    .bind(request.library_id)
+    .execute(&state.pool)
+    .await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }

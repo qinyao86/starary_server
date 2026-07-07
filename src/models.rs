@@ -104,6 +104,14 @@ pub struct UserRecord {
     pub display_name: String,
     pub global_role: String,
     pub is_active: bool,
+    #[sqlx(default)]
+    pub last_login_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub last_seen_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub last_seen_library_id: Option<Uuid>,
+    #[sqlx(default)]
+    pub last_seen_library_name: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -120,10 +128,11 @@ pub struct UserWithPassword {
 
 #[derive(Debug, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TeamLibraryRecord {
+pub struct LibraryRecord {
     pub id: Uuid,
-    pub name: String,
+    pub display_name: String,
     pub description: Option<String>,
+    pub icon_url: Option<String>,
     pub created_by_user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -133,8 +142,9 @@ pub struct TeamLibraryRecord {
 #[serde(rename_all = "camelCase")]
 pub struct LibraryWithRole {
     pub id: Uuid,
-    pub name: String,
+    pub display_name: String,
     pub description: Option<String>,
+    pub icon_url: Option<String>,
     pub current_user_role: String,
     pub creator_name: String,
     pub member_names: Vec<String>,
@@ -182,7 +192,7 @@ pub struct LibraryMemberRecord {
 pub struct AssetRecord {
     pub id: Uuid,
     pub library_id: Uuid,
-    pub title: String,
+    pub name: String,
     pub asset_kind: String,
     pub import_mode: String,
     pub storage_key: Option<String>,

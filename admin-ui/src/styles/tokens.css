@@ -1,0 +1,79 @@
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  color-scheme: light;
+  font-family:
+    Inter, "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius: 0.5rem;
+  --background: #f7f9fb;
+  --foreground: #18202c;
+  --card: #ffffff;
+  --card-foreground: #18202c;
+  --popover: #ffffff;
+  --popover-foreground: #18202c;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #eef3f7;
+  --secondary-foreground: #253244;
+  --muted: #eef3f7;
+  --muted-foreground: #697586;
+  --accent: #e8f0ff;
+  --accent-foreground: #1e3a8a;
+  --destructive: #dc2626;
+  --border: #d8e0ea;
+  --input: #d2dae6;
+  --ring: #2563eb;
+  background: #f7f9fb;
+  color: #18202c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1120px;
+  min-height: 100vh;
+  background: #f7f9fb;
+}
+
+body:has(.admin-shell.theme-dark) {
+  background: #18181b;
+}
+
+body:has(.auth-shell.theme-dark) {
+  background: #18181b;
+}
+
+button {
+  font: inherit;
+  line-height: 1;
+}

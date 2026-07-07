@@ -50,7 +50,7 @@ pub async fn list_activity(
             a.target_id,
             COALESCE(
                 target_user.display_name,
-                target_library.name,
+                target_library.display_name,
                 target_root.name,
                 a.details->>'name'
             ) AS target_name,
@@ -59,7 +59,7 @@ pub async fn list_activity(
         FROM activity_log a
         LEFT JOIN users actor ON actor.id = a.actor_user_id
         LEFT JOIN users target_user ON a.target_type = 'user' AND target_user.id = a.target_id
-        LEFT JOIN team_libraries target_library ON a.target_type = 'library' AND target_library.id = a.target_id
+        LEFT JOIN libraries target_library ON a.target_type = 'library' AND target_library.id = a.target_id
         LEFT JOIN storage_roots target_root ON a.target_type = 'storage_root' AND target_root.id = a.target_id
         WHERE a.library_id = $1
         ORDER BY a.created_at DESC, a.id DESC
@@ -131,7 +131,7 @@ fn activity_select_sql(where_clause: &str) -> String {
             a.target_id,
             COALESCE(
                 target_user.display_name,
-                target_library.name,
+                target_library.display_name,
                 target_root.name,
                 a.details->>'name'
             ) AS target_name,
@@ -140,7 +140,7 @@ fn activity_select_sql(where_clause: &str) -> String {
         FROM activity_log a
         LEFT JOIN users actor ON actor.id = a.actor_user_id
         LEFT JOIN users target_user ON a.target_type = 'user' AND target_user.id = a.target_id
-        LEFT JOIN team_libraries target_library ON a.target_type = 'library' AND target_library.id = a.target_id
+        LEFT JOIN libraries target_library ON a.target_type = 'library' AND target_library.id = a.target_id
         LEFT JOIN storage_roots target_root ON a.target_type = 'storage_root' AND target_root.id = a.target_id
         WHERE {where_clause}
         ORDER BY a.created_at DESC, a.id DESC

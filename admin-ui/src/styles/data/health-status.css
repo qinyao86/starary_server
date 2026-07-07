@@ -1,0 +1,66 @@
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.health-line {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 60px;
+  padding: 10px;
+  border: 1px solid #e4e9f0;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.health-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  color: #2563eb;
+  background: #e8f0ff;
+}
+
+.health-label {
+  margin-bottom: 5px;
+  color: #697586;
+  font-size: 12px;
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.status-dot span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.status-dot.tone-good span {
+  background: #10b981;
+}
+
+.status-dot.tone-warn span {
+  background: #f59e0b;
+}
+
+.status-dot.tone-muted span {
+  background: #94a3b8;
+}

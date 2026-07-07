@@ -1,7 +1,7 @@
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    models::{LibraryMemberRecord, Role},
+    models::LibraryMemberRecord,
     routes::access::ensure_library_manager,
     state::AppState,
 };
@@ -10,14 +10,13 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use serde::Deserialize;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpsertMemberRequest {
-    role: Role,
-}
+mod guards;
+mod requests;
+
+use guards::{current_library_role, ensure_another_library_manager};
+use requests::UpsertMemberRequest;
 
 pub async fn list_members(
     State(state): State<AppState>,
@@ -175,54 +174,4 @@ pub async fn remove_member(
     tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-async fn current_library_role(
-    state: &AppState,
-    library_id: Uuid,
-    user_id: Uuid,
-) -> AppResult<Option<Role>> {
-    let role_value: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT role
-        FROM library_memberships
-        WHERE library_id = $1 AND user_id = $2
-        "#,
-    )
-    .bind(library_id)
-    .bind(user_id)
-    .fetch_optional(&state.pool)
-    .await?;
-
-    role_value
-        .map(|value| value.parse::<Role>().map_err(|_| AppError::Forbidden))
-        .transpose()
-}
-
-async fn ensure_another_library_manager(
-    state: &AppState,
-    library_id: Uuid,
-    user_id: Uuid,
-) -> AppResult<()> {
-    let count: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)
-        FROM library_memberships
-        WHERE library_id = $1
-            AND user_id <> $2
-            AND role IN ('owner', 'admin', 'library_manager')
-        "#,
-    )
-    .bind(library_id)
-    .bind(user_id)
-    .fetch_one(&state.pool)
-    .await?;
-
-    if count == 0 {
-        return Err(AppError::Conflict(
-            "at least one library manager is required".to_string(),
-        ));
-    }
-
-    Ok(())
 }

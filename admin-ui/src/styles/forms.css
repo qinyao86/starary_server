@@ -1,0 +1,43 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #d2dae6;
+  border-radius: 8px;
+  padding: 0 10px;
+  outline: none;
+  color: #1f2937;
+  background: #ffffff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 0 9px;
+  color: #2563eb;
+  background: #eff6ff;
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1;
+}

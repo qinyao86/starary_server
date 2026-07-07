@@ -8,28 +8,13 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use serde::Deserialize;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateUserRequest {
-    email: String,
-    password: String,
-    display_name: Option<String>,
-    #[serde(default)]
-    role: Option<Role>,
-}
+pub(crate) mod guards;
+mod requests;
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateUserRequest {
-    display_name: Option<String>,
-    #[serde(default)]
-    role: Option<Role>,
-    is_active: Option<bool>,
-    password: Option<String>,
-}
+use guards::{ensure_another_active_owner, ensure_unique_display_name};
+use requests::{CreateUserRequest, UpdateUserRequest};
 
 pub async fn list_users(
     State(state): State<AppState>,
@@ -41,9 +26,24 @@ pub async fn list_users(
 
     let users = sqlx::query_as::<_, UserRecord>(
         r#"
-        SELECT id, email, display_name, global_role, is_active, created_at, updated_at
-        FROM users
-        ORDER BY display_name ASC, email ASC
+        SELECT
+            u.id,
+            u.email,
+            u.display_name,
+            u.global_role,
+            u.is_active,
+            u.last_login_at,
+            u.last_seen_at,
+            u.last_seen_library_id,
+            l.display_name AS last_seen_library_name,
+            u.created_at,
+            u.updated_at
+        FROM users u
+        LEFT JOIN libraries l ON l.id = u.last_seen_library_id AND l.deleted_at IS NULL
+        ORDER BY
+            u.last_seen_at DESC NULLS LAST,
+            u.display_name ASC,
+            u.email ASC
         "#,
     )
     .fetch_all(&state.pool)
@@ -86,7 +86,10 @@ pub async fn create_user(
     let display_name = request
         .display_name
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| email.clone());
+        .unwrap_or_else(|| email.clone())
+        .trim()
+        .to_string();
+    ensure_unique_display_name(&state, &display_name, None).await?;
 
     let user_id = Uuid::new_v4();
     let password_hash = hash_password(&request.password)?;
@@ -180,7 +183,9 @@ pub async fn update_user(
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .unwrap_or(&target.display_name);
+        .unwrap_or(&target.display_name)
+        .to_string();
+    ensure_unique_display_name(&state, &next_display_name, Some(user_id)).await?;
 
     let password_hash = match request.password.as_deref().map(str::trim) {
         Some(password) if !password.is_empty() => Some(hash_password(password)?),
@@ -204,7 +209,7 @@ pub async fn update_user(
         "#,
     )
     .bind(user_id)
-    .bind(next_display_name)
+    .bind(&next_display_name)
     .bind(next_role.as_str())
     .bind(next_is_active)
     .bind(password_hash.as_deref())
@@ -231,25 +236,4 @@ pub async fn update_user(
     tx.commit().await?;
 
     Ok(Json(user))
-}
-
-async fn ensure_another_active_owner(state: &AppState, user_id: Uuid) -> AppResult<()> {
-    let count: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)
-        FROM users
-        WHERE id <> $1 AND global_role = 'owner' AND is_active = TRUE
-        "#,
-    )
-    .bind(user_id)
-    .fetch_one(&state.pool)
-    .await?;
-
-    if count == 0 {
-        return Err(AppError::Conflict(
-            "at least one active owner is required".to_string(),
-        ));
-    }
-
-    Ok(())
 }

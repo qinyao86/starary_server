@@ -1,0 +1,52 @@
+.theme-dark .dialog-backdrop {
+  background: rgba(9, 9, 11, 0.68);
+}
+
+.theme-dark .dialog-panel {
+  border-color: #2f2f33;
+  background: #18181b;
+  color: #fafafa;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
+}
+
+.theme-dark .dialog-header {
+  border-color: #2f2f33;
+  background:
+    radial-gradient(circle at 85% 0%, rgba(59, 130, 246, 0.16), transparent 34%),
+    linear-gradient(180deg, #202024 0%, #18181b 100%);
+}
+
+.theme-dark .dialog-title {
+  color: #fafafa;
+}
+
+.theme-dark .dialog-subtitle {
+  color: #c4c7cf;
+}
+
+.theme-dark .dialog-close {
+  color: #d4d4d8;
+}
+
+.theme-dark .dialog-close:hover {
+  color: #fafafa;
+  background: #27272a;
+}
+
+.theme-dark .gauge-ring {
+  border-color: #27272a;
+  border-right-color: #3b82f6;
+  border-bottom-color: #3b82f6;
+  color: #fafafa;
+}
+
+.theme-dark .message-bar {
+  border-color: #7c5b16;
+  color: #fde68a;
+  background: #2d2413;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+}
+
+.theme-dark .message-bar button:hover {
+  background: rgba(253, 230, 138, 0.1);
+}

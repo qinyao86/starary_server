@@ -1,0 +1,10 @@
+export { OverviewPage } from "./overview";
+export { ServicePage } from "./service";
+export { LibrariesPage } from "./libraries";
+export { UsersPage } from "./users";
+export { PermissionsPage } from "./permissions";
+export { StoragePage } from "./storage";
+export { StatisticsPage } from "./statistics";
+export { ActivityPage } from "./activity";
+export { BackupsPage } from "./backups";
+export { SettingsPage } from "./settings";

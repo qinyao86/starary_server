@@ -1,0 +1,57 @@
+.theme-dark .sidebar-server-card,
+.theme-dark .metric-card,
+.theme-dark .panel,
+.theme-dark .library-card,
+.theme-dark .library-detail-hero,
+.theme-dark .select-card {
+  border-color: #2f2f33;
+  background: #18181b;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+}
+
+.theme-dark .library-card {
+  background: linear-gradient(180deg, #1b1b1f 0%, #17171a 100%);
+}
+
+.theme-dark .library-card:hover {
+  border-color: #3b82f6;
+  background: linear-gradient(180deg, #202024 0%, #1b1b1f 100%);
+}
+
+.theme-dark .health-icon,
+.theme-dark .activity-avatar,
+.theme-dark .check-cell.is-checked,
+.theme-dark .service-orb.is-on {
+  color: #bfdbfe;
+  background: #1f2937;
+}
+
+.theme-dark .library-icon-button {
+  color: #a1a1aa;
+}
+
+.theme-dark .library-icon-button:hover {
+  border-color: #3f3f46;
+  color: #fafafa;
+  background: #34343b;
+}
+
+.theme-dark .library-icon-button.is-danger:hover {
+  border-color: #7f1d1d;
+  color: #fca5a5;
+  background: #2d1414;
+}
+
+.theme-dark .library-card-footer,
+.theme-dark .member-row,
+.theme-dark .activity-item,
+.theme-dark .data-table th,
+.theme-dark .data-table td,
+.theme-dark .matrix th,
+.theme-dark .matrix td,
+.theme-dark .sidebar-theme-switch,
+.theme-dark .sidebar-logout-button,
+.theme-dark .panel-header,
+.theme-dark .auth-brand {
+  border-color: #2f2f33;
+}

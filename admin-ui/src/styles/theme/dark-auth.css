@@ -1,0 +1,78 @@
+.theme-dark.auth-shell {
+  background:
+    radial-gradient(circle at center, rgba(59, 130, 246, 0.12), transparent 26%),
+    linear-gradient(180deg, #111113 0%, #111113 100%);
+}
+
+.theme-dark .auth-frame {
+  border-color: #2f2f33;
+  background: #18181b;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.42);
+}
+
+.theme-dark .auth-visual {
+  background: linear-gradient(180deg, #18181b 0%, #18181b 100%);
+  color: #fafafa;
+}
+
+.theme-dark .auth-product-name,
+.theme-dark .auth-visual-copy h2 {
+  color: #fafafa;
+}
+
+.theme-dark .auth-product-mode,
+.theme-dark .auth-visual-copy p,
+.theme-dark .auth-note {
+  color: #c4c7cf;
+}
+
+.theme-dark .auth-form p,
+.theme-dark .field,
+.theme-dark .field label {
+  color: #e4e4e7;
+}
+
+.theme-dark .field input,
+.theme-dark .field select {
+  border-color: #52525b;
+  color: #f8fafc;
+}
+
+.theme-dark .auth-header .select-button,
+.theme-dark .auth-brand .select-button {
+  color: #f4f4f5;
+}
+
+.theme-dark .auth-system-card,
+.theme-dark .auth-boot-panel {
+  border-color: #2f2f33;
+  background: #18181b;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+}
+
+.theme-dark .auth-card {
+  border-color: #2f2f33;
+  background: #18181b;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.02);
+}
+
+.theme-dark .auth-system-card span,
+.theme-dark .auth-boot-title,
+.theme-dark .auth-boot-row {
+  color: #e4e4e7;
+}
+
+.theme-dark .auth-system-card strong {
+  color: #fafafa;
+}
+
+.theme-dark .auth-header h1,
+.theme-dark .auth-brand .brand-title,
+.theme-dark .auth-brand .brand-subtitle,
+.theme-dark .auth-kicker {
+  color: #fafafa;
+}
+
+.theme-dark .auth-brand .brand-subtitle {
+  color: #c4c7cf;
+}

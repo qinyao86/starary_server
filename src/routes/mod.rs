@@ -7,7 +7,7 @@ mod libraries;
 mod members;
 mod setup;
 mod storage_roots;
-mod users;
+pub(crate) mod users;
 
 use crate::state::AppState;
 use axum::{
@@ -31,7 +31,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/setup/status", get(setup::setup_status))
         .route("/api/v1/setup/owner", post(setup::create_owner))
         .route("/api/v1/auth/login", post(auth_routes::login))
-        .route("/api/v1/me", get(auth_routes::me))
+        .route("/api/v1/me", get(auth_routes::me).patch(auth_routes::update_me))
+        .route("/api/v1/me/presence", patch(auth_routes::update_presence))
         .route(
             "/api/v1/users",
             get(users::list_users).post(users::create_user),

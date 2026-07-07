@@ -1,0 +1,100 @@
+.theme-dark .sidebar-deployment-label,
+.theme-dark .status-dot,
+.theme-dark .bar-meta,
+.theme-dark .key-value,
+.theme-dark .search-box,
+.theme-dark .placeholder-box {
+  color: #d4d4d8;
+}
+
+.theme-dark .badge {
+  border-color: #3f3f46;
+  color: #f4f4f5;
+  background: #27272a;
+}
+
+.theme-dark .control-badge,
+.theme-dark .member-role-badge {
+  border-color: rgba(244, 244, 245, 0.08);
+}
+
+.theme-dark .control-badge {
+  color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.22);
+}
+
+.theme-dark .member-role-badge {
+  color: #d4d4d8;
+  background: rgba(244, 244, 245, 0.06);
+}
+
+.theme-dark .panel-action-button {
+  box-shadow: none;
+}
+
+.theme-dark .panel-action-button:disabled {
+  border-color: rgba(244, 244, 245, 0.08);
+  color: #a1a1aa;
+  background: rgba(244, 244, 245, 0.07);
+}
+
+.theme-dark .member-action-button {
+  border-color: rgba(244, 244, 245, 0.22);
+  color: #e4e4e7;
+  background: transparent;
+}
+
+.theme-dark .member-action-button:hover {
+  border-color: rgba(248, 113, 113, 0.42);
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.theme-dark .table-action-button {
+  border-color: rgba(244, 244, 245, 0.16);
+  color: #e4e4e7;
+  background: transparent;
+}
+
+.theme-dark .table-action-button:hover {
+  border-color: #3f3f46;
+  color: #fafafa;
+  background: #27272a;
+}
+
+.theme-dark .table-action-button.is-danger:hover {
+  border-color: rgba(248, 113, 113, 0.42);
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.theme-dark .status-pill {
+  border-color: #3f3f46;
+  color: #d4d4d8;
+  background: #23232a;
+}
+
+.theme-dark .status-pill.is-on {
+  border-color: rgba(52, 211, 153, 0.24);
+  color: #86efac;
+  background: rgba(22, 101, 52, 0.18);
+}
+
+.theme-dark .status-pill.is-off {
+  border-color: rgba(244, 244, 245, 0.08);
+  color: #a1a1aa;
+  background: rgba(244, 244, 245, 0.06);
+}
+
+.theme-dark .health-row,
+.theme-dark .library-detail-stat,
+.theme-dark .placeholder-box,
+.theme-dark .service-orb {
+  border-color: #2f2f33;
+  background: #111113;
+}
+
+.theme-dark .library-card-stats {
+  border-top-color: rgba(244, 244, 245, 0.07);
+  border-bottom-color: rgba(244, 244, 245, 0.07);
+}
