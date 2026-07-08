@@ -109,9 +109,7 @@ pub async fn update_me(
 ) -> AppResult<Json<CurrentUserResponse>> {
     let display_name = request.display_name.trim();
     if display_name.is_empty() {
-        return Err(AppError::BadRequest(
-            "display name is required".to_string(),
-        ));
+        return Err(AppError::BadRequest("display name is required".to_string()));
     }
 
     ensure_unique_display_name(&state, display_name, Some(user.id)).await?;

@@ -4,6 +4,12 @@ use sqlx::FromRow;
 use std::{fmt, str::FromStr};
 use uuid::Uuid;
 
+mod library_structure;
+mod presets;
+
+pub use library_structure::*;
+pub use presets::*;
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {

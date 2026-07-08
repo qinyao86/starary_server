@@ -56,3 +56,13 @@ pub async fn ensure_library_manager(
         Err(AppError::Forbidden)
     }
 }
+
+pub async fn ensure_library_write_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: Uuid,
+) -> AppResult<Role> {
+    // The first team version keeps structure editing permissive for members.
+    // Tighten this single gate later when folder/tag permissions are finalized.
+    ensure_library_access(state, user, library_id).await
+}

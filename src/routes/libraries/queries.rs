@@ -14,10 +14,6 @@ asset_stats AS (
     SELECT
         library_id,
         COUNT(*) FILTER (WHERE deleted_at IS NULL)::BIGINT AS asset_count,
-        COUNT(*) FILTER (
-            WHERE deleted_at IS NULL
-            AND (asset_kind = 'folder' OR asset_kind = 'package')
-        )::BIGINT AS folder_count,
         COALESCE(SUM(
             CASE
                 WHEN deleted_at IS NULL AND (metadata->>'sizeBytes') ~ '^[0-9]+$' THEN (metadata->>'sizeBytes')::BIGINT
@@ -29,19 +25,19 @@ asset_stats AS (
     FROM assets
     GROUP BY library_id
 ),
+folder_stats AS (
+    SELECT
+        library_id,
+        COUNT(*)::BIGINT AS folder_count
+    FROM folders
+    GROUP BY library_id
+),
 tag_stats AS (
     SELECT
-        assets.library_id,
-        COUNT(DISTINCT tag.value)::BIGINT AS tag_count
-    FROM assets
-    CROSS JOIN LATERAL jsonb_array_elements_text(
-        CASE
-            WHEN jsonb_typeof(metadata->'tags') = 'array' THEN metadata->'tags'
-            ELSE '[]'::jsonb
-        END
-    ) AS tag(value)
-    WHERE assets.deleted_at IS NULL
-    GROUP BY assets.library_id
+        library_id,
+        COUNT(*)::BIGINT AS tag_count
+    FROM tags
+    GROUP BY library_id
 )
 "#;
 
@@ -55,7 +51,7 @@ SELECT
     creator.display_name AS creator_name,
     COALESCE(ms.member_names, ARRAY[]::TEXT[]) AS member_names,
     COALESCE(ast.asset_count, 0) AS asset_count,
-    COALESCE(ast.folder_count, 0) AS folder_count,
+    COALESCE(fs.folder_count, 0) AS folder_count,
     COALESCE(ts.tag_count, 0) AS tag_count,
     COALESCE(ast.total_size_bytes, 0) AS total_size_bytes,
     l.created_by_user_id,
@@ -78,6 +74,7 @@ pub async fn list_libraries_for_server_manager(
         LEFT JOIN library_memberships m ON m.library_id = l.id AND m.user_id = $1
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
         WHERE l.deleted_at IS NULL
         ORDER BY l.display_name ASC
@@ -103,6 +100,7 @@ pub async fn list_libraries_for_member(
         INNER JOIN library_memberships m ON m.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
         WHERE l.deleted_at IS NULL AND m.user_id = $1
         ORDER BY l.display_name ASC
