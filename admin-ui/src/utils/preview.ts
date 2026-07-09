@@ -9,12 +9,19 @@ export function buildPreviewLibraries(t: TranslatorContext["t"]): TeamLibrary[] 
     displayName: item.name,
     description: t(item.policy),
     currentUserRole: index === 0 ? "owner" : "library_manager",
+    enabled: index !== 2,
     creatorName: designUsers[index % designUsers.length]?.name ?? "Qin Yao",
     memberNames: designUsers.slice(0, Math.min(3, item.members)).map((user) => user.name),
     assetCount: Number(item.assets.replace(/,/g, "")),
     folderCount: Math.max(0, Math.round(Number(item.assets.replace(/,/g, "")) / 120)),
     tagCount: Math.max(0, Math.round(Number(item.assets.replace(/,/g, "")) / 80)),
-    totalSizeBytes: parseStorageSize(item.storage)
+    totalSizeBytes: parseStorageSize(item.storage),
+    storageRootCount: 1,
+    enabledStorageRootCount: index === 2 ? 0 : 1,
+    primaryStorageKind: "smb",
+    primaryStorageUri: `smb://192.168.3.13/libraries/${item.name.toLowerCase().replace(/\s+/g, "-")}`,
+    primaryStorageWindowsPath: `\\\\192.168.3.13\\libraries\\${item.name.toLowerCase().replace(/\s+/g, "-")}`,
+    primaryStorageMacosPath: `smb://192.168.3.13/libraries/${item.name.toLowerCase().replace(/\s+/g, "-")}`
   }));
 }
 

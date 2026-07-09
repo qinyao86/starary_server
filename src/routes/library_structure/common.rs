@@ -1,5 +1,6 @@
 use crate::{
     error::{AppError, AppResult},
+    ids::generate_id,
     state::AppState,
 };
 use serde_json::json;
@@ -24,7 +25,7 @@ pub fn normalize_required_text(value: Option<String>, fallback: &str) -> String 
 }
 
 pub fn new_prefixed_id(prefix: &str) -> String {
-    format!("{prefix}{}", Uuid::new_v4().simple())
+    generate_id(prefix)
 }
 
 pub fn unique_ids(ids: &[String]) -> Vec<String> {
@@ -40,7 +41,7 @@ pub fn unique_ids(ids: &[String]) -> Vec<String> {
 
 pub async fn insert_activity(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     actor_user_id: Uuid,
     action: &str,
     target_type: &str,
@@ -70,10 +71,10 @@ pub async fn insert_activity(
 
 pub async fn ensure_asset_in_library(
     state: &AppState,
-    library_id: Uuid,
-    asset_id: Uuid,
+    library_id: &str,
+    asset_id: &str,
 ) -> AppResult<()> {
-    let exists: Option<Uuid> = sqlx::query_scalar(
+    let exists: Option<String> = sqlx::query_scalar(
         r#"
         SELECT id
         FROM assets

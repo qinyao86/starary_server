@@ -6,7 +6,7 @@ pub(super) async fn create_presets_schema(tx: &mut MigrationTx<'_>) -> anyhow::R
         r#"
         CREATE TABLE IF NOT EXISTS presets (
             id TEXT PRIMARY KEY,
-            library_id UUID NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+            library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
             "type" TEXT NOT NULL,
             name TEXT NOT NULL,
             value_json JSONB NOT NULL DEFAULT '{}'::jsonb,

@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +16,7 @@ pub struct UpdateFolderRequest {
     pub description: Option<String>,
     pub icon: Option<String>,
     pub color: Option<String>,
-    pub cover_asset_id: Option<Uuid>,
+    pub cover_asset_id: Option<String>,
     pub clear_cover_asset_id: Option<bool>,
     pub smart_import_id: Option<String>,
     pub clear_smart_import_id: Option<bool>,

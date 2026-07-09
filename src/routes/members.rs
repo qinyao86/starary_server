@@ -21,9 +21,9 @@ use requests::UpsertMemberRequest;
 pub async fn list_members(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
 ) -> AppResult<Json<Vec<LibraryMemberRecord>>> {
-    ensure_library_manager(&state, &user, library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
 
     let members = sqlx::query_as::<_, LibraryMemberRecord>(
         r#"
@@ -41,7 +41,7 @@ pub async fn list_members(
         ORDER BY u.display_name ASC, u.email ASC
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .fetch_all(&state.pool)
     .await?;
 
@@ -51,10 +51,10 @@ pub async fn list_members(
 pub async fn upsert_member(
     State(state): State<AppState>,
     actor: AuthUser,
-    Path((library_id, user_id)): Path<(Uuid, Uuid)>,
+    Path((library_id, user_id)): Path<(String, Uuid)>,
     Json(request): Json<UpsertMemberRequest>,
 ) -> AppResult<Json<LibraryMemberRecord>> {
-    ensure_library_manager(&state, &actor, library_id).await?;
+    ensure_library_manager(&state, &actor, &library_id).await?;
 
     let target_is_active: Option<bool> =
         sqlx::query_scalar("SELECT is_active FROM users WHERE id = $1")
@@ -67,9 +67,9 @@ pub async fn upsert_member(
         None => return Err(AppError::NotFound("user not found".to_string())),
     }
 
-    if let Some(current_role) = current_library_role(&state, library_id, user_id).await? {
+    if let Some(current_role) = current_library_role(&state, &library_id, user_id).await? {
         if current_role.can_manage_library() && !request.role.can_manage_library() {
-            ensure_another_library_manager(&state, library_id, user_id).await?;
+            ensure_another_library_manager(&state, &library_id, user_id).await?;
         }
     }
 
@@ -83,7 +83,7 @@ pub async fn upsert_member(
         DO UPDATE SET role = EXCLUDED.role, updated_at = NOW()
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(user_id)
     .bind(request.role.as_str())
     .execute(&mut *tx)
@@ -96,9 +96,9 @@ pub async fn upsert_member(
         "#,
     )
     .bind(Uuid::new_v4())
-    .bind(library_id)
+    .bind(&library_id)
     .bind(actor.id)
-    .bind(user_id)
+    .bind(user_id.to_string())
     .bind(serde_json::json!({ "role": request.role.as_str() }))
     .execute(&mut *tx)
     .await?;
@@ -120,7 +120,7 @@ pub async fn upsert_member(
         WHERE m.library_id = $1 AND m.user_id = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(user_id)
     .fetch_one(&state.pool)
     .await?;
@@ -131,13 +131,13 @@ pub async fn upsert_member(
 pub async fn remove_member(
     State(state): State<AppState>,
     actor: AuthUser,
-    Path((library_id, user_id)): Path<(Uuid, Uuid)>,
+    Path((library_id, user_id)): Path<(String, Uuid)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_manager(&state, &actor, library_id).await?;
+    ensure_library_manager(&state, &actor, &library_id).await?;
 
-    if let Some(current_role) = current_library_role(&state, library_id, user_id).await? {
+    if let Some(current_role) = current_library_role(&state, &library_id, user_id).await? {
         if current_role.can_manage_library() {
-            ensure_another_library_manager(&state, library_id, user_id).await?;
+            ensure_another_library_manager(&state, &library_id, user_id).await?;
         }
     }
 
@@ -149,7 +149,7 @@ pub async fn remove_member(
         WHERE library_id = $1 AND user_id = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(user_id)
     .execute(&mut *tx)
     .await?;
@@ -165,9 +165,9 @@ pub async fn remove_member(
         "#,
     )
     .bind(Uuid::new_v4())
-    .bind(library_id)
+    .bind(&library_id)
     .bind(actor.id)
-    .bind(user_id)
+    .bind(user_id.to_string())
     .execute(&mut *tx)
     .await?;
 

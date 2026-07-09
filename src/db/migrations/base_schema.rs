@@ -34,10 +34,11 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
     tx.execute(
         r#"
         CREATE TABLE IF NOT EXISTS libraries (
-            id UUID PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             display_name TEXT NOT NULL,
             description TEXT,
             icon_url TEXT,
+            enabled BOOLEAN NOT NULL DEFAULT TRUE,
             created_by_user_id UUID NOT NULL REFERENCES users(id),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -81,7 +82,7 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
     tx.execute(
         r#"
         CREATE TABLE IF NOT EXISTS library_memberships (
-            library_id UUID NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+            library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'library_manager', 'editor', 'viewer')),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -96,7 +97,7 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
         r#"
         CREATE TABLE IF NOT EXISTS storage_roots (
             id UUID PRIMARY KEY,
-            library_id UUID NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+            library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
             name TEXT NOT NULL,
             kind TEXT NOT NULL CHECK (kind IN ('server_filesystem', 'smb', 's3')),
             canonical_uri TEXT NOT NULL,
@@ -117,8 +118,8 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
     tx.execute(
         r#"
         CREATE TABLE IF NOT EXISTS assets (
-            id UUID PRIMARY KEY,
-            library_id UUID NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+            id TEXT PRIMARY KEY,
+            library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
             name TEXT NOT NULL,
             asset_kind TEXT NOT NULL,
             import_mode TEXT NOT NULL CHECK (import_mode IN ('copy', 'reference')),
@@ -194,11 +195,11 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
         r#"
         CREATE TABLE IF NOT EXISTS activity_log (
             id UUID PRIMARY KEY,
-            library_id UUID REFERENCES libraries(id) ON DELETE CASCADE,
+            library_id TEXT REFERENCES libraries(id) ON DELETE CASCADE,
             actor_user_id UUID REFERENCES users(id),
             action TEXT NOT NULL,
             target_type TEXT NOT NULL,
-            target_id UUID,
+            target_id TEXT,
             details JSONB NOT NULL DEFAULT '{}'::jsonb,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );

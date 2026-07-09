@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ActivityItem, LibraryMember, StorageRoot, TeamLibrary, TeamUser } from "../../api";
 import type { TranslatorContext } from "../../types";
-import { formatBytes, formatCount, isLibraryManagerRole, roleLabel } from "../../utils/format";
+import { formatBytes, formatCount, isLibraryManagerRole, roleLabel, storageKindLabel } from "../../utils/format";
 import { ActivityList, Badge, DataTable, LibraryDetailStat, Panel } from "../common";
 import { MemberDialog } from "../dialogs";
 
@@ -101,8 +101,8 @@ export function LibraryDetailView({
         <Panel title={t("libraryStorage")} icon={Network} className="span-6" action={<Badge>{storageRoots.length ? t("realData") : t("empty")}</Badge>}>
           <DataTable
             emptyLabel={t("noSharedRoots")}
-            columns={[t("name"), t("provider"), t("status")]}
-            rows={storageRoots.map((root) => [root.name, root.kind, root.enabled ? t("enabled") : t("disabled")])}
+            columns={[t("name"), t("kind"), t("status")]}
+            rows={storageRoots.map((root) => [root.name, storageKindLabel(t, root.kind), root.enabled ? t("enabled") : t("disabled")])}
           />
         </Panel>
         <Panel title={t("libraryActivity")} icon={ListChecks} className="span-6" action={<Badge>{libraryActivityItems.length ? t("realData") : t("empty")}</Badge>}>

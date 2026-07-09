@@ -38,6 +38,18 @@ tag_stats AS (
         COUNT(*)::BIGINT AS tag_count
     FROM tags
     GROUP BY library_id
+),
+storage_stats AS (
+    SELECT
+        library_id,
+        COUNT(*)::BIGINT AS storage_root_count,
+        COUNT(*) FILTER (WHERE enabled)::BIGINT AS enabled_storage_root_count,
+        (ARRAY_AGG(kind ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_kind,
+        (ARRAY_AGG(canonical_uri ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_uri,
+        (ARRAY_AGG(windows_unc_path ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_windows_path,
+        (ARRAY_AGG(macos_smb_url ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_macos_path
+    FROM storage_roots
+    GROUP BY library_id
 )
 "#;
 
@@ -47,6 +59,7 @@ SELECT
     l.display_name,
     l.description,
     l.icon_url,
+    l.enabled,
     {role_expression} AS current_user_role,
     creator.display_name AS creator_name,
     COALESCE(ms.member_names, ARRAY[]::TEXT[]) AS member_names,
@@ -54,6 +67,12 @@ SELECT
     COALESCE(fs.folder_count, 0) AS folder_count,
     COALESCE(ts.tag_count, 0) AS tag_count,
     COALESCE(ast.total_size_bytes, 0) AS total_size_bytes,
+    COALESCE(ss.storage_root_count, 0) AS storage_root_count,
+    COALESCE(ss.enabled_storage_root_count, 0) AS enabled_storage_root_count,
+    ss.primary_storage_kind,
+    ss.primary_storage_uri,
+    ss.primary_storage_windows_path,
+    ss.primary_storage_macos_path,
     l.created_by_user_id,
     l.created_at,
     l.updated_at
@@ -76,6 +95,7 @@ pub async fn list_libraries_for_server_manager(
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
+        LEFT JOIN storage_stats ss ON ss.library_id = l.id
         WHERE l.deleted_at IS NULL
         ORDER BY l.display_name ASC
         "#
@@ -102,6 +122,7 @@ pub async fn list_libraries_for_member(
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
+        LEFT JOIN storage_stats ss ON ss.library_id = l.id
         WHERE l.deleted_at IS NULL AND m.user_id = $1
         ORDER BY l.display_name ASC
         "#

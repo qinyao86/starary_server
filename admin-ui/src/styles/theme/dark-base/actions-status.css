@@ -88,13 +88,12 @@
 
 .theme-dark .health-row,
 .theme-dark .library-detail-stat,
-.theme-dark .placeholder-box,
-.theme-dark .service-orb {
+.theme-dark .placeholder-box {
   border-color: #2f2f33;
   background: #111113;
 }
 
-.theme-dark .library-card-stats {
+.theme-dark .library-card-metrics {
   border-top-color: rgba(244, 244, 245, 0.07);
   border-bottom-color: rgba(244, 244, 245, 0.07);
 }

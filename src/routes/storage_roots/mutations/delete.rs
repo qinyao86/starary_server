@@ -17,7 +17,7 @@ pub async fn delete_storage_root(
     Path(root_id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
     let existing = get_storage_root_record(&state, root_id).await?;
-    let library_role = ensure_library_access(&state, &user, existing.library_id).await?;
+    let library_role = ensure_library_access(&state, &user, &existing.library_id).await?;
     if !user.role.can_manage_server() && !library_role.can_manage_library() {
         return Err(AppError::Forbidden);
     }
@@ -26,7 +26,7 @@ pub async fn delete_storage_root(
 
     if active_assets > 0 {
         return Err(AppError::Conflict(
-            "storage root is still referenced by assets; disable it instead".to_string(),
+            "workspace is still referenced by assets; disable it instead".to_string(),
         ));
     }
 
@@ -37,7 +37,7 @@ pub async fn delete_storage_root(
         .await?;
 
     if deleted.rows_affected() == 0 {
-        return Err(AppError::NotFound("storage root not found".to_string()));
+        return Err(AppError::NotFound("workspace not found".to_string()));
     }
 
     sqlx::query(
@@ -47,9 +47,9 @@ pub async fn delete_storage_root(
         "#,
     )
     .bind(Uuid::new_v4())
-    .bind(existing.library_id)
+    .bind(&existing.library_id)
     .bind(user.id)
-    .bind(root_id)
+    .bind(root_id.to_string())
     .bind(serde_json::json!({ "name": existing.name }))
     .execute(&mut *tx)
     .await?;

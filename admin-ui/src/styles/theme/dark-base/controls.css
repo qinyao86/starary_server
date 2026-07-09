@@ -13,6 +13,41 @@
   color: #fafafa;
 }
 
+.theme-dark .library-storage-setup {
+  border-color: #2f2f33;
+  background: #111113;
+}
+
+.theme-dark .storage-kind-option {
+  border-color: #34343a;
+  color: #d4d4d8;
+  background: #1d1d21;
+}
+
+.theme-dark .storage-kind-option:hover {
+  border-color: #494950;
+  background: #232329;
+}
+
+.theme-dark .storage-kind-option.is-active {
+  border-color: #60a5fa;
+  color: #dbeafe;
+  background: rgba(59, 130, 246, 0.14);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.14);
+}
+
+.theme-dark .storage-kind-option-description {
+  color: #a1a1aa;
+}
+
+.theme-dark .library-storage-heading strong {
+  color: #fafafa;
+}
+
+.theme-dark .library-storage-heading span {
+  color: #a1a1aa;
+}
+
 .theme-dark .field input:focus,
 .theme-dark .field select:focus {
   border-color: #60a5fa;

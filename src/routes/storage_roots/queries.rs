@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 pub async fn list_storage_root_records(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
 ) -> AppResult<Vec<StorageRootRecord>> {
     Ok(sqlx::query_as::<_, StorageRootRecord>(
         r#"
@@ -62,12 +62,12 @@ pub async fn get_storage_root_record(
     .bind(root_id)
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| AppError::NotFound("storage root not found".to_string()))
+    .ok_or_else(|| AppError::NotFound("workspace not found".to_string()))
 }
 
 pub async fn ensure_storage_root_name_available(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     name: &str,
     except_root_id: Option<Uuid>,
 ) -> AppResult<()> {
@@ -86,7 +86,7 @@ pub async fn ensure_storage_root_name_available(
 
     if existing.is_some() {
         return Err(AppError::Conflict(
-            "storage root name already exists in this library".to_string(),
+            "workspace name already exists in this library".to_string(),
         ));
     }
 

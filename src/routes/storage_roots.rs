@@ -21,9 +21,9 @@ pub async fn list_storage_roots(
     user: AuthUser,
     Query(query): Query<ListStorageRootsQuery>,
 ) -> AppResult<Json<Vec<StorageRootRecord>>> {
-    ensure_library_access(&state, &user, query.library_id).await?;
+    ensure_library_access(&state, &user, &query.library_id).await?;
 
-    let roots = list_storage_root_records(&state, query.library_id).await?;
+    let roots = list_storage_root_records(&state, &query.library_id).await?;
 
     Ok(Json(roots))
 }
@@ -35,7 +35,7 @@ pub async fn get_storage_root(
 ) -> AppResult<Json<StorageRootRecord>> {
     let root = get_storage_root_record(&state, root_id).await?;
 
-    ensure_library_access(&state, &user, root.library_id).await?;
+    ensure_library_access(&state, &user, &root.library_id).await?;
 
     Ok(Json(root))
 }

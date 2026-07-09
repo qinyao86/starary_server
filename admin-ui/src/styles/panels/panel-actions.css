@@ -43,7 +43,7 @@
 
 .panel-action-button span,
 .member-action-button span,
-.library-card-footer button span {
+.library-card-action span {
   display: inline-flex;
   align-items: center;
   line-height: 1;

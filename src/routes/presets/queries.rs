@@ -3,7 +3,6 @@ use crate::{
     models::PresetRecord,
     state::AppState,
 };
-use uuid::Uuid;
 
 pub const FILTER_PRESET_TYPE: &str = "filter";
 pub const SMART_FOLDER_PRESET_TYPE: &str = "smart_folder";
@@ -33,7 +32,7 @@ pub fn normalize_required_name(value: &str) -> AppResult<String> {
 
 pub async fn query_presets(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     preset_type: &str,
 ) -> AppResult<Vec<PresetRecord>> {
     let records = sqlx::query_as::<_, PresetRecord>(
@@ -63,7 +62,7 @@ pub async fn query_presets(
 
 pub async fn query_preset_name(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     preset_type: &str,
     preset_id: &str,
 ) -> AppResult<String> {
@@ -86,7 +85,7 @@ pub async fn query_preset_name(
 
 pub async fn query_preset_edit_state(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     preset_type: &str,
     preset_id: &str,
 ) -> AppResult<(String, serde_json::Value)> {
@@ -109,7 +108,7 @@ pub async fn query_preset_edit_state(
 
 pub async fn next_preset_sort_order(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     preset_type: &str,
 ) -> AppResult<i64> {
     let sort_order = sqlx::query_scalar(

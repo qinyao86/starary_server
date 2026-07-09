@@ -33,12 +33,19 @@ export type TeamLibrary = {
   displayName: string;
   description?: string | null;
   currentUserRole?: string;
+  enabled: boolean;
   creatorName?: string;
   memberNames?: string[];
   assetCount?: number;
   folderCount?: number;
   tagCount?: number;
   totalSizeBytes?: number;
+  storageRootCount?: number;
+  enabledStorageRootCount?: number;
+  primaryStorageKind?: string | null;
+  primaryStorageUri?: string | null;
+  primaryStorageWindowsPath?: string | null;
+  primaryStorageMacosPath?: string | null;
   createdByUserId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -72,6 +79,20 @@ export type StorageRoot = {
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type StorageRootInput = {
+  name: string;
+  kind: string;
+  canonicalUri: string;
+  windowsUncPath?: string;
+  windowsMappedDriveAliases?: string[];
+  macosSmbUrl?: string;
+  macosMountAliases?: string[];
+};
+
+export type DefaultStorageRootInput = Omit<StorageRootInput, "name"> & {
+  name?: string;
 };
 
 export type LibraryMember = {

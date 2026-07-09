@@ -4,7 +4,6 @@ import type { createTranslator, Language, TranslationKey } from "./i18n";
 
 export type Section =
   | "overview"
-  | "service"
   | "libraries"
   | "users"
   | "permissions"

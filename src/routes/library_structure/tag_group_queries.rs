@@ -3,11 +3,10 @@ use crate::{
     models::TagGroupRecord,
     state::AppState,
 };
-use uuid::Uuid;
 
 pub async fn query_tag_groups(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
 ) -> AppResult<Vec<TagGroupRecord>> {
     Ok(sqlx::query_as::<_, TagGroupRecord>(
         r#"
@@ -39,7 +38,7 @@ pub async fn query_tag_groups(
     .await?)
 }
 
-pub async fn next_group_sort_order(state: &AppState, library_id: Uuid) -> AppResult<i64> {
+pub async fn next_group_sort_order(state: &AppState, library_id: &str) -> AppResult<i64> {
     Ok(sqlx::query_scalar::<_, i64>(
         "SELECT COALESCE(MAX(sort_order), 0) + 1000 FROM tag_groups WHERE library_id = $1",
     )
@@ -50,7 +49,7 @@ pub async fn next_group_sort_order(state: &AppState, library_id: Uuid) -> AppRes
 
 pub async fn ensure_unique_group_name(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     name: &str,
     excluded_group_id: Option<&str>,
 ) -> AppResult<()> {
@@ -81,7 +80,7 @@ pub async fn ensure_unique_group_name(
 
 pub async fn query_group_name(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     group_id: &str,
 ) -> AppResult<String> {
     sqlx::query_scalar("SELECT name FROM tag_groups WHERE library_id = $1 AND id = $2")
@@ -94,7 +93,7 @@ pub async fn query_group_name(
 
 pub async fn query_group_edit_state(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     group_id: &str,
 ) -> AppResult<TagGroupEditState> {
     sqlx::query_as::<_, TagGroupEditState>(

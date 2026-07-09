@@ -79,9 +79,9 @@ export function StorageRootDialog({
           <label className="field">
             <span>{t("kind")}</span>
             <select value={kind} onChange={(event) => onKindChange(event.target.value)}>
-              <option value="smb">SMB</option>
-              <option value="server_filesystem">Filesystem</option>
-              <option value="s3">S3</option>
+              <option value="server_filesystem">{t("storageKindServerFilesystem")}</option>
+              <option value="smb">{t("storageKindSmb")}</option>
+              <option value="s3">{t("storageKindS3")}</option>
             </select>
           </label>
           <label className="field">
@@ -92,12 +92,8 @@ export function StorageRootDialog({
             </select>
           </label>
           <div className="span-field">
-            <TextField required label={t("canonicalUri")} value={canonicalUri} onChange={onCanonicalUriChange} />
+            <TextField required label={t("workspaceLocation")} value={canonicalUri} onChange={onCanonicalUriChange} />
           </div>
-          <TextField label={t("windowsUncPath")} value={windowsUncPath} onChange={onWindowsUncPathChange} />
-          <TextField label={t("windowsAliases")} value={windowsAliases} onChange={onWindowsAliasesChange} placeholder={t("commaSeparated")} />
-          <TextField label={t("macosSmbUrl")} value={macosSmbUrl} onChange={onMacosSmbUrlChange} />
-          <TextField label={t("macosAliases")} value={macosAliases} onChange={onMacosAliasesChange} placeholder={t("commaSeparated")} />
         </div>
         <div className="dialog-footer">
           <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>

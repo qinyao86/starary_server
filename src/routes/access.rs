@@ -4,15 +4,14 @@ use crate::{
     models::Role,
     state::AppState,
 };
-use uuid::Uuid;
 
 pub async fn ensure_library_access(
     state: &AppState,
     user: &AuthUser,
-    library_id: Uuid,
+    library_id: &str,
 ) -> AppResult<Role> {
     if user.role.can_manage_server() {
-        let exists: Option<Uuid> =
+        let exists: Option<String> =
             sqlx::query_scalar("SELECT id FROM libraries WHERE id = $1 AND deleted_at IS NULL")
                 .bind(library_id)
                 .fetch_optional(&state.pool)
@@ -47,7 +46,7 @@ pub async fn ensure_library_access(
 pub async fn ensure_library_manager(
     state: &AppState,
     user: &AuthUser,
-    library_id: Uuid,
+    library_id: &str,
 ) -> AppResult<Role> {
     let role = ensure_library_access(state, user, library_id).await?;
     if user.role.can_manage_server() || role.can_manage_library() {
@@ -60,7 +59,7 @@ pub async fn ensure_library_manager(
 pub async fn ensure_library_write_access(
     state: &AppState,
     user: &AuthUser,
-    library_id: Uuid,
+    library_id: &str,
 ) -> AppResult<Role> {
     // The first team version keeps structure editing permissive for members.
     // Tighten this single gate later when folder/tag permissions are finalized.

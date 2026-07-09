@@ -23,33 +23,32 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use uuid::Uuid;
 
 pub async fn list_folders(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    ensure_library_access(&state, &user, library_id).await?;
-    Ok(Json(query_folders(&state, library_id).await?))
+    ensure_library_access(&state, &user, &library_id).await?;
+    Ok(Json(query_folders(&state, &library_id).await?))
 }
 
 pub async fn create_folder(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
     Json(request): Json<CreateFolderRequest>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
 
     let name = normalize_required_name(&request.name, "folder name")?;
     let icon = normalize_required_text(request.icon, "folder");
     let color = normalize_required_text(request.color, "default");
-    ensure_parent_folder(&state, library_id, request.parent_id.as_deref()).await?;
+    ensure_parent_folder(&state, &library_id, request.parent_id.as_deref()).await?;
 
     let folder_id = new_prefixed_id("folder_");
     let sort_order =
-        next_folder_sort_order(&state, library_id, request.parent_id.as_deref()).await?;
+        next_folder_sort_order(&state, &library_id, request.parent_id.as_deref()).await?;
 
     sqlx::query(
         r#"
@@ -61,7 +60,7 @@ pub async fn create_folder(
         "#,
     )
     .bind(&folder_id)
-    .bind(library_id)
+    .bind(&library_id)
     .bind(request.parent_id)
     .bind(&name)
     .bind(icon)
@@ -73,7 +72,7 @@ pub async fn create_folder(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "folder.created",
         "folder",
@@ -82,18 +81,18 @@ pub async fn create_folder(
     )
     .await?;
 
-    Ok(Json(query_folders(&state, library_id).await?))
+    Ok(Json(query_folders(&state, &library_id).await?))
 }
 
 pub async fn update_folder(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, folder_id)): Path<(Uuid, String)>,
+    Path((library_id, folder_id)): Path<(String, String)>,
     Json(request): Json<UpdateFolderRequest>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
 
-    let current = query_folder_edit_state(&state, library_id, &folder_id).await?;
+    let current = query_folder_edit_state(&state, &library_id, &folder_id).await?;
     let name = request
         .name
         .as_deref()
@@ -117,8 +116,8 @@ pub async fn update_folder(
         normalize_optional_text(request.smart_import_id).or(current.smart_import_id)
     };
 
-    if let Some(asset_id) = cover_asset_id {
-        ensure_asset_in_library(&state, library_id, asset_id).await?;
+    if let Some(asset_id) = cover_asset_id.as_deref() {
+        ensure_asset_in_library(&state, &library_id, asset_id).await?;
     }
 
     sqlx::query(
@@ -135,7 +134,7 @@ pub async fn update_folder(
         WHERE library_id = $1 AND id = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&folder_id)
     .bind(&name)
     .bind(description)
@@ -149,7 +148,7 @@ pub async fn update_folder(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "folder.updated",
         "folder",
@@ -158,26 +157,26 @@ pub async fn update_folder(
     )
     .await?;
 
-    Ok(Json(query_folders(&state, library_id).await?))
+    Ok(Json(query_folders(&state, &library_id).await?))
 }
 
 pub async fn reorder_folders(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
     Json(request): Json<ReorderFoldersRequest>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
-    ensure_parent_folder(&state, library_id, request.parent_id.as_deref()).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_parent_folder(&state, &library_id, request.parent_id.as_deref()).await?;
 
     let requested_folder_ids = unique_ids(&request.folder_ids);
     if requested_folder_ids.is_empty() {
-        return Ok(Json(query_folders(&state, library_id).await?));
+        return Ok(Json(query_folders(&state, &library_id).await?));
     }
 
     let mut tx = state.pool.begin().await?;
     let existing_sibling_ids =
-        query_sibling_folder_ids_in_tx(&mut tx, library_id, request.parent_id.as_deref()).await?;
+        query_sibling_folder_ids_in_tx(&mut tx, &library_id, request.parent_id.as_deref()).await?;
     let mut ordered_folder_ids = requested_folder_ids;
     for sibling_id in existing_sibling_ids {
         if !ordered_folder_ids
@@ -189,9 +188,14 @@ pub async fn reorder_folders(
     }
 
     for (index, folder_id) in ordered_folder_ids.iter().enumerate() {
-        ensure_folder_exists_in_tx(&mut tx, library_id, folder_id).await?;
-        ensure_folder_can_move(&mut tx, library_id, folder_id, request.parent_id.as_deref())
-            .await?;
+        ensure_folder_exists_in_tx(&mut tx, &library_id, folder_id).await?;
+        ensure_folder_can_move(
+            &mut tx,
+            &library_id,
+            folder_id,
+            request.parent_id.as_deref(),
+        )
+        .await?;
         sqlx::query(
             r#"
             UPDATE folders
@@ -202,7 +206,7 @@ pub async fn reorder_folders(
             WHERE library_id = $1 AND id = $2
             "#,
         )
-        .bind(library_id)
+        .bind(&library_id)
         .bind(folder_id)
         .bind(&request.parent_id)
         .bind((index as i64 + 1) * 1000)
@@ -212,19 +216,19 @@ pub async fn reorder_folders(
     }
     tx.commit().await?;
 
-    Ok(Json(query_folders(&state, library_id).await?))
+    Ok(Json(query_folders(&state, &library_id).await?))
 }
 
 pub async fn delete_folder(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, folder_id)): Path<(Uuid, String)>,
+    Path((library_id, folder_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, library_id).await?;
-    let folder_name = query_folder_name(&state, library_id, &folder_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
+    let folder_name = query_folder_name(&state, &library_id, &folder_id).await?;
 
     let deleted = sqlx::query("DELETE FROM folders WHERE library_id = $1 AND id = $2")
-        .bind(library_id)
+        .bind(&library_id)
         .bind(&folder_id)
         .execute(&state.pool)
         .await?;
@@ -235,7 +239,7 @@ pub async fn delete_folder(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "folder.deleted",
         "folder",

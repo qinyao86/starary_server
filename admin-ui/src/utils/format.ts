@@ -80,6 +80,10 @@ export function activityActionLabel(t: ReturnType<typeof createTranslator>, acti
       return t("libraryUpdated");
     case "library.deleted":
       return t("libraryDeleted");
+    case "library.enabled":
+      return t("libraryEnabled");
+    case "library.disabled":
+      return t("libraryDisabled");
     case "library.member_upserted":
       return t("memberUpdated");
     case "library.member_removed":
@@ -108,6 +112,13 @@ export function storageStatusLabel(t: ReturnType<typeof createTranslator>, serve
   if (serverInfo.storageStatus === "writable") return t("storageWritable");
   if (serverInfo.storageStatus === "read_only") return t("storageReadOnly");
   return t("storageMissing");
+}
+
+export function storageKindLabel(t: ReturnType<typeof createTranslator>, kind: string) {
+  if (kind === "server_filesystem") return t("storageKindServerFilesystem");
+  if (kind === "smb") return t("storageKindSmb");
+  if (kind === "s3") return t("storageKindS3");
+  return kind;
 }
 
 export function splitList(value: string) {

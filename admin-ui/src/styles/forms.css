@@ -41,3 +41,80 @@
   font-weight: 680;
   line-height: 1;
 }
+
+.library-storage-setup {
+  display: grid;
+  gap: 12px;
+  margin-top: 2px;
+  border: 1px solid #e4e9f0;
+  border-radius: 12px;
+  padding: 13px;
+  background: #f8fafc;
+}
+
+.library-storage-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.library-storage-heading strong {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.library-storage-heading span {
+  color: #697586;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.storage-kind-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.storage-kind-option {
+  display: grid;
+  gap: 5px;
+  min-height: 70px;
+  border: 1px solid #dbe3ee;
+  border-radius: 11px;
+  padding: 11px 12px;
+  color: #526071;
+  text-align: left;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.storage-kind-option:hover {
+  border-color: #cbd6e5;
+  background: #f9fbfd;
+}
+
+.storage-kind-option.is-active {
+  border-color: #2563eb;
+  color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.storage-kind-option-title {
+  color: inherit;
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 18px;
+}
+
+.storage-kind-option-description {
+  color: #697586;
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 17px;
+}
+
+.library-storage-fields {
+  display: grid;
+  gap: 12px;
+}

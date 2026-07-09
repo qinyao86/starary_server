@@ -3,11 +3,13 @@ import type {
   ActivityListResponse,
   AssetListResponse,
   CurrentUser,
+  DefaultStorageRootInput,
   LibraryMember,
   LoginResponse,
   ServerInfo,
   SetupStatus,
   StorageRoot,
+  StorageRootInput,
   TeamLibrary,
   TeamUser
 } from "./types";
@@ -47,7 +49,7 @@ export const api = {
       body: JSON.stringify(payload)
     }),
   listLibraries: (token: string) => request<TeamLibrary[]>("/api/v1/libraries", { token }),
-  createLibrary: (token: string, payload: { displayName: string; description?: string }) =>
+  createLibrary: (token: string, payload: { displayName: string; description?: string; defaultStorageRoot?: DefaultStorageRootInput }) =>
     request<TeamLibrary>("/api/v1/libraries", {
       method: "POST",
       token,
@@ -55,6 +57,12 @@ export const api = {
     }),
   updateLibrary: (token: string, libraryId: string, payload: { displayName: string; description?: string }) =>
     request<TeamLibrary>(`/api/v1/libraries/${libraryId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload)
+    }),
+  updateLibraryEnabled: (token: string, libraryId: string, payload: { enabled: boolean }) =>
+    request<TeamLibrary>(`/api/v1/libraries/${libraryId}/enabled`, {
       method: "PATCH",
       token,
       body: JSON.stringify(payload)
@@ -81,16 +89,7 @@ export const api = {
     request<StorageRoot[]>(`/api/v1/storage-roots?libraryId=${encodeURIComponent(libraryId)}`, { token }),
   createStorageRoot: (
     token: string,
-    payload: {
-      libraryId: string;
-      name: string;
-      kind: string;
-      canonicalUri: string;
-      windowsUncPath?: string;
-      windowsMappedDriveAliases?: string[];
-      macosSmbUrl?: string;
-      macosMountAliases?: string[];
-    }
+    payload: StorageRootInput & { libraryId: string }
   ) =>
     request<StorageRoot>("/api/v1/storage-roots", {
       method: "POST",

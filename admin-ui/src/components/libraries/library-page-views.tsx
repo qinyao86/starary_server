@@ -83,6 +83,8 @@ export function LibraryListPageView({
   libraries,
   showCreate,
   t,
+  workspaceCanonicalUri,
+  workspaceKind,
   onCloseCreate,
   onCancelEdit,
   onCreate,
@@ -94,7 +96,10 @@ export function LibraryListPageView({
   onEditNameChange,
   onOpen,
   onOpenCreate,
-  onUpdate
+  onToggleEnabled,
+  onUpdate,
+  onWorkspaceCanonicalUriChange,
+  onWorkspaceKindChange
 }: TranslatorContext & {
   createDescription: string;
   createName: string;
@@ -103,6 +108,8 @@ export function LibraryListPageView({
   editingLibraryId: string | null;
   libraries: TeamLibrary[];
   showCreate: boolean;
+  workspaceCanonicalUri: string;
+  workspaceKind: string;
   onCloseCreate: () => void;
   onCancelEdit: () => void;
   onCreate: (event: FormEvent) => void | Promise<void>;
@@ -114,7 +121,10 @@ export function LibraryListPageView({
   onEditNameChange: (value: string) => void;
   onOpen: (libraryId: string) => void;
   onOpenCreate: () => void;
+  onToggleEnabled: (library: TeamLibrary, enabled: boolean) => void;
   onUpdate: (event: FormEvent) => void | Promise<void>;
+  onWorkspaceCanonicalUriChange: (value: string) => void;
+  onWorkspaceKindChange: (value: string) => void;
 }) {
   return (
     <PageFrame
@@ -136,10 +146,15 @@ export function LibraryListPageView({
           description={createDescription}
           submitLabel={t("submit")}
           t={t}
+          showWorkspaceSection
+          workspaceCanonicalUri={workspaceCanonicalUri}
+          workspaceKind={workspaceKind}
           onClose={onCloseCreate}
           onDescriptionChange={onCreateDescriptionChange}
           onNameChange={onCreateNameChange}
           onSubmit={onCreate}
+          onWorkspaceCanonicalUriChange={onWorkspaceCanonicalUriChange}
+          onWorkspaceKindChange={onWorkspaceKindChange}
         />
         <LibraryDialog
           open={Boolean(editingLibraryId)}
@@ -154,7 +169,7 @@ export function LibraryListPageView({
           onNameChange={onEditNameChange}
           onSubmit={onUpdate}
         />
-        <LibraryCardList libraries={libraries} t={t} onDelete={onDelete} onEdit={onEdit} onOpen={onOpen} />
+        <LibraryCardList libraries={libraries} t={t} onDelete={onDelete} onEdit={onEdit} onOpen={onOpen} onToggleEnabled={onToggleEnabled} />
       </div>
     </PageFrame>
   );

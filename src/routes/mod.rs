@@ -52,6 +52,10 @@ pub fn router(state: AppState) -> Router {
             patch(libraries::update_library).delete(libraries::delete_library),
         )
         .route(
+            "/api/v1/libraries/:library_id/enabled",
+            patch(libraries::update_library_enabled),
+        )
+        .route(
             "/api/v1/libraries/:library_id/members",
             get(members::list_members),
         )

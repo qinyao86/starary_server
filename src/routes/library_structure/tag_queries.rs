@@ -3,9 +3,8 @@ use crate::{
     models::TagRecord,
     state::AppState,
 };
-use uuid::Uuid;
 
-pub async fn query_tags(state: &AppState, library_id: Uuid) -> AppResult<Vec<TagRecord>> {
+pub async fn query_tags(state: &AppState, library_id: &str) -> AppResult<Vec<TagRecord>> {
     Ok(sqlx::query_as::<_, TagRecord>(
         r#"
         SELECT
@@ -38,7 +37,7 @@ pub async fn query_tags(state: &AppState, library_id: Uuid) -> AppResult<Vec<Tag
 
 pub async fn next_tag_sort_order(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     group_id: Option<&str>,
 ) -> AppResult<i64> {
     Ok(sqlx::query_scalar::<_, i64>(
@@ -57,7 +56,7 @@ pub async fn next_tag_sort_order(
 
 pub async fn query_group_color(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     group_id: Option<&str>,
 ) -> AppResult<Option<String>> {
     let Some(group_id) = group_id else {
@@ -75,7 +74,7 @@ pub async fn query_group_color(
 
 pub async fn ensure_unique_tag_name(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     name: &str,
     excluded_tag_id: Option<&str>,
 ) -> AppResult<()> {
@@ -102,7 +101,7 @@ pub async fn ensure_unique_tag_name(
     Ok(())
 }
 
-pub async fn query_tag_name(state: &AppState, library_id: Uuid, tag_id: &str) -> AppResult<String> {
+pub async fn query_tag_name(state: &AppState, library_id: &str, tag_id: &str) -> AppResult<String> {
     sqlx::query_scalar("SELECT name FROM tags WHERE library_id = $1 AND id = $2")
         .bind(library_id)
         .bind(tag_id)
@@ -113,7 +112,7 @@ pub async fn query_tag_name(state: &AppState, library_id: Uuid, tag_id: &str) ->
 
 pub async fn query_tag_edit_state(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     tag_id: &str,
 ) -> AppResult<TagEditState> {
     sqlx::query_as::<_, TagEditState>(
@@ -128,7 +127,7 @@ pub async fn query_tag_edit_state(
 
 pub async fn ensure_tag_exists_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    library_id: Uuid,
+    library_id: &str,
     tag_id: &str,
 ) -> AppResult<()> {
     let exists: Option<String> =

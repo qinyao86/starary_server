@@ -1,22 +1,106 @@
-import { Library, Pencil, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { TeamLibrary } from "../../api";
 import type { TranslatorContext } from "../../types";
-import { formatBytes, formatCount } from "../../utils/format";
-import { LibraryStat } from "../common";
+import { formatBytes, formatCount, storageKindLabel } from "../../utils/format";
+
+function libraryStorageMeta(library: TeamLibrary, t: TranslatorContext["t"]) {
+  const storagePath = preferredStoragePath(library);
+  const kind = library.primaryStorageKind ? storageKindLabel(t, library.primaryStorageKind) : t("storage");
+  const extraCount = Math.max((library.storageRootCount ?? 0) - 1, 0);
+  return {
+    extraCount,
+    kind,
+    path: storagePath || t("noStorageLocation"),
+    rawPath: storagePath
+  };
+}
+
+function preferredStoragePath(library: TeamLibrary) {
+  const platform = currentPlatformLabel();
+  if (platform.includes("mac")) {
+    return library.primaryStorageMacosPath
+      || smbUrlFromUnc(library.primaryStorageWindowsPath)
+      || library.primaryStorageUri
+      || "";
+  }
+  if (platform.includes("win")) {
+    return library.primaryStorageWindowsPath
+      || uncFromSmbUrl(library.primaryStorageUri)
+      || uncFromSmbUrl(library.primaryStorageMacosPath)
+      || library.primaryStorageUri
+      || "";
+  }
+  return library.primaryStorageUri || library.primaryStorageMacosPath || library.primaryStorageWindowsPath || "";
+}
+
+function currentPlatformLabel() {
+  if (typeof navigator === "undefined") return "";
+  return `${navigator.platform} ${navigator.userAgent}`.toLowerCase();
+}
+
+function uncFromSmbUrl(value?: string | null) {
+  if (!value?.startsWith("smb://")) return "";
+  const parts = value
+    .slice("smb://".length)
+    .split("/")
+    .filter(Boolean);
+  if (parts.length < 2) return "";
+  return `\\\\${parts.join("\\")}`;
+}
+
+function smbUrlFromUnc(value?: string | null) {
+  if (!value?.startsWith("\\\\")) return "";
+  const parts = value
+    .replace(/\//g, "\\")
+    .split("\\")
+    .filter(Boolean);
+  if (parts.length < 2) return "";
+  return `smb://${parts.join("/")}`;
+}
+
+function LibraryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="library-card-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+async function copyTextToClipboard(value: string) {
+  if (!value.trim()) return;
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
 
 export function LibraryCardList({
   libraries,
   t,
   onDelete,
   onEdit,
-  onOpen
+  onOpen,
+  onToggleEnabled
 }: TranslatorContext & {
   libraries: TeamLibrary[];
   onDelete: (library: TeamLibrary) => void;
   onEdit: (library: TeamLibrary) => void;
   onOpen: (libraryId: string) => void;
+  onToggleEnabled: (library: TeamLibrary, enabled: boolean) => void;
 }) {
   if (libraries.length === 0) {
     return <div className="placeholder-box">{t("noLibraries")}</div>;
@@ -24,40 +108,82 @@ export function LibraryCardList({
 
   return (
     <div className="library-card-grid">
-      {libraries.map((library) => (
-        <Card className="library-card" key={library.id}>
-          <div className="library-card-top">
-            <div className="library-card-heading">
-              <div className="library-card-title">{library.displayName}</div>
-              <div className="library-card-description">{library.description || t("noDescription")}</div>
+      {libraries.map((library) => {
+        const isEnabled = library.enabled !== false;
+        const storageMeta = libraryStorageMeta(library, t);
+        return (
+          <Card className={`library-card${isEnabled ? "" : " is-disabled"}`} key={library.id}>
+            <div className="library-card-top">
+              <div className="library-card-heading">
+                <div className="library-card-title-row">
+                  <div className="library-card-title">{library.displayName}</div>
+                  <span className={`library-card-status${isEnabled ? " is-on" : " is-off"}`}>
+                    {isEnabled ? t("libraryStarted") : t("libraryNotStarted")}
+                  </span>
+                </div>
+                <div className="library-card-description">{library.description || t("noDescription")}</div>
+              </div>
+              <button
+                aria-checked={isEnabled}
+                aria-label={isEnabled ? t("deactivate") : t("activate")}
+                className={`library-card-switch${isEnabled ? " is-on" : ""}`}
+                role="switch"
+                type="button"
+                onClick={() => onToggleEnabled(library, !isEnabled)}
+              >
+                <span />
+              </button>
             </div>
-            <div className="library-card-tools">
-              <button className="library-icon-button" type="button" aria-label={t("editLibrary")} onClick={() => onEdit(library)}>
+
+            <div className="library-card-storage">
+              <div className="library-card-storage-header">
+                <span>{t("storageLocation")}</span>
+                <em>
+                  {storageMeta.kind}
+                  {storageMeta.extraCount > 0 ? ` +${storageMeta.extraCount}` : ""}
+                </em>
+              </div>
+              <div className="library-card-storage-path-row">
+                <strong className="library-card-storage-path" title={storageMeta.path}>
+                  {storageMeta.path}
+                </strong>
+                <button
+                  aria-label={t("copyMode")}
+                  className="library-card-storage-copy"
+                  disabled={!storageMeta.rawPath}
+                  title={t("copyMode")}
+                  type="button"
+                  onClick={() => void copyTextToClipboard(storageMeta.rawPath)}
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div className="library-card-metrics">
+              <LibraryMetric label={t("totalSize")} value={formatBytes(library.totalSizeBytes)} />
+              <LibraryMetric label={t("membersLabel")} value={formatCount(library.memberNames?.length)} />
+              <LibraryMetric label={t("assets")} value={formatCount(library.assetCount)} />
+              <LibraryMetric label={t("creator")} value={library.creatorName || "-"} />
+            </div>
+
+            <div className="library-card-actions">
+              <Button className="library-card-action is-primary" size="sm" type="button" onClick={() => onOpen(library.id)}>
+                <ExternalLink size={15} />
+                <span>{t("openLibrary")}</span>
+              </Button>
+              <Button className="library-card-action" size="sm" type="button" variant="outline" onClick={() => onEdit(library)}>
                 <Pencil size={15} />
-              </button>
-              <button className="library-icon-button is-danger" type="button" aria-label={t("deleteLibrary")} onClick={() => onDelete(library)}>
+                <span>{t("editLibrary")}</span>
+              </Button>
+              <Button className="library-card-action is-danger" size="sm" type="button" variant="outline" onClick={() => onDelete(library)}>
                 <Trash2 size={15} />
-              </button>
+                <span>{t("deleteLibrary")}</span>
+              </Button>
             </div>
-          </div>
-          <div className="library-card-stats">
-            <LibraryStat label={t("totalSize")} value={formatBytes(library.totalSizeBytes)} />
-            <LibraryStat label={t("membersLabel")} value={formatCount(library.memberNames?.length)} />
-            <LibraryStat label={t("assets")} value={formatCount(library.assetCount)} />
-            <LibraryStat label={t("tags")} value={formatCount(library.tagCount)} />
-          </div>
-          <div className="library-card-footer">
-            <div className="library-card-members" title={library.creatorName ?? ""}>
-              <span>{t("creator")}</span>
-              <strong>{library.creatorName || "-"}</strong>
-            </div>
-            <Button size="sm" type="button" onClick={() => onOpen(library.id)}>
-              <Library size={15} />
-              <span>{t("openLibrary")}</span>
-            </Button>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 }

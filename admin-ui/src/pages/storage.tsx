@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { HardDrive } from "lucide-react";
+import type { FormEvent } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { StorageRoot } from "../api";
 import { api } from "../api";
 import type { PageContext } from "../types";
 import { StorageRootDialog } from "../components/dialogs";
-import { InfoStack, Panel } from "../components/common";
+import { PageFrame } from "../components/common";
 import { StorageRootsPanel } from "../components/storage/storage-roots-panel";
 import { splitList } from "../utils/format";
 import { storageRootPayloadFromRecord } from "../utils/storage-roots";
 
-export function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibraryId, storageRoots, deploymentMode, refreshAll, setMessage }: PageContext) {
+export function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibraryId, storageRoots, refreshAll, setMessage }: PageContext) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoot, setEditingRoot] = useState<StorageRoot | null>(null);
   const [name, setName] = useState("");
@@ -56,7 +58,7 @@ export function StoragePage({ t, token, libraries, selectedLibraryId, setSelecte
     setDialogOpen(false);
   };
 
-  const submitRoot = async (event: React.FormEvent) => {
+  const submitRoot = async (event: FormEvent) => {
     event.preventDefault();
     if (!selectedLibraryId || !name.trim() || !canonicalUri.trim()) {
       setMessage(t("formRequiredHint"));
@@ -123,53 +125,54 @@ export function StoragePage({ t, token, libraries, selectedLibraryId, setSelecte
   };
 
   return (
-    <div className="page-grid">
-      <StorageRootDialog
-        canonicalUri={canonicalUri}
-        enabled={rootEnabled}
-        editingRoot={editingRoot}
-        kind={kind}
-        libraries={libraries}
-        macosAliases={macosAliases}
-        macosSmbUrl={macosSmbUrl}
-        name={name}
-        open={dialogOpen}
-        selectedLibraryId={selectedLibraryId}
-        t={t}
-        windowsAliases={windowsAliases}
-        windowsUncPath={windowsUncPath}
-        onCanonicalUriChange={setCanonicalUri}
-        onClose={closeDialog}
-        onEnabledChange={setRootEnabled}
-        onKindChange={setKind}
-        onLibraryChange={setSelectedLibraryId}
-        onMacosAliasesChange={setMacosAliases}
-        onMacosSmbUrlChange={setMacosSmbUrl}
-        onNameChange={setName}
-        onSubmit={submitRoot}
-        onWindowsAliasesChange={setWindowsAliases}
-        onWindowsUncPathChange={setWindowsUncPath}
-      />
-      <Panel title={t("storage")} icon={HardDrive} className="span-4">
-        <InfoStack
-          items={[
-            [t("provider"), deploymentMode === "local" ? "Filesystem" : "S3 / MinIO"],
-            [t("objectStorage"), deploymentMode === "cloud" ? t("notConfigured") : t("disabled")],
-            [t("pathResolver"), t("enabled")]
-          ]}
+    <PageFrame
+      title={t("storage")}
+      description={t("storagePageHint")}
+      action={
+        <Button type="button" onClick={openCreateDialog} disabled={libraries.length === 0}>
+          <Plus size={16} />
+          <span>{t("createStorageRoot")}</span>
+        </Button>
+      }
+    >
+      <div className="storage-page">
+        <StorageRootDialog
+          canonicalUri={canonicalUri}
+          enabled={rootEnabled}
+          editingRoot={editingRoot}
+          kind={kind}
+          libraries={libraries}
+          macosAliases={macosAliases}
+          macosSmbUrl={macosSmbUrl}
+          name={name}
+          open={dialogOpen}
+          selectedLibraryId={selectedLibraryId}
+          t={t}
+          windowsAliases={windowsAliases}
+          windowsUncPath={windowsUncPath}
+          onCanonicalUriChange={setCanonicalUri}
+          onClose={closeDialog}
+          onEnabledChange={setRootEnabled}
+          onKindChange={setKind}
+          onLibraryChange={setSelectedLibraryId}
+          onMacosAliasesChange={setMacosAliases}
+          onMacosSmbUrlChange={setMacosSmbUrl}
+          onNameChange={setName}
+          onSubmit={submitRoot}
+          onWindowsAliasesChange={setWindowsAliases}
+          onWindowsUncPathChange={setWindowsUncPath}
         />
-      </Panel>
-      <StorageRootsPanel
-        libraries={libraries}
-        selectedLibraryId={selectedLibraryId}
-        storageRoots={storageRoots}
-        t={t}
-        onCreate={openCreateDialog}
-        onDelete={(root) => void deleteStorageRoot(root)}
-        onEdit={openEditDialog}
-        onLibraryChange={setSelectedLibraryId}
-        onToggle={(root) => void toggleStorageRoot(root)}
-      />
-    </div>
+        <StorageRootsPanel
+          libraries={libraries}
+          selectedLibraryId={selectedLibraryId}
+          storageRoots={storageRoots}
+          t={t}
+          onDelete={(root) => void deleteStorageRoot(root)}
+          onEdit={openEditDialog}
+          onLibraryChange={setSelectedLibraryId}
+          onToggle={(root) => void toggleStorageRoot(root)}
+        />
+      </div>
+    </PageFrame>
   );
 }

@@ -1,5 +1,4 @@
 export { OverviewPage } from "./overview";
-export { ServicePage } from "./service";
 export { LibrariesPage } from "./libraries";
 export { UsersPage } from "./users";
 export { PermissionsPage } from "./permissions";

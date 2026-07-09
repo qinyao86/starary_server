@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 pub async fn current_library_role(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     user_id: Uuid,
 ) -> AppResult<Option<Role>> {
     let role_value: Option<String> = sqlx::query_scalar(
@@ -29,7 +29,7 @@ pub async fn current_library_role(
 
 pub async fn ensure_another_library_manager(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     user_id: Uuid,
 ) -> AppResult<()> {
     let count: i64 = sqlx::query_scalar(

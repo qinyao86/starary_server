@@ -2,7 +2,7 @@ use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
     models::StorageRootRecord,
-    path_resolver::{validate_aliases, validate_storage_root},
+    path_resolver::{ensure_storage_location_exists, resolve_storage_location, validate_aliases},
     routes::access::ensure_library_access,
     state::AppState,
 };
@@ -17,7 +17,7 @@ pub async fn create_storage_root(
     user: AuthUser,
     Json(request): Json<CreateStorageRootRequest>,
 ) -> AppResult<Json<StorageRootRecord>> {
-    let library_role = ensure_library_access(&state, &user, request.library_id).await?;
+    let library_role = ensure_library_access(&state, &user, &request.library_id).await?;
     if !user.role.can_manage_server() && !library_role.can_manage_library() {
         return Err(AppError::Forbidden);
     }
@@ -25,20 +25,20 @@ pub async fn create_storage_root(
     let name = request.name.trim();
     if name.is_empty() {
         return Err(AppError::BadRequest(
-            "storage root name is required".to_string(),
+            "workspace name is required".to_string(),
         ));
     }
-    ensure_storage_root_name_available(&state, request.library_id, name, None).await?;
+    ensure_storage_root_name_available(&state, &request.library_id, name, None).await?;
 
-    validate_storage_root(request.kind, &request.canonical_uri)?;
+    let location = resolve_storage_location(
+        request.kind,
+        &request.canonical_uri,
+        request.windows_unc_path,
+        request.macos_smb_url,
+    )?;
+    ensure_storage_location_exists(request.kind, &location)?;
     validate_aliases(&request.windows_mapped_drive_aliases)?;
     validate_aliases(&request.macos_mount_aliases)?;
-    if let Some(value) = &request.windows_unc_path {
-        validate_aliases(std::slice::from_ref(value))?;
-    }
-    if let Some(value) = &request.macos_smb_url {
-        validate_aliases(std::slice::from_ref(value))?;
-    }
 
     let root_id = Uuid::new_v4();
     let mut tx = state.pool.begin().await?;
@@ -74,13 +74,13 @@ pub async fn create_storage_root(
         "#,
     )
     .bind(root_id)
-    .bind(request.library_id)
+    .bind(&request.library_id)
     .bind(name)
     .bind(request.kind.as_str())
-    .bind(request.canonical_uri.trim())
-    .bind(request.windows_unc_path)
+    .bind(location.canonical_uri)
+    .bind(location.windows_unc_path)
     .bind(serde_json::to_value(request.windows_mapped_drive_aliases)?)
-    .bind(request.macos_smb_url)
+    .bind(location.macos_smb_url)
     .bind(serde_json::to_value(request.macos_mount_aliases)?)
     .bind(user.id)
     .fetch_one(&mut *tx)
@@ -93,9 +93,9 @@ pub async fn create_storage_root(
         "#,
     )
     .bind(Uuid::new_v4())
-    .bind(request.library_id)
+    .bind(&request.library_id)
     .bind(user.id)
-    .bind(root_id)
+    .bind(root_id.to_string())
     .bind(serde_json::json!({ "name": root.name }))
     .execute(&mut *tx)
     .await?;

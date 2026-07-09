@@ -1,17 +1,16 @@
 use crate::models::StorageRootKind;
 use serde::Deserialize;
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListStorageRootsQuery {
-    pub library_id: Uuid,
+    pub library_id: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateStorageRootRequest {
-    pub library_id: Uuid,
+    pub library_id: String,
     pub name: String,
     pub kind: StorageRootKind,
     pub canonical_uri: String,

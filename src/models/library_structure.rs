@@ -13,7 +13,7 @@ pub struct FolderRecord {
     pub icon: String,
     pub color: String,
     pub asset_count: i64,
-    pub cover_asset_id: Option<Uuid>,
+    pub cover_asset_id: Option<String>,
     pub cover_asset: Option<serde_json::Value>,
     pub smart_import_id: Option<String>,
     pub sort_order: i64,

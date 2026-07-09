@@ -97,7 +97,7 @@ impl FromStr for StorageRootKind {
             "server_filesystem" => Ok(StorageRootKind::ServerFilesystem),
             "smb" => Ok(StorageRootKind::Smb),
             "s3" => Ok(StorageRootKind::S3),
-            other => Err(format!("unknown storage root kind: {other}")),
+            other => Err(format!("unknown workspace kind: {other}")),
         }
     }
 }
@@ -115,7 +115,7 @@ pub struct UserRecord {
     #[sqlx(default)]
     pub last_seen_at: Option<DateTime<Utc>>,
     #[sqlx(default)]
-    pub last_seen_library_id: Option<Uuid>,
+    pub last_seen_library_id: Option<String>,
     #[sqlx(default)]
     pub last_seen_library_name: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -135,10 +135,11 @@ pub struct UserWithPassword {
 #[derive(Debug, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryRecord {
-    pub id: Uuid,
+    pub id: String,
     pub display_name: String,
     pub description: Option<String>,
     pub icon_url: Option<String>,
+    pub enabled: bool,
     pub created_by_user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -147,10 +148,11 @@ pub struct LibraryRecord {
 #[derive(Debug, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryWithRole {
-    pub id: Uuid,
+    pub id: String,
     pub display_name: String,
     pub description: Option<String>,
     pub icon_url: Option<String>,
+    pub enabled: bool,
     pub current_user_role: String,
     pub creator_name: String,
     pub member_names: Vec<String>,
@@ -158,6 +160,12 @@ pub struct LibraryWithRole {
     pub folder_count: i64,
     pub tag_count: i64,
     pub total_size_bytes: i64,
+    pub storage_root_count: i64,
+    pub enabled_storage_root_count: i64,
+    pub primary_storage_kind: Option<String>,
+    pub primary_storage_uri: Option<String>,
+    pub primary_storage_windows_path: Option<String>,
+    pub primary_storage_macos_path: Option<String>,
     pub created_by_user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -167,7 +175,7 @@ pub struct LibraryWithRole {
 #[serde(rename_all = "camelCase")]
 pub struct StorageRootRecord {
     pub id: Uuid,
-    pub library_id: Uuid,
+    pub library_id: String,
     pub name: String,
     pub kind: String,
     pub canonical_uri: String,
@@ -184,7 +192,7 @@ pub struct StorageRootRecord {
 #[derive(Debug, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryMemberRecord {
-    pub library_id: Uuid,
+    pub library_id: String,
     pub user_id: Uuid,
     pub email: String,
     pub display_name: String,
@@ -196,8 +204,8 @@ pub struct LibraryMemberRecord {
 #[derive(Debug, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetRecord {
-    pub id: Uuid,
-    pub library_id: Uuid,
+    pub id: String,
+    pub library_id: String,
     pub name: String,
     pub asset_kind: String,
     pub import_mode: String,
@@ -221,13 +229,13 @@ pub struct AssetRecord {
 #[serde(rename_all = "camelCase")]
 pub struct ActivityLogRecord {
     pub id: Uuid,
-    pub library_id: Option<Uuid>,
+    pub library_id: Option<String>,
     pub actor_user_id: Option<Uuid>,
     pub actor_display_name: Option<String>,
     pub actor_email: Option<String>,
     pub action: String,
     pub target_type: String,
-    pub target_id: Option<Uuid>,
+    pub target_id: Option<String>,
     pub target_name: Option<String>,
     pub details: serde_json::Value,
     pub created_at: DateTime<Utc>,

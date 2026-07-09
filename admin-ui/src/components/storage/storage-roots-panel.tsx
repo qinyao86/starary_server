@@ -1,7 +1,8 @@
-import { Network, Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Network, Pencil, Power, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { StorageRoot, TeamLibrary } from "../../api";
 import type { TranslatorContext } from "../../types";
+import { storageKindLabel } from "../../utils/format";
 import { Panel, StatusDot } from "../common";
 
 export function StorageRootsPanel({
@@ -9,7 +10,6 @@ export function StorageRootsPanel({
   selectedLibraryId,
   storageRoots,
   t,
-  onCreate,
   onDelete,
   onEdit,
   onLibraryChange,
@@ -18,7 +18,6 @@ export function StorageRootsPanel({
   libraries: TeamLibrary[];
   selectedLibraryId: string;
   storageRoots: StorageRoot[];
-  onCreate: () => void;
   onDelete: (root: StorageRoot) => void;
   onEdit: (root: StorageRoot) => void;
   onLibraryChange: (libraryId: string) => void;
@@ -28,13 +27,7 @@ export function StorageRootsPanel({
     <Panel
       title={t("sharedRoots")}
       icon={Network}
-      className="span-8"
-      action={
-        <Button className="panel-action-button" size="sm" type="button" onClick={onCreate} disabled={libraries.length === 0}>
-          <Plus size={15} />
-          <span>{t("createStorageRoot")}</span>
-        </Button>
-      }
+      className="storage-roots-card"
     >
       <div className="toolbar-strip">
         <label className="field compact-select-field">
@@ -52,8 +45,8 @@ export function StorageRootsPanel({
           <thead>
             <tr>
               <th>{t("name")}</th>
-              <th>{t("provider")}</th>
-              <th>{t("canonicalUri")}</th>
+              <th>{t("kind")}</th>
+              <th>{t("workspaceLocation")}</th>
               <th>{t("status")}</th>
               <th>{t("action")}</th>
             </tr>
@@ -67,7 +60,7 @@ export function StorageRootsPanel({
               storageRoots.map((item) => (
                 <tr key={item.id}>
                   <td>{item.name}</td>
-                  <td>{item.kind}</td>
+                  <td>{storageKindLabel(t, item.kind)}</td>
                   <td>{item.canonicalUri}</td>
                   <td><span className={`status-pill${item.enabled ? " is-on" : " is-off"}`}>{item.enabled ? t("enabled") : t("disabled")}</span></td>
                   <td>

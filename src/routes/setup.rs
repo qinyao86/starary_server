@@ -1,6 +1,7 @@
 use crate::{
     auth::{hash_password, issue_token_for_user},
     error::{AppError, AppResult},
+    ids::generate_id,
     models::{Role, UserRecord},
     state::AppState,
 };
@@ -26,7 +27,7 @@ pub struct CreateOwnerRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CreateOwnerResponse {
     user: UserRecord,
-    default_library_id: Uuid,
+    default_library_id: String,
     access_token: String,
     token_type: &'static str,
 }
@@ -67,7 +68,7 @@ pub async fn create_owner(
     }
 
     let user_id = Uuid::new_v4();
-    let library_id = Uuid::new_v4();
+    let library_id = generate_id("lib_");
     let password_hash = hash_password(&request.password)?;
     let display_name = request
         .display_name
@@ -97,7 +98,7 @@ pub async fn create_owner(
         VALUES ($1, 'Default Team Library', 'Created during first server setup.', $2)
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(user_id)
     .execute(&mut *tx)
     .await?;
@@ -108,7 +109,7 @@ pub async fn create_owner(
         VALUES ($1, $2, $3)
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(user_id)
     .bind(Role::Owner.as_str())
     .execute(&mut *tx)
@@ -117,12 +118,13 @@ pub async fn create_owner(
     sqlx::query(
         r#"
         INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id)
-        VALUES ($1, $2, $3, 'server.owner_created', 'user', $3)
+        VALUES ($1, $2, $3, 'server.owner_created', 'user', $4)
         "#,
     )
     .bind(Uuid::new_v4())
-    .bind(library_id)
+    .bind(&library_id)
     .bind(user_id)
+    .bind(user_id.to_string())
     .execute(&mut *tx)
     .await?;
 

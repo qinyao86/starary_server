@@ -21,31 +21,30 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use uuid::Uuid;
 
 pub async fn list_tag_groups(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
 ) -> AppResult<Json<Vec<crate::models::TagGroupRecord>>> {
-    ensure_library_access(&state, &user, library_id).await?;
-    Ok(Json(query_tag_groups(&state, library_id).await?))
+    ensure_library_access(&state, &user, &library_id).await?;
+    Ok(Json(query_tag_groups(&state, &library_id).await?))
 }
 
 pub async fn create_tag_group(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
     Json(request): Json<CreateTagGroupRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagGroupRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
 
     let name = normalize_required_name(&request.name, "tag group name")?;
     let color = normalize_required_text(request.color, "default");
-    ensure_unique_group_name(&state, library_id, &name, None).await?;
+    ensure_unique_group_name(&state, &library_id, &name, None).await?;
 
     let group_id = new_prefixed_id("tag_group_");
-    let sort_order = next_group_sort_order(&state, library_id).await?;
+    let sort_order = next_group_sort_order(&state, &library_id).await?;
 
     sqlx::query(
         r#"
@@ -56,7 +55,7 @@ pub async fn create_tag_group(
         "#,
     )
     .bind(&group_id)
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&name)
     .bind(&color)
     .bind(sort_order)
@@ -66,7 +65,7 @@ pub async fn create_tag_group(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "tag_group.created",
         "tag_group",
@@ -75,18 +74,18 @@ pub async fn create_tag_group(
     )
     .await?;
 
-    Ok(Json(query_tag_groups(&state, library_id).await?))
+    Ok(Json(query_tag_groups(&state, &library_id).await?))
 }
 
 pub async fn update_tag_group(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, group_id)): Path<(Uuid, String)>,
+    Path((library_id, group_id)): Path<(String, String)>,
     Json(request): Json<UpdateTagGroupRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagGroupRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
 
-    let current = query_group_edit_state(&state, library_id, &group_id).await?;
+    let current = query_group_edit_state(&state, &library_id, &group_id).await?;
     let name = request
         .name
         .as_deref()
@@ -95,7 +94,7 @@ pub async fn update_tag_group(
         .unwrap_or(current.name);
     let color = normalize_required_text(request.color, &current.color);
 
-    ensure_unique_group_name(&state, library_id, &name, Some(&group_id)).await?;
+    ensure_unique_group_name(&state, &library_id, &name, Some(&group_id)).await?;
 
     let mut tx = state.pool.begin().await?;
     sqlx::query(
@@ -108,7 +107,7 @@ pub async fn update_tag_group(
         WHERE library_id = $1 AND id = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&group_id)
     .bind(&name)
     .bind(&color)
@@ -125,7 +124,7 @@ pub async fn update_tag_group(
         WHERE library_id = $1 AND group_id = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&group_id)
     .bind(&color)
     .bind(user.id)
@@ -136,7 +135,7 @@ pub async fn update_tag_group(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "tag_group.updated",
         "tag_group",
@@ -145,16 +144,16 @@ pub async fn update_tag_group(
     )
     .await?;
 
-    Ok(Json(query_tag_groups(&state, library_id).await?))
+    Ok(Json(query_tag_groups(&state, &library_id).await?))
 }
 
 pub async fn delete_tag_group(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, group_id)): Path<(Uuid, String)>,
+    Path((library_id, group_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, library_id).await?;
-    let name = query_group_name(&state, library_id, &group_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
+    let name = query_group_name(&state, &library_id, &group_id).await?;
 
     let mut tx = state.pool.begin().await?;
     sqlx::query(
@@ -167,14 +166,14 @@ pub async fn delete_tag_group(
         WHERE library_id = $1 AND group_id = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&group_id)
     .bind(user.id)
     .execute(&mut *tx)
     .await?;
 
     let deleted = sqlx::query("DELETE FROM tag_groups WHERE library_id = $1 AND id = $2")
-        .bind(library_id)
+        .bind(&library_id)
         .bind(&group_id)
         .execute(&mut *tx)
         .await?;
@@ -187,7 +186,7 @@ pub async fn delete_tag_group(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "tag_group.deleted",
         "tag_group",

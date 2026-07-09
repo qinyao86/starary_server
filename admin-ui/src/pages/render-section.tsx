@@ -5,7 +5,6 @@ import {
   LibrariesPage,
   OverviewPage,
   PermissionsPage,
-  ServicePage,
   SettingsPage,
   StatisticsPage,
   StoragePage,
@@ -14,8 +13,6 @@ import {
 
 export function renderSection(section: Section, context: PageContext) {
   switch (section) {
-    case "service":
-      return <ServicePage {...context} />;
     case "libraries":
       return <LibrariesPage {...context} />;
     case "users":

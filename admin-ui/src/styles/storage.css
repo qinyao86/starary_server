@@ -1,0 +1,32 @@
+.storage-page {
+  display: flex;
+  justify-content: center;
+  width: min(100%, 980px);
+}
+
+.storage-roots-card {
+  width: 100%;
+}
+
+.storage-roots-card .toolbar-strip {
+  margin-bottom: 14px;
+}
+
+.storage-roots-card .table-wrap {
+  border: 1px solid #e8edf4;
+  border-radius: 12px;
+}
+
+.storage-roots-card .data-table th:first-child,
+.storage-roots-card .data-table td:first-child {
+  padding-left: 14px;
+}
+
+.storage-roots-card .data-table th:last-child,
+.storage-roots-card .data-table td:last-child {
+  padding-right: 14px;
+}
+
+.theme-dark .storage-roots-card .table-wrap {
+  border-color: #2f2f33;
+}

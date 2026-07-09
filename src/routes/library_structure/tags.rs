@@ -22,30 +22,29 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use uuid::Uuid;
 
 pub async fn list_tags(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
 ) -> AppResult<Json<Vec<crate::models::TagRecord>>> {
-    ensure_library_access(&state, &user, library_id).await?;
-    Ok(Json(query_tags(&state, library_id).await?))
+    ensure_library_access(&state, &user, &library_id).await?;
+    Ok(Json(query_tags(&state, &library_id).await?))
 }
 
 pub async fn create_tag(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
     Json(request): Json<CreateTagRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
 
     let name = normalize_required_name(&request.name, "tag name")?;
-    ensure_unique_tag_name(&state, library_id, &name, None).await?;
-    let group_color = query_group_color(&state, library_id, request.group_id.as_deref()).await?;
+    ensure_unique_tag_name(&state, &library_id, &name, None).await?;
+    let group_color = query_group_color(&state, &library_id, request.group_id.as_deref()).await?;
     let color = normalize_optional_text(request.color).or(group_color);
-    let sort_order = next_tag_sort_order(&state, library_id, request.group_id.as_deref()).await?;
+    let sort_order = next_tag_sort_order(&state, &library_id, request.group_id.as_deref()).await?;
     let tag_id = new_prefixed_id("tag_");
 
     sqlx::query(
@@ -58,7 +57,7 @@ pub async fn create_tag(
         "#,
     )
     .bind(&tag_id)
-    .bind(library_id)
+    .bind(&library_id)
     .bind(request.group_id)
     .bind(&name)
     .bind(color)
@@ -69,7 +68,7 @@ pub async fn create_tag(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "tag.created",
         "tag",
@@ -78,32 +77,32 @@ pub async fn create_tag(
     )
     .await?;
 
-    Ok(Json(query_tags(&state, library_id).await?))
+    Ok(Json(query_tags(&state, &library_id).await?))
 }
 
 pub async fn update_tag(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, tag_id)): Path<(Uuid, String)>,
+    Path((library_id, tag_id)): Path<(String, String)>,
     Json(request): Json<UpdateTagRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
 
-    let current = query_tag_edit_state(&state, library_id, &tag_id).await?;
+    let current = query_tag_edit_state(&state, &library_id, &tag_id).await?;
     let name = request
         .name
         .as_deref()
         .map(|value| normalize_required_name(value, "tag name"))
         .transpose()?
         .unwrap_or(current.name);
-    ensure_unique_tag_name(&state, library_id, &name, Some(&tag_id)).await?;
+    ensure_unique_tag_name(&state, &library_id, &name, Some(&tag_id)).await?;
 
     let group_id = if request.clear_group_id.unwrap_or(false) {
         None
     } else {
         request.group_id.or(current.group_id)
     };
-    let group_color = query_group_color(&state, library_id, group_id.as_deref()).await?;
+    let group_color = query_group_color(&state, &library_id, group_id.as_deref()).await?;
     let color = if request.clear_color.unwrap_or(false) {
         None
     } else {
@@ -125,7 +124,7 @@ pub async fn update_tag(
         WHERE library_id = $1 AND id = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&tag_id)
     .bind(&name)
     .bind(group_id)
@@ -137,7 +136,7 @@ pub async fn update_tag(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "tag.updated",
         "tag",
@@ -146,19 +145,19 @@ pub async fn update_tag(
     )
     .await?;
 
-    Ok(Json(query_tags(&state, library_id).await?))
+    Ok(Json(query_tags(&state, &library_id).await?))
 }
 
 pub async fn delete_tag(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, tag_id)): Path<(Uuid, String)>,
+    Path((library_id, tag_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, library_id).await?;
-    let tag_name = query_tag_name(&state, library_id, &tag_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
+    let tag_name = query_tag_name(&state, &library_id, &tag_id).await?;
 
     let deleted = sqlx::query("DELETE FROM tags WHERE library_id = $1 AND id = $2")
-        .bind(library_id)
+        .bind(&library_id)
         .bind(&tag_id)
         .execute(&state.pool)
         .await?;
@@ -169,7 +168,7 @@ pub async fn delete_tag(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "tag.deleted",
         "tag",
@@ -184,20 +183,20 @@ pub async fn delete_tag(
 pub async fn move_tags(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
     Json(request): Json<MoveTagsRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
 
     let tag_ids = unique_ids(&request.tag_ids);
     if tag_ids.is_empty() {
-        return Ok(Json(query_tags(&state, library_id).await?));
+        return Ok(Json(query_tags(&state, &library_id).await?));
     }
 
-    let group_color = query_group_color(&state, library_id, request.group_id.as_deref()).await?;
+    let group_color = query_group_color(&state, &library_id, request.group_id.as_deref()).await?;
     let mut tx = state.pool.begin().await?;
     for tag_id in &tag_ids {
-        ensure_tag_exists_in_tx(&mut tx, library_id, tag_id).await?;
+        ensure_tag_exists_in_tx(&mut tx, &library_id, tag_id).await?;
         sqlx::query(
             r#"
             UPDATE tags
@@ -208,7 +207,7 @@ pub async fn move_tags(
             WHERE library_id = $1 AND id = $2
             "#,
         )
-        .bind(library_id)
+        .bind(&library_id)
         .bind(tag_id)
         .bind(&request.group_id)
         .bind(&group_color)
@@ -220,7 +219,7 @@ pub async fn move_tags(
 
     insert_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "tag.moved",
         "tag",
@@ -229,5 +228,5 @@ pub async fn move_tags(
     )
     .await?;
 
-    Ok(Json(query_tags(&state, library_id).await?))
+    Ok(Json(query_tags(&state, &library_id).await?))
 }

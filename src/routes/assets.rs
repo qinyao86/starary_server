@@ -7,7 +7,6 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,10 +31,10 @@ pub struct AssetListResponse {
 pub async fn list_assets(
     State(state): State<AppState>,
     user: AuthUser,
-    Path(library_id): Path<Uuid>,
+    Path(library_id): Path<String>,
     Query(query): Query<ListAssetsQuery>,
 ) -> AppResult<Json<AssetListResponse>> {
-    ensure_library_access(&state, &user, library_id).await?;
+    ensure_library_access(&state, &user, &library_id).await?;
 
     let limit = query.limit.clamp(1, 500);
     let offset = query.offset.max(0);
@@ -47,7 +46,7 @@ pub async fn list_assets(
         WHERE library_id = $1 AND ($2 OR deleted_at IS NULL)
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(query.include_deleted)
     .fetch_one(&state.pool)
     .await?;
@@ -80,7 +79,7 @@ pub async fn list_assets(
         LIMIT $3 OFFSET $4
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(query.include_deleted)
     .bind(limit)
     .bind(offset)

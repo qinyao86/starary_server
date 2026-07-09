@@ -14,6 +14,8 @@ export function LibrariesPage({
   const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [workspaceKind, setWorkspaceKind] = useState("smb");
+  const [workspaceCanonicalUri, setWorkspaceCanonicalUri] = useState("");
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [memberUserId, setMemberUserId] = useState("");
@@ -26,6 +28,8 @@ export function LibrariesPage({
     cancelEditLibrary();
     setName("");
     setDescription("");
+    setWorkspaceKind("smb");
+    setWorkspaceCanonicalUri("");
     setShowCreate(true);
   };
 
@@ -33,6 +37,8 @@ export function LibrariesPage({
     setShowCreate(false);
     setName("");
     setDescription("");
+    setWorkspaceKind("smb");
+    setWorkspaceCanonicalUri("");
   };
 
   const openLibrary = (libraryId: string) => {
@@ -61,7 +67,7 @@ export function LibrariesPage({
 
   const createLibrary = async (event: FormEvent) => {
     event.preventDefault();
-    if (!name.trim()) {
+    if (!name.trim() || !workspaceCanonicalUri.trim()) {
       setMessage(t("formRequiredHint"));
       return;
     }
@@ -70,12 +76,18 @@ export function LibrariesPage({
       return;
     }
     try {
-      const library = await api.createLibrary(token, { displayName: name.trim(), description: description.trim() || undefined });
+      await api.createLibrary(token, {
+        displayName: name.trim(),
+        description: description.trim() || undefined,
+        defaultStorageRoot: {
+          kind: workspaceKind,
+          canonicalUri: workspaceCanonicalUri.trim()
+        }
+      });
       closeCreateLibraryDialog();
-      setViewLibraryId(library.id);
-      setSelectedLibraryId(library.id);
       setMessage(t("saved"));
       await refreshAll();
+      setViewLibraryId(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
@@ -97,6 +109,20 @@ export function LibrariesPage({
         description: editDescription.trim() || undefined
       });
       cancelEditLibrary();
+      setMessage(t("saved"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const toggleLibraryEnabled = async (library: TeamLibrary, enabled: boolean) => {
+    if (!token) {
+      setMessage(t("plannedNote"));
+      return;
+    }
+    try {
+      await api.updateLibraryEnabled(token, library.id, { enabled });
       setMessage(t("saved"));
       await refreshAll();
     } catch (error) {
@@ -189,6 +215,8 @@ export function LibrariesPage({
       libraries={libraries}
       showCreate={showCreate}
       t={t}
+      workspaceCanonicalUri={workspaceCanonicalUri}
+      workspaceKind={workspaceKind}
       onCancelEdit={cancelEditLibrary}
       onCloseCreate={closeCreateLibraryDialog}
       onCreate={createLibrary}
@@ -200,7 +228,10 @@ export function LibrariesPage({
       onEditNameChange={setEditName}
       onOpen={openLibrary}
       onOpenCreate={openCreateLibraryDialog}
+      onToggleEnabled={(library, enabled) => void toggleLibraryEnabled(library, enabled)}
       onUpdate={updateLibrary}
+      onWorkspaceCanonicalUriChange={setWorkspaceCanonicalUri}
+      onWorkspaceKindChange={setWorkspaceKind}
     />
   );
 }

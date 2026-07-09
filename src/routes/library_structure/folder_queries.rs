@@ -3,9 +3,8 @@ use crate::{
     models::FolderRecord,
     state::AppState,
 };
-use uuid::Uuid;
 
-pub async fn query_folders(state: &AppState, library_id: Uuid) -> AppResult<Vec<FolderRecord>> {
+pub async fn query_folders(state: &AppState, library_id: &str) -> AppResult<Vec<FolderRecord>> {
     Ok(sqlx::query_as::<_, FolderRecord>(
         r#"
         SELECT
@@ -52,7 +51,7 @@ pub async fn query_folders(state: &AppState, library_id: Uuid) -> AppResult<Vec<
 
 pub async fn ensure_parent_folder(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     parent_id: Option<&str>,
 ) -> AppResult<()> {
     let Some(parent_id) = parent_id else {
@@ -75,7 +74,7 @@ pub async fn ensure_parent_folder(
 
 pub async fn next_folder_sort_order(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     parent_id: Option<&str>,
 ) -> AppResult<i64> {
     Ok(sqlx::query_scalar::<_, i64>(
@@ -94,7 +93,7 @@ pub async fn next_folder_sort_order(
 
 pub async fn query_folder_name(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     folder_id: &str,
 ) -> AppResult<String> {
     sqlx::query_scalar("SELECT name FROM folders WHERE library_id = $1 AND id = $2")
@@ -107,7 +106,7 @@ pub async fn query_folder_name(
 
 pub async fn query_folder_edit_state(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     folder_id: &str,
 ) -> AppResult<FolderEditState> {
     sqlx::query_as::<_, FolderEditState>(
@@ -126,7 +125,7 @@ pub async fn query_folder_edit_state(
 
 pub async fn ensure_folder_exists_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    library_id: Uuid,
+    library_id: &str,
     folder_id: &str,
 ) -> AppResult<()> {
     let exists: Option<String> =
@@ -145,7 +144,7 @@ pub async fn ensure_folder_exists_in_tx(
 
 pub async fn query_sibling_folder_ids_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    library_id: Uuid,
+    library_id: &str,
     parent_id: Option<&str>,
 ) -> AppResult<Vec<String>> {
     Ok(sqlx::query_scalar::<_, String>(
@@ -165,7 +164,7 @@ pub async fn query_sibling_folder_ids_in_tx(
 
 pub async fn ensure_folder_can_move(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    library_id: Uuid,
+    library_id: &str,
     folder_id: &str,
     parent_id: Option<&str>,
 ) -> AppResult<()> {
@@ -214,6 +213,6 @@ pub struct FolderEditState {
     pub description: String,
     pub icon: String,
     pub color: String,
-    pub cover_asset_id: Option<Uuid>,
+    pub cover_asset_id: Option<String>,
     pub smart_import_id: Option<String>,
 }

@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod db;
 mod error;
+mod ids;
 mod models;
 mod path_resolver;
 mod routes;

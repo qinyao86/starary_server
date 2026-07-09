@@ -36,8 +36,8 @@
 .theme-dark .library-card-title,
 .theme-dark .library-detail-hero h2,
 .theme-dark .library-detail-stats strong,
-.theme-dark .library-card-stat strong,
-.theme-dark .library-card-members strong,
+.theme-dark .library-card-metric strong,
+.theme-dark .library-card-storage-path,
 .theme-dark .member-row strong,
 .theme-dark .user-identity-cell strong,
 .theme-dark .data-table td,
@@ -53,8 +53,8 @@
 .theme-dark .activity-meta,
 .theme-dark .activity-time,
 .theme-dark .library-card-description,
-.theme-dark .library-card-stat span,
-.theme-dark .library-card-members span,
+.theme-dark .library-card-metric span,
+.theme-dark .library-card-storage-header span,
 .theme-dark .library-detail-hero p,
 .theme-dark .library-detail-stat span,
 .theme-dark .member-row span,
@@ -64,6 +64,10 @@
 .theme-dark .matrix th,
 .theme-dark .page-intro p {
   color: #a1a1aa;
+}
+
+.theme-dark .library-card-storage-header em {
+  color: #d4d4d8;
 }
 
 .theme-dark .main {

@@ -4,6 +4,7 @@ mod requests;
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
+    ids::generate_id,
     models::PresetRecord,
     routes::{
         access::{ensure_library_access, ensure_library_write_access},
@@ -30,12 +31,12 @@ use serde_json::json;
 use uuid::Uuid;
 
 fn new_preset_id() -> String {
-    format!("preset_{}", Uuid::new_v4().simple())
+    generate_id("preset_")
 }
 
 async fn insert_preset_activity(
     state: &AppState,
-    library_id: Uuid,
+    library_id: &str,
     actor_user_id: Uuid,
     action: &str,
     preset_type: &str,
@@ -66,24 +67,26 @@ async fn insert_preset_activity(
 pub async fn list_presets(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, preset_type)): Path<(Uuid, String)>,
+    Path((library_id, preset_type)): Path<(String, String)>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_access(&state, &user, library_id).await?;
+    ensure_library_access(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
-    Ok(Json(query_presets(&state, library_id, &preset_type).await?))
+    Ok(Json(
+        query_presets(&state, &library_id, &preset_type).await?,
+    ))
 }
 
 pub async fn create_preset(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, preset_type)): Path<(Uuid, String)>,
+    Path((library_id, preset_type)): Path<(String, String)>,
     Json(request): Json<CreatePresetRequest>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     let name = normalize_required_name(&request.name)?;
     let preset_id = new_preset_id();
-    let sort_order = next_preset_sort_order(&state, library_id, &preset_type).await?;
+    let sort_order = next_preset_sort_order(&state, &library_id, &preset_type).await?;
 
     sqlx::query(
         r#"
@@ -95,7 +98,7 @@ pub async fn create_preset(
         "#,
     )
     .bind(&preset_id)
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&preset_type)
     .bind(&name)
     .bind(request.value)
@@ -106,7 +109,7 @@ pub async fn create_preset(
 
     insert_preset_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "preset.created",
         &preset_type,
@@ -115,19 +118,21 @@ pub async fn create_preset(
     )
     .await?;
 
-    Ok(Json(query_presets(&state, library_id, &preset_type).await?))
+    Ok(Json(
+        query_presets(&state, &library_id, &preset_type).await?,
+    ))
 }
 
 pub async fn update_preset(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, preset_type, preset_id)): Path<(Uuid, String, String)>,
+    Path((library_id, preset_type, preset_id)): Path<(String, String, String)>,
     Json(request): Json<UpdatePresetRequest>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     let (current_name, current_value) =
-        query_preset_edit_state(&state, library_id, &preset_type, &preset_id).await?;
+        query_preset_edit_state(&state, &library_id, &preset_type, &preset_id).await?;
     let name = request
         .name
         .as_deref()
@@ -148,7 +153,7 @@ pub async fn update_preset(
           AND id = $3
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&preset_type)
     .bind(&preset_id)
     .bind(&name)
@@ -163,7 +168,7 @@ pub async fn update_preset(
 
     insert_preset_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "preset.updated",
         &preset_type,
@@ -172,17 +177,19 @@ pub async fn update_preset(
     )
     .await?;
 
-    Ok(Json(query_presets(&state, library_id, &preset_type).await?))
+    Ok(Json(
+        query_presets(&state, &library_id, &preset_type).await?,
+    ))
 }
 
 pub async fn delete_preset(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, preset_type, preset_id)): Path<(Uuid, String, String)>,
+    Path((library_id, preset_type, preset_id)): Path<(String, String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
-    let preset_name = query_preset_name(&state, library_id, &preset_type, &preset_id).await?;
+    let preset_name = query_preset_name(&state, &library_id, &preset_type, &preset_id).await?;
 
     let deleted = sqlx::query(
         r#"
@@ -192,7 +199,7 @@ pub async fn delete_preset(
           AND id = $3
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&preset_type)
     .bind(&preset_id)
     .execute(&state.pool)
@@ -204,7 +211,7 @@ pub async fn delete_preset(
 
     insert_preset_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "preset.deleted",
         &preset_type,
@@ -219,9 +226,9 @@ pub async fn delete_preset(
 pub async fn clear_presets(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, preset_type)): Path<(Uuid, String)>,
+    Path((library_id, preset_type)): Path<(String, String)>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
 
     sqlx::query(
@@ -231,14 +238,14 @@ pub async fn clear_presets(
           AND "type" = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&preset_type)
     .execute(&state.pool)
     .await?;
 
     insert_preset_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "preset.cleared",
         &preset_type,
@@ -253,14 +260,16 @@ pub async fn clear_presets(
 pub async fn reorder_presets(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, preset_type)): Path<(Uuid, String)>,
+    Path((library_id, preset_type)): Path<(String, String)>,
     Json(request): Json<ReorderPresetsRequest>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     let preset_ids = unique_ids(&request.preset_ids);
     if preset_ids.is_empty() {
-        return Ok(Json(query_presets(&state, library_id, &preset_type).await?));
+        return Ok(Json(
+            query_presets(&state, &library_id, &preset_type).await?,
+        ));
     }
 
     if preset_ids.len()
@@ -284,7 +293,7 @@ pub async fn reorder_presets(
           AND "type" = $2
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&preset_type)
     .fetch_one(&mut *tx)
     .await?;
@@ -307,7 +316,7 @@ pub async fn reorder_presets(
               AND id = $3
             "#,
         )
-        .bind(library_id)
+        .bind(&library_id)
         .bind(&preset_type)
         .bind(preset_id)
         .bind((index as i64 + 1) * 1000)
@@ -326,7 +335,7 @@ pub async fn reorder_presets(
 
     insert_preset_activity(
         &state,
-        library_id,
+        &library_id,
         user.id,
         "preset.reordered",
         &preset_type,
@@ -335,16 +344,18 @@ pub async fn reorder_presets(
     )
     .await?;
 
-    Ok(Json(query_presets(&state, library_id, &preset_type).await?))
+    Ok(Json(
+        query_presets(&state, &library_id, &preset_type).await?,
+    ))
 }
 
 pub async fn update_preset_count(
     State(state): State<AppState>,
     user: AuthUser,
-    Path((library_id, preset_type, preset_id)): Path<(Uuid, String, String)>,
+    Path((library_id, preset_type, preset_id)): Path<(String, String, String)>,
     Json(request): Json<UpdatePresetCountRequest>,
 ) -> AppResult<Json<PresetRecord>> {
-    ensure_library_write_access(&state, &user, library_id).await?;
+    ensure_library_write_access(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     if preset_type != SMART_FOLDER_PRESET_TYPE {
         return Err(AppError::BadRequest(
@@ -364,7 +375,7 @@ pub async fn update_preset_count(
           AND id = $3
         "#,
     )
-    .bind(library_id)
+    .bind(&library_id)
     .bind(&preset_type)
     .bind(&preset_id)
     .bind(asset_count)
@@ -376,7 +387,7 @@ pub async fn update_preset_count(
         return Err(AppError::NotFound("preset not found".to_string()));
     }
 
-    let record = query_presets(&state, library_id, &preset_type)
+    let record = query_presets(&state, &library_id, &preset_type)
         .await?
         .into_iter()
         .find(|preset| preset.id == preset_id)

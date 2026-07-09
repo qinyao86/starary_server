@@ -7,7 +7,6 @@ use crate::{
 };
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use super::access::ensure_library_access;
 
@@ -21,7 +20,7 @@ pub struct LoginRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PresenceRequest {
-    library_id: Option<Uuid>,
+    library_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -140,7 +139,7 @@ pub async fn update_presence(
     user: AuthUser,
     Json(request): Json<PresenceRequest>,
 ) -> AppResult<StatusCode> {
-    if let Some(library_id) = request.library_id {
+    if let Some(library_id) = request.library_id.as_deref() {
         ensure_library_access(&state, &user, library_id).await?;
     }
 
