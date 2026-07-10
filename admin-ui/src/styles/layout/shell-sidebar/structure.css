@@ -1,15 +1,21 @@
 .admin-shell {
   display: grid;
   grid-template-columns: 272px minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   padding: 0;
+  overflow: hidden;
   background: #f7f9fb;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: calc(100vh - 24px);
   margin: 12px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #f7f9fb;
   border-right: 0;
   box-shadow: none;
@@ -66,6 +72,7 @@
   flex: 1;
   flex-direction: column;
   gap: 4px;
+  min-height: 0;
   padding: 10px 12px;
 }
 

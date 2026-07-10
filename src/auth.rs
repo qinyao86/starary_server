@@ -71,6 +71,44 @@ pub fn issue_token_for_user(state: &AppState, user_id: Uuid, role: &str) -> AppR
     )?)
 }
 
+pub async fn auth_user_from_token(state: &AppState, token: &str) -> AppResult<AuthUser> {
+    let token = decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map_err(|_| AppError::Unauthorized)?;
+
+    let user_id = Uuid::parse_str(&token.claims.sub).map_err(|_| AppError::Unauthorized)?;
+    let user = sqlx::query_as::<_, UserRecord>(
+        r#"
+        SELECT id, email, display_name, global_role, is_active, created_at, updated_at
+        FROM users
+        WHERE id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::Unauthorized)?;
+
+    if !user.is_active {
+        return Err(AppError::Unauthorized);
+    }
+
+    let role = user
+        .global_role
+        .parse::<Role>()
+        .map_err(|_| AppError::Unauthorized)?;
+
+    Ok(AuthUser {
+        id: user.id,
+        email: user.email,
+        display_name: user.display_name,
+        role,
+    })
+}
+
 #[async_trait]
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AppError;
@@ -86,40 +124,6 @@ impl FromRequestParts<AppState> for AuthUser {
             .and_then(|value| value.strip_prefix("Bearer "))
             .ok_or(AppError::Unauthorized)?;
 
-        let token = decode::<Claims>(
-            token,
-            &DecodingKey::from_secret(state.config.jwt_secret.as_bytes()),
-            &Validation::default(),
-        )
-        .map_err(|_| AppError::Unauthorized)?;
-
-        let user_id = Uuid::parse_str(&token.claims.sub).map_err(|_| AppError::Unauthorized)?;
-        let user = sqlx::query_as::<_, UserRecord>(
-            r#"
-            SELECT id, email, display_name, global_role, is_active, created_at, updated_at
-            FROM users
-            WHERE id = $1
-            "#,
-        )
-        .bind(user_id)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or(AppError::Unauthorized)?;
-
-        if !user.is_active {
-            return Err(AppError::Unauthorized);
-        }
-
-        let role = user
-            .global_role
-            .parse::<Role>()
-            .map_err(|_| AppError::Unauthorized)?;
-
-        Ok(AuthUser {
-            id: user.id,
-            email: user.email,
-            display_name: user.display_name,
-            role,
-        })
+        auth_user_from_token(state, token).await
     }
 }

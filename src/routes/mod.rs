@@ -13,6 +13,8 @@ pub(crate) mod users;
 
 use crate::state::AppState;
 use axum::{
+    extract::DefaultBodyLimit,
+    handler::Handler,
     response::Redirect,
     routing::{get, patch, post},
     Router,
@@ -65,7 +67,12 @@ pub fn router(state: AppState) -> Router {
         )
         .route(
             "/api/v1/libraries/:library_id/assets",
-            get(assets::list_assets),
+            get(assets::list_assets)
+                .post(assets::import_assets.layer(DefaultBodyLimit::max(384 * 1024 * 1024))),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/storage-roots/:storage_root_id/files/*relative_path",
+            get(assets::read_library_storage_file),
         )
         .route(
             "/api/v1/libraries/:library_id/folders",

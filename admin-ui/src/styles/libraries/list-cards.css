@@ -211,18 +211,14 @@
   font-size: 13px;
   font-weight: 720;
   line-height: 19px;
-  scrollbar-width: thin;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   user-select: text;
   white-space: nowrap;
 }
 
 .library-card-storage-path::-webkit-scrollbar {
-  height: 4px;
-}
-
-.library-card-storage-path::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(100, 116, 139, 0.34);
+  display: none;
 }
 
 .library-card-storage-copy {
