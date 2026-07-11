@@ -1,7 +1,7 @@
 import { ArrowLeft, Plus } from "lucide-react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import type { ActivityItem, LibraryMember, StorageRoot, TeamLibrary, TeamUser } from "../../api";
+import type { ActivityItem, LibraryMember, StorageConnection, StorageRoot, TeamLibrary, TeamUser } from "../../api";
 import type { TranslatorContext } from "../../types";
 import { PageFrame } from "../common";
 import { LibraryDialog } from "../dialogs";
@@ -81,10 +81,12 @@ export function LibraryListPageView({
   editName,
   editingLibraryId,
   libraries,
+  canCreateLibrary,
+  canManageLibrary,
   showCreate,
   t,
-  workspaceCanonicalUri,
-  workspaceKind,
+  storageConnectionId,
+  storageConnections,
   onCloseCreate,
   onCancelEdit,
   onCreate,
@@ -96,10 +98,10 @@ export function LibraryListPageView({
   onEditNameChange,
   onOpen,
   onOpenCreate,
+  onOpenStorageCreate,
   onToggleEnabled,
   onUpdate,
-  onWorkspaceCanonicalUriChange,
-  onWorkspaceKindChange
+  onStorageConnectionChange
 }: TranslatorContext & {
   createDescription: string;
   createName: string;
@@ -107,9 +109,11 @@ export function LibraryListPageView({
   editName: string;
   editingLibraryId: string | null;
   libraries: TeamLibrary[];
+  canCreateLibrary: boolean;
+  canManageLibrary: (library: TeamLibrary) => boolean;
   showCreate: boolean;
-  workspaceCanonicalUri: string;
-  workspaceKind: string;
+  storageConnectionId: string;
+  storageConnections: StorageConnection[];
   onCloseCreate: () => void;
   onCancelEdit: () => void;
   onCreate: (event: FormEvent) => void | Promise<void>;
@@ -121,55 +125,68 @@ export function LibraryListPageView({
   onEditNameChange: (value: string) => void;
   onOpen: (libraryId: string) => void;
   onOpenCreate: () => void;
+  onOpenStorageCreate: () => void;
   onToggleEnabled: (library: TeamLibrary, enabled: boolean) => void;
   onUpdate: (event: FormEvent) => void | Promise<void>;
-  onWorkspaceCanonicalUriChange: (value: string) => void;
-  onWorkspaceKindChange: (value: string) => void;
+  onStorageConnectionChange: (value: string) => void;
 }) {
   return (
     <PageFrame
       title={t("libraries")}
       description={t("libraryPageHint")}
-      action={
+      action={canCreateLibrary ? (
         <Button type="button" onClick={onOpenCreate}>
           <Plus size={16} />
           <span>{t("createLibrary")}</span>
         </Button>
-      }
+      ) : undefined}
     >
       <div className="library-page">
         <LibraryDialog
           open={showCreate}
           title={t("createLibrary")}
-          hint={t("libraryPageHint")}
+          hint={t("createLibraryDialogHint")}
           name={createName}
           description={createDescription}
           submitLabel={t("submit")}
           t={t}
-          showWorkspaceSection
-          workspaceCanonicalUri={workspaceCanonicalUri}
-          workspaceKind={workspaceKind}
+          showStorage
+          storageConnectionId={storageConnectionId}
+          storageConnections={storageConnections}
           onClose={onCloseCreate}
           onDescriptionChange={onCreateDescriptionChange}
           onNameChange={onCreateNameChange}
           onSubmit={onCreate}
-          onWorkspaceCanonicalUriChange={onWorkspaceCanonicalUriChange}
-          onWorkspaceKindChange={onWorkspaceKindChange}
+          onStorageConnectionChange={onStorageConnectionChange}
+          onCreateStorage={onOpenStorageCreate}
         />
         <LibraryDialog
           open={Boolean(editingLibraryId)}
           title={t("updateLibrary")}
-          hint={t("libraryPageHint")}
+          hint={t("editLibraryDialogHint")}
           name={editName}
           description={editDescription}
           submitLabel={t("submit")}
           t={t}
+          showStorage
+          storageConnectionId={storageConnectionId}
+          storageConnections={storageConnections}
           onClose={onCancelEdit}
           onDescriptionChange={onEditDescriptionChange}
           onNameChange={onEditNameChange}
+          onStorageConnectionChange={onStorageConnectionChange}
+          onCreateStorage={onOpenStorageCreate}
           onSubmit={onUpdate}
         />
-        <LibraryCardList libraries={libraries} t={t} onDelete={onDelete} onEdit={onEdit} onOpen={onOpen} onToggleEnabled={onToggleEnabled} />
+        <LibraryCardList
+          libraries={libraries}
+          canManageLibrary={canManageLibrary}
+          t={t}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onOpen={onOpen}
+          onToggleEnabled={onToggleEnabled}
+        />
       </div>
     </PageFrame>
   );

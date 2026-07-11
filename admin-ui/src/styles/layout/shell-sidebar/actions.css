@@ -1,70 +1,5 @@
-.sidebar-theme-switch {
-  position: relative;
-  display: inline-block;
-  width: 66px;
-  height: 36px;
-  border: 1px solid #d8e0ea;
-  border-radius: 999px;
-  padding: 0;
-  color: #8a95a4;
-  background: rgba(255, 255, 255, 0.72);
-  cursor: pointer;
-}
-
-.sidebar-theme-switch:hover {
-  border-color: #c8d2df;
-  background: #ffffff;
-}
-
-.sidebar-theme-switch-icon {
-  position: absolute;
-  top: 50%;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  transform: translateY(-50%);
-  transition: color 160ms ease;
-}
-
-.sidebar-theme-switch-icon.is-light {
-  left: 6px;
-  color: #d18a00;
-}
-
-.sidebar-theme-switch-icon.is-dark {
-  right: 6px;
-  color: #94a3b8;
-}
-
-.sidebar-theme-switch-thumb {
-  position: absolute;
-  top: 5px;
-  left: 6px;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  color: #d18a00;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
-  transition: transform 180ms ease;
-}
-
-.sidebar-theme-switch-thumb svg {
-  display: block;
-}
-
-.sidebar-theme-switch.is-dark .sidebar-theme-switch-thumb {
-  color: #dbeafe;
-  transform: translateX(30px);
-}
-
 .sidebar-logout-button {
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
 }
 
@@ -76,7 +11,6 @@
 }
 
 .sidebar-logout-button:hover {
-  border-color: #f2b8b5;
   color: #b42318;
-  background: #fff7f7;
+  background: rgba(180, 35, 24, 0.07);
 }

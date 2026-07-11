@@ -1,4 +1,5 @@
 export { api } from "./api/endpoints";
+export { ApiError } from "./api/request";
 export { clearStoredToken, getStoredToken, storeToken } from "./api/token";
 export type {
   ActivityItem,
@@ -9,6 +10,8 @@ export type {
   LoginResponse,
   ServerInfo,
   SetupStatus,
+  StorageConnection,
+  StorageConnectionInput,
   StorageRoot,
   TeamLibrary,
   TeamUser

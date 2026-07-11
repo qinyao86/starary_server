@@ -3,7 +3,6 @@ import {
   ActivityPage,
   BackupsPage,
   LibrariesPage,
-  OverviewPage,
   PermissionsPage,
   SettingsPage,
   StatisticsPage,
@@ -29,8 +28,7 @@ export function renderSection(section: Section, context: PageContext) {
       return <BackupsPage {...context} />;
     case "settings":
       return <SettingsPage {...context} />;
-    case "overview":
     default:
-      return <OverviewPage {...context} />;
+      return <LibrariesPage {...context} />;
   }
 }

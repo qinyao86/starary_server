@@ -36,7 +36,7 @@ export function DialogShell({
 
   return (
     <div
-      className="dialog-backdrop"
+      className={`dialog-backdrop ${className}-backdrop`}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();

@@ -47,7 +47,7 @@
 
 .theme-dark .brand-subtitle,
 .theme-dark .crumb,
-.theme-dark .sidebar-address,
+.theme-dark .sidebar-runtime-address,
 .theme-dark .metric-label,
 .theme-dark .health-label,
 .theme-dark .activity-meta,
@@ -117,4 +117,16 @@
   color: #fafafa;
   background: #27272a;
   box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+.theme-dark .sidebar-footer {
+  border-color: #2f2f33;
+}
+
+.theme-dark .sidebar-runtime-heading strong {
+  color: #f4f4f5;
+}
+
+.theme-dark .sidebar-runtime-heading > span:last-child {
+  color: #a1a1aa;
 }

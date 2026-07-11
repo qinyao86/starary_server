@@ -5,6 +5,7 @@ mod error;
 mod ids;
 mod models;
 mod path_resolver;
+mod portable;
 mod routes;
 mod state;
 
@@ -12,7 +13,6 @@ use anyhow::Context;
 use config::ServerConfig;
 use sqlx::postgres::PgPoolOptions;
 use state::AppState;
-use std::path::PathBuf;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -20,10 +20,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let server_env = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".env");
-    dotenvy::from_path(server_env).ok();
-    dotenvy::dotenv().ok();
-
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -32,7 +28,8 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let config = ServerConfig::from_env();
+    let mut portable_runtime = portable::PortableRuntime::prepare()?;
+    let config = ServerConfig::from_env(&portable_runtime.app_home);
     std::fs::create_dir_all(&config.storage_dir).with_context(|| {
         format!(
             "failed to create storage directory {}",
@@ -61,9 +58,12 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Mad Library Team Server listening on http://{bind_addr}");
 
-    axum::serve(listener, app)
+    let server_result = axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        .await;
+
+    portable_runtime.stop();
+    server_result?;
 
     Ok(())
 }

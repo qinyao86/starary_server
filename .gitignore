@@ -15,5 +15,6 @@ target_*/
 *.sqlite
 *.sqlite3
 .dev/
+/release/
 Thumbs.db
 .DS_Store

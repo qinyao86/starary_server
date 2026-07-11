@@ -1,6 +1,5 @@
 use crate::{
     error::{AppError, AppResult},
-    ids::is_prefixed_id,
     models::StorageRootKind,
 };
 use std::{
@@ -22,13 +21,22 @@ struct UncPathParts {
     segments: Vec<String>,
 }
 
+#[cfg(test)]
 pub fn validate_storage_root(kind: StorageRootKind, canonical_uri: &str) -> AppResult<()> {
+    validate_storage_root_with_policy(kind, canonical_uri, false)
+}
+
+pub fn validate_storage_root_with_policy(
+    kind: StorageRootKind,
+    canonical_uri: &str,
+    allow_personal_paths: bool,
+) -> AppResult<()> {
     let value = canonical_uri.trim();
     if value.is_empty() {
         return Err(AppError::BadRequest("canonicalUri is required".to_string()));
     }
 
-    if looks_like_personal_path(value) {
+    if !allow_personal_paths && looks_like_personal_path(value) {
         return Err(AppError::BadRequest(
             "team workspaces cannot point to a personal user directory".to_string(),
         ));
@@ -61,17 +69,39 @@ pub fn validate_storage_root(kind: StorageRootKind, canonical_uri: &str) -> AppR
     }
 }
 
+#[cfg(test)]
 pub fn resolve_storage_location(
     kind: StorageRootKind,
     canonical_uri: &str,
     windows_unc_path: Option<String>,
     macos_smb_url: Option<String>,
 ) -> AppResult<ResolvedStorageLocation> {
+    resolve_storage_location_with_policy(
+        kind,
+        canonical_uri,
+        windows_unc_path,
+        macos_smb_url,
+        false,
+    )
+}
+
+pub fn resolve_storage_location_with_policy(
+    kind: StorageRootKind,
+    canonical_uri: &str,
+    windows_unc_path: Option<String>,
+    macos_smb_url: Option<String>,
+    allow_personal_paths: bool,
+) -> AppResult<ResolvedStorageLocation> {
     let canonical_uri = trim_storage_location(canonical_uri);
-    validate_storage_root(kind, &canonical_uri)?;
+    validate_storage_root_with_policy(kind, &canonical_uri, allow_personal_paths)?;
 
     if kind == StorageRootKind::Smb {
-        return resolve_smb_storage_location(&canonical_uri, windows_unc_path, macos_smb_url);
+        return resolve_smb_storage_location(
+            &canonical_uri,
+            windows_unc_path,
+            macos_smb_url,
+            allow_personal_paths,
+        );
     }
 
     let windows_unc_path = normalize_optional_storage_location(windows_unc_path)
@@ -80,10 +110,10 @@ pub fn resolve_storage_location(
         .or_else(|| canonical_uri_to_macos_path(kind, &canonical_uri));
 
     if let Some(value) = &windows_unc_path {
-        validate_aliases(std::slice::from_ref(value))?;
+        validate_aliases_with_policy(std::slice::from_ref(value), allow_personal_paths)?;
     }
     if let Some(value) = &macos_smb_url {
-        validate_aliases(std::slice::from_ref(value))?;
+        validate_aliases_with_policy(std::slice::from_ref(value), allow_personal_paths)?;
     }
 
     Ok(ResolvedStorageLocation {
@@ -93,6 +123,7 @@ pub fn resolve_storage_location(
     })
 }
 
+#[cfg(test)]
 pub fn resolve_library_storage_namespace(
     kind: StorageRootKind,
     root_uri: &str,
@@ -100,17 +131,98 @@ pub fn resolve_library_storage_namespace(
     windows_unc_root: Option<String>,
     macos_smb_root: Option<String>,
 ) -> AppResult<ResolvedStorageLocation> {
-    validate_library_storage_id(library_storage_id)?;
-    let canonical_uri = append_storage_segment(root_uri, library_storage_id);
-    let windows_unc_path = normalize_optional_storage_location(windows_unc_root)
-        .map(|value| append_storage_segment(&value, library_storage_id));
-    let macos_smb_url = normalize_optional_storage_location(macos_smb_root)
-        .map(|value| append_storage_segment(&value, library_storage_id));
-
-    resolve_storage_location(kind, &canonical_uri, windows_unc_path, macos_smb_url)
+    resolve_library_storage_namespace_with_policy(
+        kind,
+        root_uri,
+        library_storage_id,
+        windows_unc_root,
+        macos_smb_root,
+        false,
+    )
 }
 
+#[cfg(test)]
+pub fn resolve_library_storage_namespace_with_policy(
+    kind: StorageRootKind,
+    root_uri: &str,
+    library_storage_id: &str,
+    windows_unc_root: Option<String>,
+    macos_smb_root: Option<String>,
+    allow_personal_paths: bool,
+) -> AppResult<ResolvedStorageLocation> {
+    validate_library_storage_id(library_storage_id)?;
+    resolve_storage_namespace_with_policy(
+        kind,
+        root_uri,
+        library_storage_id,
+        windows_unc_root,
+        macos_smb_root,
+        allow_personal_paths,
+    )
+}
+
+pub fn resolve_storage_namespace_with_policy(
+    kind: StorageRootKind,
+    root_uri: &str,
+    namespace: &str,
+    windows_unc_root: Option<String>,
+    macos_smb_root: Option<String>,
+    allow_personal_paths: bool,
+) -> AppResult<ResolvedStorageLocation> {
+    if namespace.is_empty() {
+        return resolve_storage_location_with_policy(
+            kind,
+            root_uri,
+            windows_unc_root,
+            macos_smb_root,
+            allow_personal_paths,
+        );
+    }
+    let canonical_uri = append_storage_segment(root_uri, namespace);
+    let windows_unc_path = normalize_optional_storage_location(windows_unc_root)
+        .map(|value| append_storage_segment(&value, namespace));
+    let macos_smb_url = normalize_optional_storage_location(macos_smb_root)
+        .map(|value| append_storage_segment(&value, namespace));
+
+    resolve_storage_location_with_policy(
+        kind,
+        &canonical_uri,
+        windows_unc_path,
+        macos_smb_url,
+        allow_personal_paths,
+    )
+}
+
+pub fn normalize_storage_namespace(value: Option<&str>, library_id: &str) -> AppResult<String> {
+    let value = value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(library_id);
+    let normalized = value.replace('\\', "/").trim_matches('/').to_string();
+    if normalized.is_empty()
+        || normalized.starts_with('.')
+        || normalized
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+        || normalized.contains(':')
+    {
+        return Err(AppError::BadRequest(
+            "storage namespace must be a relative folder path without dot segments".to_string(),
+        ));
+    }
+    Ok(normalized)
+}
+
+pub fn normalize_existing_storage_namespace(value: &str) -> AppResult<String> {
+    if value.trim().is_empty() {
+        return Ok(String::new());
+    }
+    normalize_storage_namespace(Some(value), "unused")
+}
+
+#[cfg(test)]
 fn validate_library_storage_id(value: &str) -> AppResult<()> {
+    use crate::ids::is_prefixed_id;
     if !is_prefixed_id(value, "lib_") {
         return Err(AppError::BadRequest(
             "library storage folder must use the lib_ plus 12 character format".to_string(),
@@ -168,9 +280,12 @@ pub fn ensure_storage_namespace_exists(
     }
 }
 
-pub fn validate_aliases(values: &[String]) -> AppResult<()> {
+pub fn validate_aliases_with_policy(
+    values: &[String],
+    allow_personal_paths: bool,
+) -> AppResult<()> {
     for value in values {
-        if looks_like_personal_path(value) {
+        if !allow_personal_paths && looks_like_personal_path(value) {
             return Err(AppError::BadRequest(
                 "team workspace aliases cannot point to a personal user directory".to_string(),
             ));
@@ -193,6 +308,7 @@ fn resolve_smb_storage_location(
     canonical_uri: &str,
     windows_unc_path: Option<String>,
     macos_smb_url: Option<String>,
+    allow_personal_paths: bool,
 ) -> AppResult<ResolvedStorageLocation> {
     let standard_unc_path = resolve_smb_input_to_standard_unc(canonical_uri)?;
     let standard_smb_url = unc_to_smb_url(&standard_unc_path).ok_or_else(|| {
@@ -217,10 +333,10 @@ fn resolve_smb_storage_location(
     };
 
     if let Some(value) = &windows_unc_path {
-        validate_aliases(std::slice::from_ref(value))?;
+        validate_aliases_with_policy(std::slice::from_ref(value), allow_personal_paths)?;
     }
     if let Some(value) = &macos_smb_url {
-        validate_aliases(std::slice::from_ref(value))?;
+        validate_aliases_with_policy(std::slice::from_ref(value), allow_personal_paths)?;
     }
 
     Ok(ResolvedStorageLocation {
@@ -572,6 +688,16 @@ mod tests {
     fn rejects_personal_windows_paths() {
         assert!(looks_like_personal_path(r"C:\Users\Alice\Assets"));
         assert!(looks_like_personal_path(r"P:\Users\Alice\Assets"));
+    }
+
+    #[test]
+    fn personal_server_paths_require_the_development_policy() {
+        let path = r"C:\Users\Alice\Assets";
+        assert!(validate_storage_root(StorageRootKind::ServerFilesystem, path).is_err());
+        assert!(
+            validate_storage_root_with_policy(StorageRootKind::ServerFilesystem, path, true)
+                .is_ok()
+        );
     }
 
     #[test]

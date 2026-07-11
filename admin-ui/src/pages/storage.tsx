@@ -1,93 +1,57 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { StorageRoot } from "../api";
+import type { StorageConnection } from "../api";
 import { api } from "../api";
+import { PageFrame, StatusDot } from "../components/common";
+import { StorageConnectionDialog } from "../components/dialogs";
 import type { PageContext } from "../types";
-import { StorageRootDialog } from "../components/dialogs";
-import { PageFrame } from "../components/common";
-import { StorageRootsPanel } from "../components/storage/storage-roots-panel";
-import { splitList } from "../utils/format";
-import { storageRootPayloadFromRecord } from "../utils/storage-roots";
+import { storageKindLabel } from "../utils/format";
 
-export function StoragePage({ t, token, libraries, selectedLibraryId, setSelectedLibraryId, storageRoots, refreshAll, setMessage }: PageContext) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingRoot, setEditingRoot] = useState<StorageRoot | null>(null);
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState("smb");
-  const [canonicalUri, setCanonicalUri] = useState("");
-  const [windowsUncPath, setWindowsUncPath] = useState("");
-  const [windowsAliases, setWindowsAliases] = useState("");
-  const [macosSmbUrl, setMacosSmbUrl] = useState("");
-  const [macosAliases, setMacosAliases] = useState("");
-  const [rootEnabled, setRootEnabled] = useState(true);
+export function StoragePage({ t, token, currentUser, storageConnections, refreshAll, setMessage }: PageContext) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<StorageConnection | null>(null);
+  const [kind, setKind] = useState("server_filesystem");
+  const [location, setLocation] = useState("");
+  const [enabled, setEnabled] = useState(true);
+  const canManageStorage = currentUser?.role === "owner" || currentUser?.role === "admin";
 
-  const resetRootForm = () => {
-    setName("");
-    setKind("smb");
-    setCanonicalUri("");
-    setWindowsUncPath("");
-    setWindowsAliases("");
-    setMacosSmbUrl("");
-    setMacosAliases("");
-    setRootEnabled(true);
+  const openCreate = () => {
+    setEditing(null);
+    setKind("server_filesystem");
+    setLocation("");
+    setEnabled(true);
+    setOpen(true);
   };
 
-  const openCreateDialog = () => {
-    setEditingRoot(null);
-    resetRootForm();
-    setDialogOpen(true);
+  const openEdit = (connection: StorageConnection) => {
+    setEditing(connection);
+    setKind(connection.kind);
+    setLocation(connection.canonicalUri);
+    setEnabled(connection.enabled);
+    setOpen(true);
   };
 
-  const openEditDialog = (root: StorageRoot) => {
-    setEditingRoot(root);
-    setSelectedLibraryId(root.libraryId);
-    setName(root.name);
-    setKind(root.kind);
-    setCanonicalUri(root.canonicalUri);
-    setWindowsUncPath(root.windowsUncPath ?? "");
-    setWindowsAliases(root.windowsMappedDriveAliases.join(", "));
-    setMacosSmbUrl(root.macosSmbUrl ?? "");
-    setMacosAliases(root.macosMountAliases.join(", "));
-    setRootEnabled(root.enabled);
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-  };
-
-  const submitRoot = async (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedLibraryId || !name.trim() || !canonicalUri.trim()) {
+    if (!location.trim()) {
       setMessage(t("formRequiredHint"));
       return;
     }
-    if (!token) {
-      setMessage(t("plannedNote"));
-      return;
-    }
     try {
+      const preservePlatformMappings = editing?.kind === kind;
       const payload = {
-        name: name.trim(),
         kind,
-        canonicalUri: canonicalUri.trim(),
-        windowsUncPath: windowsUncPath.trim() || undefined,
-        windowsMappedDriveAliases: splitList(windowsAliases),
-        macosSmbUrl: macosSmbUrl.trim() || undefined,
-        macosMountAliases: splitList(macosAliases),
-        enabled: rootEnabled
+        canonicalUri: location.trim(),
+        windowsUncPath: preservePlatformMappings ? editing?.windowsUncPath ?? undefined : undefined,
+        windowsMappedDriveAliases: preservePlatformMappings ? editing?.windowsMappedDriveAliases ?? [] : [],
+        macosSmbUrl: preservePlatformMappings ? editing?.macosSmbUrl ?? undefined : undefined,
+        macosMountAliases: preservePlatformMappings ? editing?.macosMountAliases ?? [] : []
       };
-      if (editingRoot) {
-        await api.updateStorageRoot(token, editingRoot.id, payload);
-      } else {
-        await api.createStorageRoot(token, {
-          libraryId: selectedLibraryId,
-          ...payload
-        });
-      }
-      closeDialog();
+      if (editing) await api.updateStorageConnection(token, editing.id, { ...payload, enabled });
+      else await api.createStorageConnection(token, payload);
+      setOpen(false);
       setMessage(t("saved"));
       await refreshAll();
     } catch (error) {
@@ -95,29 +59,27 @@ export function StoragePage({ t, token, libraries, selectedLibraryId, setSelecte
     }
   };
 
-  const toggleStorageRoot = async (root: StorageRoot) => {
-    if (!token) {
-      setMessage(t("plannedNote"));
-      return;
-    }
+  const toggle = async (connection: StorageConnection) => {
     try {
-      await api.updateStorageRoot(token, root.id, storageRootPayloadFromRecord(root, !root.enabled));
-      setMessage(t("saved"));
+      await api.updateStorageConnection(token, connection.id, {
+        kind: connection.kind,
+        canonicalUri: connection.canonicalUri,
+        windowsUncPath: connection.windowsUncPath ?? undefined,
+        windowsMappedDriveAliases: connection.windowsMappedDriveAliases,
+        macosSmbUrl: connection.macosSmbUrl ?? undefined,
+        macosMountAliases: connection.macosMountAliases,
+        enabled: !connection.enabled
+      });
       await refreshAll();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
   };
 
-  const deleteStorageRoot = async (root: StorageRoot) => {
-    if (!window.confirm(t("deleteStorageRootConfirm"))) return;
-    if (!token) {
-      setMessage(t("plannedNote"));
-      return;
-    }
+  const remove = async (connection: StorageConnection) => {
+    if (!window.confirm(t("deleteStorageConnectionConfirm"))) return;
     try {
-      await api.deleteStorageRoot(token, root.id);
-      setMessage(t("saved"));
+      await api.deleteStorageConnection(token, connection.id);
       await refreshAll();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -127,51 +89,41 @@ export function StoragePage({ t, token, libraries, selectedLibraryId, setSelecte
   return (
     <PageFrame
       title={t("storage")}
-      description={t("storagePageHint")}
-      action={
-        <Button type="button" onClick={openCreateDialog} disabled={libraries.length === 0}>
-          <Plus size={16} />
-          <span>{t("createStorageRoot")}</span>
-        </Button>
-      }
+      description={t("storageConnectionsPageHint")}
+      action={canManageStorage ? <Button type="button" onClick={openCreate}><Plus size={16} /><span>{t("createStorageConnection")}</span></Button> : undefined}
     >
-      <div className="storage-page">
-        <StorageRootDialog
-          canonicalUri={canonicalUri}
-          enabled={rootEnabled}
-          editingRoot={editingRoot}
-          kind={kind}
-          libraries={libraries}
-          macosAliases={macosAliases}
-          macosSmbUrl={macosSmbUrl}
-          name={name}
-          open={dialogOpen}
-          selectedLibraryId={selectedLibraryId}
-          t={t}
-          windowsAliases={windowsAliases}
-          windowsUncPath={windowsUncPath}
-          onCanonicalUriChange={setCanonicalUri}
-          onClose={closeDialog}
-          onEnabledChange={setRootEnabled}
-          onKindChange={setKind}
-          onLibraryChange={setSelectedLibraryId}
-          onMacosAliasesChange={setMacosAliases}
-          onMacosSmbUrlChange={setMacosSmbUrl}
-          onNameChange={setName}
-          onSubmit={submitRoot}
-          onWindowsAliasesChange={setWindowsAliases}
-          onWindowsUncPathChange={setWindowsUncPath}
-        />
-        <StorageRootsPanel
-          libraries={libraries}
-          selectedLibraryId={selectedLibraryId}
-          storageRoots={storageRoots}
-          t={t}
-          onDelete={(root) => void deleteStorageRoot(root)}
-          onEdit={openEditDialog}
-          onLibraryChange={setSelectedLibraryId}
-          onToggle={(root) => void toggleStorageRoot(root)}
-        />
+      <StorageConnectionDialog
+        connection={editing}
+        enabled={enabled}
+        kind={kind}
+        location={location}
+        open={open}
+        t={t}
+        onClose={() => setOpen(false)}
+        onEnabledChange={setEnabled}
+        onKindChange={setKind}
+        onLocationChange={setLocation}
+        onSubmit={submit}
+      />
+      <div className="table-wrap storage-connections-table">
+        <table className="data-table">
+          <thead><tr><th>{t("libraryStorageLocation")}</th><th>{t("kind")}</th><th>{t("linkedLibraries")}</th><th>{t("status")}</th>{canManageStorage && <th>{t("action")}</th>}</tr></thead>
+          <tbody>
+            {storageConnections.length === 0 ? <tr><td colSpan={canManageStorage ? 5 : 4}>{t("noStorageConnections")}</td></tr> : storageConnections.map((connection) => (
+              <tr key={connection.id}>
+                <td className="storage-connection-path"><strong>{connection.canonicalUri}</strong></td>
+                <td>{storageKindLabel(t, connection.kind)}</td>
+                <td>{connection.libraryCount}</td>
+                <td><StatusDot label={connection.enabled ? t("enabled") : t("disabled")} tone={connection.enabled ? "good" : "muted"} /></td>
+                {canManageStorage && <td><div className="table-actions">
+                  <Button size="icon" type="button" variant="outline" title={t("edit")} onClick={() => openEdit(connection)}><Pencil size={14} /></Button>
+                  <Button size="icon" type="button" variant="outline" title={connection.enabled ? t("deactivate") : t("activate")} onClick={() => void toggle(connection)}><Power size={14} /></Button>
+                  <Button size="icon" type="button" variant="outline" title={t("delete")} disabled={connection.libraryCount > 0} onClick={() => void remove(connection)}><Trash2 size={14} /></Button>
+                </div></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </PageFrame>
   );

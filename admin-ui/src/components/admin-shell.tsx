@@ -1,11 +1,11 @@
-import { Cloud, LogOut, Moon, RefreshCw, Server, Sun } from "lucide-react";
+import { Cloud, LogOut, RefreshCw, Server } from "lucide-react";
 import type { ReactNode } from "react";
 import logoImage from "../assets/logo.png";
 import type { ServerInfo } from "../api";
 import { navItems } from "../navigation";
 import type { ColorTheme, DeploymentMode, Section, TranslatorContext } from "../types";
 import { deploymentModeLabel } from "../utils/format";
-import { Segmented, StatusDot } from "./common";
+import { Segmented } from "./common";
 
 export function AdminShell({
   children,
@@ -22,8 +22,7 @@ export function AdminShell({
   onLogout,
   onRefresh,
   onSelectSection,
-  onSetDeploymentMode,
-  onToggleColorTheme
+  onSetDeploymentMode
 }: TranslatorContext & {
   children: ReactNode;
   colorTheme: ColorTheme;
@@ -39,7 +38,6 @@ export function AdminShell({
   onRefresh: () => Promise<void>;
   onSelectSection: (section: Section) => void;
   onSetDeploymentMode: (mode: DeploymentMode) => void;
-  onToggleColorTheme: () => void;
 }) {
   return (
     <div className={`admin-shell ${colorTheme === "dark" ? "dark theme-dark" : "theme-light"}`}>
@@ -47,7 +45,7 @@ export function AdminShell({
         <SidebarBrand t={t} />
         <SidebarStatus deploymentMode={deploymentMode} serverInfo={serverInfo} serviceRunning={serviceRunning} t={t} />
         <SidebarNav section={section} t={t} onSelectSection={onSelectSection} />
-        <SidebarFooter colorTheme={colorTheme} t={t} onLogout={onLogout} onToggleColorTheme={onToggleColorTheme} />
+        <SidebarFooter t={t} onLogout={onLogout} />
       </aside>
 
       <main className="main">
@@ -110,12 +108,16 @@ function SidebarStatus({ deploymentMode, serverInfo, serviceRunning, t }: Transl
 }) {
   return (
     <div className="sidebar-status-area">
-      <div className="sidebar-server-card">
-        <div className="sidebar-server-row">
-          <StatusDot label={t(serviceRunning ? "running" : "stopped")} tone={serviceRunning ? "good" : "muted"} />
+      <div className={`sidebar-runtime${serviceRunning ? " is-running" : " is-stopped"}`}>
+        <div className="sidebar-runtime-heading">
+          <span className="sidebar-runtime-indicator" aria-hidden="true" />
+          <strong>{t(serviceRunning ? "running" : "stopped")}</strong>
+          <span>{deploymentModeLabel(t, deploymentMode)}</span>
         </div>
-        <div className="sidebar-address">{serverInfo?.serverUrl.replace("http://", "") ?? "127.0.0.1:3789"}</div>
-        <div className="sidebar-deployment-label">{deploymentModeLabel(t, deploymentMode)}</div>
+        <div className="sidebar-runtime-address">
+          <Server size={12} aria-hidden="true" />
+          <code>{serverInfo?.serverUrl.replace("http://", "") ?? "127.0.0.1:3789"}</code>
+        </div>
       </div>
     </div>
   );
@@ -146,33 +148,15 @@ function SidebarNav({ section, t, onSelectSection }: TranslatorContext & {
   );
 }
 
-function SidebarFooter({ colorTheme, t, onLogout, onToggleColorTheme }: TranslatorContext & {
-  colorTheme: ColorTheme;
+function SidebarFooter({ t, onLogout }: TranslatorContext & {
   onLogout: () => void;
-  onToggleColorTheme: () => void;
 }) {
   return (
     <div className="sidebar-footer">
-      <div className="sidebar-quick-actions">
-        <button
-          className={`sidebar-theme-switch${colorTheme === "dark" ? " is-dark" : ""}`}
-          type="button"
-          role="switch"
-          aria-checked={colorTheme === "dark"}
-          aria-label={t(colorTheme === "dark" ? "lightTheme" : "darkTheme")}
-          onClick={onToggleColorTheme}
-        >
-          <span className="sidebar-theme-switch-icon is-light"><Sun size={12} /></span>
-          <span className="sidebar-theme-switch-icon is-dark"><Moon size={12} /></span>
-          <span className="sidebar-theme-switch-thumb">
-            {colorTheme === "dark" ? <Moon size={12} /> : <Sun size={12} />}
-          </span>
-        </button>
-        <button className="sidebar-logout-button" type="button" onClick={onLogout}>
-          <LogOut size={15} />
-          <span>{t("logout")}</span>
-        </button>
-      </div>
+      <button className="sidebar-logout-button" type="button" onClick={onLogout}>
+        <LogOut size={15} />
+        <span>{t("logout")}</span>
+      </button>
     </div>
   );
 }

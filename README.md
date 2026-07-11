@@ -57,19 +57,58 @@ Check development status:
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-status.ps1
 ```
 
+## Windows Portable Release
+
+The Windows x64 release bundles a private PostgreSQL runtime. End users do not
+need to install PostgreSQL, Docker, Node.js, or Rust.
+
+The minimized PostgreSQL runtime is committed under
+`binaries/windows-x64/postgresql/` with Git LFS. Build the portable package:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-portable.ps1
+```
+
+Normal builds do not download or extract PostgreSQL. The original archive is
+only required when intentionally regenerating the tracked runtime with
+`scripts/prepare-postgresql-runtime.ps1`.
+
+The output is `release/madlibrary-server-windows-x64.zip`. Extract it and
+double-click `start-server.cmd`. On first startup the server generates private
+local credentials, initializes PostgreSQL, creates the application database,
+runs schema migrations, and opens the admin console.
+
+Persistent files live under the package's `data/` directory. Replacing the
+application and PostgreSQL runtime during an upgrade must not replace `data/`.
+PostgreSQL only listens on `127.0.0.1:54329`.
+
+Database startup is controlled by `MADLIBRARY_POSTGRES_MODE=auto|bundled|external`.
+The default `auto` mode starts packaged PostgreSQL only when
+`MADLIBRARY_DATABASE_URL` is not set.
+
+## Repository Layout
+
+Source, downloaded inputs, development output, packaging intermediates, and
+release artifacts have separate directories. See
+[`docs/project-layout.md`](docs/project-layout.md) before adding generated or
+third-party files.
+
 ## Important Notes
 
-- `.env` is read from the repository root.
-- Relative paths in `.env`, such as `.dev/storage`, resolve from the repository root.
+- `.env` is read from the application root.
+- Relative paths in `.env`, such as `.dev/storage`, resolve from the application root.
 - `MADLIBRARY_ADMIN_ASSETS_DIR` defaults to `admin-ui/dist`.
 - `scripts/dev-up.ps1` builds `admin-ui` before starting the Rust server.
 - Startup migrations are intentionally idempotent. Existing installed PostgreSQL databases are upgraded in place when columns are added.
+- An explicit `MADLIBRARY_DATABASE_URL` disables bundled PostgreSQL and keeps
+  external-database development and deployment available.
 
 ## Current First-Version Scope
 
 The server console can currently:
 
-- Create the first Owner account and default team library.
+- Create the first Owner account, then optionally guide the Owner through
+  creating the first team library.
 - Log in with JWT-backed sessions.
 - Create, edit, activate, deactivate, and reset passwords for server users.
 - Create, edit, soft-delete, and summarize team libraries.

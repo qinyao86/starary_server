@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 export function PageFrame({
   title,
+  description,
   titleSlot,
   action,
   children
@@ -16,7 +17,10 @@ export function PageFrame({
   return (
     <div className="page-frame">
       <div className="page-intro">
-        {titleSlot ?? <h2>{title}</h2>}
+        <div className="page-intro-copy">
+          {titleSlot ?? <h2>{title}</h2>}
+          {description && <p>{description}</p>}
+        </div>
         {action && <div className="page-intro-action">{action}</div>}
       </div>
       {children}

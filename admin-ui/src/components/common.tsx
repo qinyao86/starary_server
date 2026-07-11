@@ -1,6 +1,6 @@
 export { ActivityList } from "./common/activity-list";
 export { BarList, MetricCard, TrendBars } from "./common/charts";
-export { Badge, Segmented, TextField } from "./common/controls";
+export { Badge, Segmented, SelectField, TextField } from "./common/controls";
 export { InfoStack, KeyValue } from "./common/info";
 export { LibraryDetailStat, LibraryStat } from "./common/library-stats";
 export { PageFrame, Panel } from "./common/layout";

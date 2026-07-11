@@ -1,50 +1,83 @@
 .sidebar-status-area {
-  padding: 4px 12px 8px;
+  padding: 6px 18px 12px;
 }
 
 .sidebar-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border-top: 0;
+  padding: 10px 12px 2px;
+  border-top: 1px solid #e2e7ee;
   background: transparent;
 }
 
-.sidebar-server-card {
+.sidebar-runtime {
   position: relative;
-  padding: 10px;
-  border: 1px solid #d8e0ea;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.72);
+  padding-left: 12px;
 }
 
-.sidebar-server-row {
+.sidebar-runtime::before {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: #94a3b8;
+  content: "";
+}
+
+.sidebar-runtime.is-running::before {
+  background: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+}
+
+.sidebar-runtime-heading,
+.sidebar-runtime-address {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
+  min-width: 0;
 }
 
-.sidebar-address {
-  margin-top: 8px;
-  color: #6b7788;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 12px;
+.sidebar-runtime-heading {
+  gap: 7px;
 }
 
-.sidebar-deployment-label {
-  margin-top: 5px;
+.sidebar-runtime-indicator {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+}
+
+.sidebar-runtime.is-running .sidebar-runtime-indicator {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.sidebar-runtime-heading strong {
   color: #253244;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 700;
 }
 
-.sidebar-quick-actions {
-  display: grid;
-  grid-template-columns: 66px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
+.sidebar-runtime-heading > span:last-child {
+  margin-left: auto;
+  color: #7a8697;
+  font-size: 11px;
+}
+
+.sidebar-runtime-address {
+  gap: 6px;
+  margin-top: 7px;
+  color: #7a8697;
+}
+
+.sidebar-runtime-address code {
+  overflow: hidden;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-logout-button {
@@ -52,12 +85,12 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  height: 36px;
-  border: 1px solid #d8e0ea;
-  border-radius: 9px;
-  padding: 0 10px;
+  height: 38px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 11px;
   color: #526071;
-  background: rgba(255, 255, 255, 0.72);
+  background: transparent;
   cursor: pointer;
   font-size: 12px;
   font-weight: 650;

@@ -2,20 +2,23 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import type { LibraryMember, TeamLibrary } from "../api";
 import { api } from "../api";
+import { StorageConnectionDialog } from "../components/dialogs";
 import { LibraryDetailPageView, LibraryListPageView } from "../components/libraries/library-page-views";
 import { useAvailableLibraryUsers } from "../hooks/use-available-library-users";
 import type { PageContext } from "../types";
 
 export function LibrariesPage({
-  t, token, libraries, users, storageRoots, libraryMembers, libraryActivityItems, selectedLibraryId, setSelectedLibraryId, refreshAll, setMessage
+  t, token, currentUser, libraries, users, storageRoots, storageConnections, libraryMembers, libraryActivityItems, selectedLibraryId, setSelectedLibraryId, refreshAll, setMessage
 }: PageContext) {
   const [viewLibraryId, setViewLibraryId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [workspaceKind, setWorkspaceKind] = useState("smb");
-  const [workspaceCanonicalUri, setWorkspaceCanonicalUri] = useState("");
+  const [storageConnectionId, setStorageConnectionId] = useState("");
+  const [storageDialogOpen, setStorageDialogOpen] = useState(false);
+  const [storageKind, setStorageKind] = useState("server_filesystem");
+  const [storageLocation, setStorageLocation] = useState("");
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [memberUserId, setMemberUserId] = useState("");
@@ -23,13 +26,15 @@ export function LibrariesPage({
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const activeLibrary = libraries.find((item) => item.id === viewLibraryId) ?? null;
   const availableUsers = useAvailableLibraryUsers(users, libraryMembers, memberUserId, setMemberUserId);
+  const canCreateLibrary = currentUser?.role === "owner" || currentUser?.role === "admin";
+  const canManageLibrary = (library: TeamLibrary) =>
+    ["owner", "admin", "library_manager"].includes(library.currentUserRole ?? currentUser?.role ?? "");
 
   const openCreateLibraryDialog = () => {
     cancelEditLibrary();
     setName("");
     setDescription("");
-    setWorkspaceKind("smb");
-    setWorkspaceCanonicalUri("");
+    setStorageConnectionId(storageConnections.find((connection) => connection.enabled)?.id ?? "");
     setShowCreate(true);
   };
 
@@ -37,8 +42,7 @@ export function LibrariesPage({
     setShowCreate(false);
     setName("");
     setDescription("");
-    setWorkspaceKind("smb");
-    setWorkspaceCanonicalUri("");
+    setStorageConnectionId("");
   };
 
   const openLibrary = (libraryId: string) => {
@@ -51,12 +55,41 @@ export function LibrariesPage({
     setEditingLibraryId(library.id);
     setEditName(library.displayName);
     setEditDescription(library.description ?? "");
+    setStorageConnectionId(library.primaryStorageConnectionId ?? storageConnections.find((connection) => connection.enabled)?.id ?? "");
   };
 
   const cancelEditLibrary = () => {
     setEditingLibraryId(null);
     setEditName("");
     setEditDescription("");
+    setStorageConnectionId("");
+  };
+
+  const openStorageDialog = () => {
+    setStorageKind("server_filesystem");
+    setStorageLocation("");
+    setStorageDialogOpen(true);
+  };
+
+  const createStorageConnection = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!storageLocation.trim()) {
+      setMessage(t("formRequiredHint"));
+      return;
+    }
+    try {
+      const connection = await api.createStorageConnection(token, {
+        kind: storageKind,
+        canonicalUri: storageLocation.trim(),
+        windowsMappedDriveAliases: [],
+        macosMountAliases: []
+      });
+      setStorageConnectionId(connection.id);
+      setStorageDialogOpen(false);
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const openMemberDialog = () => {
@@ -67,7 +100,7 @@ export function LibrariesPage({
 
   const createLibrary = async (event: FormEvent) => {
     event.preventDefault();
-    if (!name.trim() || !workspaceCanonicalUri.trim()) {
+    if (!name.trim() || !storageConnectionId) {
       setMessage(t("formRequiredHint"));
       return;
     }
@@ -79,10 +112,7 @@ export function LibrariesPage({
       await api.createLibrary(token, {
         displayName: name.trim(),
         description: description.trim() || undefined,
-        defaultStorageRoot: {
-          kind: workspaceKind,
-          canonicalUri: workspaceCanonicalUri.trim()
-        }
+        storageBinding: { connectionId: storageConnectionId }
       });
       closeCreateLibraryDialog();
       setMessage(t("saved"));
@@ -95,7 +125,7 @@ export function LibrariesPage({
 
   const updateLibrary = async (event: FormEvent) => {
     event.preventDefault();
-    if (!editingLibraryId || !editName.trim()) {
+    if (!editingLibraryId || !editName.trim() || !storageConnectionId) {
       setMessage(t("formRequiredHint"));
       return;
     }
@@ -106,7 +136,8 @@ export function LibrariesPage({
     try {
       await api.updateLibrary(token, editingLibraryId, {
         displayName: editName.trim(),
-        description: editDescription.trim() || undefined
+        description: editDescription.trim() || undefined,
+        storageBinding: { connectionId: storageConnectionId }
       });
       cancelEditLibrary();
       setMessage(t("saved"));
@@ -206,17 +237,35 @@ export function LibrariesPage({
   }
 
   return (
-    <LibraryListPageView
+    <>
+      <StorageConnectionDialog
+        connection={null}
+        enabled
+        kind={storageKind}
+        location={storageLocation}
+        open={storageDialogOpen}
+        subtitle={t("createStorageLocationHint")}
+        t={t}
+        title={t("createStorageLocation")}
+        onClose={() => setStorageDialogOpen(false)}
+        onEnabledChange={() => undefined}
+        onKindChange={setStorageKind}
+        onLocationChange={setStorageLocation}
+        onSubmit={createStorageConnection}
+      />
+      <LibraryListPageView
       createDescription={description}
       createName={name}
       editDescription={editDescription}
       editName={editName}
-      editingLibraryId={editingLibraryId}
+      editingLibraryId={storageDialogOpen ? null : editingLibraryId}
       libraries={libraries}
-      showCreate={showCreate}
+      canCreateLibrary={canCreateLibrary}
+      canManageLibrary={canManageLibrary}
+      showCreate={showCreate && !storageDialogOpen}
       t={t}
-      workspaceCanonicalUri={workspaceCanonicalUri}
-      workspaceKind={workspaceKind}
+      storageConnectionId={storageConnectionId}
+      storageConnections={storageConnections}
       onCancelEdit={cancelEditLibrary}
       onCloseCreate={closeCreateLibraryDialog}
       onCreate={createLibrary}
@@ -228,10 +277,11 @@ export function LibrariesPage({
       onEditNameChange={setEditName}
       onOpen={openLibrary}
       onOpenCreate={openCreateLibraryDialog}
+      onOpenStorageCreate={openStorageDialog}
       onToggleEnabled={(library, enabled) => void toggleLibraryEnabled(library, enabled)}
       onUpdate={updateLibrary}
-      onWorkspaceCanonicalUriChange={setWorkspaceCanonicalUri}
-      onWorkspaceKindChange={setWorkspaceKind}
-    />
+      onStorageConnectionChange={setStorageConnectionId}
+      />
+    </>
   );
 }

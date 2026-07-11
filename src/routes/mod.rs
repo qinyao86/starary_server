@@ -8,6 +8,7 @@ mod library_structure;
 mod members;
 mod presets;
 mod setup;
+mod storage_connections;
 mod storage_roots;
 pub(crate) mod users;
 
@@ -48,6 +49,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/libraries",
             get(libraries::list_libraries).post(libraries::create_library),
+        )
+        .route(
+            "/api/v1/library-status",
+            get(libraries::list_library_statuses),
         )
         .route(
             "/api/v1/libraries/:library_id",
@@ -130,14 +135,22 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/activity", get(activity::list_server_activity))
         .route(
+            "/api/v1/storage-connections",
+            get(storage_connections::list_storage_connections)
+                .post(storage_connections::create_storage_connection),
+        )
+        .route(
+            "/api/v1/storage-connections/:id",
+            patch(storage_connections::update_storage_connection)
+                .delete(storage_connections::delete_storage_connection),
+        )
+        .route(
             "/api/v1/storage-roots",
-            get(storage_roots::list_storage_roots).post(storage_roots::create_storage_root),
+            get(storage_roots::list_storage_roots),
         )
         .route(
             "/api/v1/storage-roots/:id",
-            get(storage_roots::get_storage_root)
-                .patch(storage_roots::update_storage_root)
-                .delete(storage_roots::delete_storage_root),
+            get(storage_roots::get_storage_root),
         )
         .with_state(state)
 }

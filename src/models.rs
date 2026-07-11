@@ -163,9 +163,38 @@ pub struct LibraryWithRole {
     pub storage_root_count: i64,
     pub enabled_storage_root_count: i64,
     pub primary_storage_kind: Option<String>,
+    pub primary_storage_connection_id: Option<Uuid>,
+    pub primary_storage_connection_name: Option<String>,
+    pub primary_storage_namespace: Option<String>,
     pub primary_storage_uri: Option<String>,
     pub primary_storage_windows_path: Option<String>,
     pub primary_storage_macos_path: Option<String>,
+    pub created_by_user_id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryStatusRecord {
+    pub id: String,
+    pub enabled: bool,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageConnectionRecord {
+    pub id: Uuid,
+    pub name: String,
+    pub kind: String,
+    pub canonical_uri: String,
+    pub windows_unc_path: Option<String>,
+    pub windows_mapped_drive_aliases: serde_json::Value,
+    pub macos_smb_url: Option<String>,
+    pub macos_mount_aliases: serde_json::Value,
+    pub enabled: bool,
+    pub library_count: i64,
     pub created_by_user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -176,6 +205,9 @@ pub struct LibraryWithRole {
 pub struct StorageRootRecord {
     pub id: Uuid,
     pub library_id: String,
+    pub storage_connection_id: Uuid,
+    pub storage_connection_name: String,
+    pub namespace: String,
     pub name: String,
     pub kind: String,
     pub canonical_uri: String,

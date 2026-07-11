@@ -42,6 +42,66 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
     .await?;
     tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
         .await?;
+    tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS storage_connection_id UUID;")
+        .await?;
+    tx.execute(
+        "ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS namespace TEXT NOT NULL DEFAULT '';",
+    )
+    .await?;
+    tx.execute(
+        r#"
+        INSERT INTO storage_connections (
+            id, name, kind, canonical_uri, windows_unc_path,
+            windows_mapped_drive_aliases, macos_smb_url, macos_mount_aliases,
+            enabled, created_by_user_id, created_at, updated_at
+        )
+        SELECT
+            sr.id,
+            CASE
+                WHEN COUNT(*) OVER (PARTITION BY lower(sr.name)) > 1
+                    THEN sr.name || ' - ' || l.display_name
+                ELSE sr.name
+            END,
+            sr.kind,
+            sr.canonical_uri,
+            sr.windows_unc_path,
+            sr.windows_mapped_drive_aliases,
+            sr.macos_smb_url,
+            sr.macos_mount_aliases,
+            sr.enabled,
+            sr.created_by_user_id,
+            sr.created_at,
+            sr.updated_at
+        FROM storage_roots sr
+        JOIN libraries l ON l.id = sr.library_id
+        WHERE sr.storage_connection_id IS NULL
+        ON CONFLICT (id) DO NOTHING;
+
+        UPDATE storage_roots
+        SET storage_connection_id = id,
+            namespace = ''
+        WHERE storage_connection_id IS NULL;
+        "#,
+    )
+    .await?;
+    tx.execute(
+        r#"
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'storage_roots_storage_connection_id_fkey'
+            ) THEN
+                ALTER TABLE storage_roots
+                    ADD CONSTRAINT storage_roots_storage_connection_id_fkey
+                    FOREIGN KEY (storage_connection_id) REFERENCES storage_connections(id);
+            END IF;
+        END $$;
+        "#,
+    )
+    .await?;
+    tx.execute("ALTER TABLE storage_roots ALTER COLUMN storage_connection_id SET NOT NULL;")
+        .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS storage_key TEXT;")
         .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS storage_root_id UUID REFERENCES storage_roots(id);")

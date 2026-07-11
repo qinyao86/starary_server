@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import type { TeamUser } from "../../api";
 import type { TranslatorContext } from "../../types";
-import { TextField } from "../common";
+import { SelectField, TextField } from "../common";
 import { DialogShell } from "./dialog-shell";
 
 export function UserDialog({
@@ -62,24 +62,22 @@ export function UserDialog({
             <TextField autoFocus required label={t("email")} value={email} onChange={onEmailChange} />
           )}
           <TextField label={t("displayName")} value={displayName} onChange={onDisplayNameChange} />
-          <label className="field">
-            <span>{t("role")}</span>
-            <select value={role} onChange={(event) => onRoleChange(event.target.value)}>
+          <SelectField label={t("role")} value={role} onChange={onRoleChange}>
               {canAssignOwner && <option value="owner">{t("owner")}</option>}
               <option value="admin">{t("adminRole")}</option>
               <option value="library_manager">{t("manager")}</option>
               <option value="editor">{t("editor")}</option>
               <option value="viewer">{t("viewer")}</option>
-            </select>
-          </label>
+          </SelectField>
           {editingUser && (
-            <label className="field">
-              <span>{t("status")}</span>
-              <select value={isActive ? "enabled" : "disabled"} onChange={(event) => onIsActiveChange(event.target.value === "enabled")}>
+            <SelectField
+              label={t("status")}
+              value={isActive ? "enabled" : "disabled"}
+              onChange={(value) => onIsActiveChange(value === "enabled")}
+            >
                 <option value="enabled">{t("enabled")}</option>
                 <option value="disabled">{t("disabled")}</option>
-              </select>
-            </label>
+            </SelectField>
           )}
           <TextField
             label={editingUser ? t("newPassword") : t("password")}

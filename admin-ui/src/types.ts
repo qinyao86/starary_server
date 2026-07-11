@@ -1,9 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import type { ActivityItem, CurrentUser, LibraryMember, ServerInfo, StorageRoot, TeamLibrary, TeamUser } from "./api";
+import type { ActivityItem, CurrentUser, LibraryMember, ServerInfo, StorageConnection, StorageRoot, TeamLibrary, TeamUser } from "./api";
 import type { createTranslator, Language, TranslationKey } from "./i18n";
 
 export type Section =
-  | "overview"
   | "libraries"
   | "users"
   | "permissions"
@@ -26,6 +25,8 @@ export type TranslatorContext = {
 export type PageContext = TranslatorContext & {
   language: Language;
   setLanguage: (language: Language) => void;
+  colorTheme: ColorTheme;
+  setColorTheme: (theme: ColorTheme) => void;
   deploymentMode: DeploymentMode;
   setDeploymentMode: (mode: DeploymentMode) => void;
   serviceRunning: boolean;
@@ -34,6 +35,7 @@ export type PageContext = TranslatorContext & {
   libraries: TeamLibrary[];
   users: TeamUser[];
   storageRoots: StorageRoot[];
+  storageConnections: StorageConnection[];
   libraryMembers: LibraryMember[];
   selectedLibrary: TeamLibrary | null;
   selectedLibraryId: string;
@@ -43,6 +45,7 @@ export type PageContext = TranslatorContext & {
   activityItems: ActivityItem[];
   libraryActivityItems: ActivityItem[];
   refreshAll: () => Promise<void>;
+  navigateToSection: (section: Section) => void;
   setMessage: (message: string | null) => void;
   previewMode: boolean;
 };

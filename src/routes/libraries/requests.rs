@@ -9,6 +9,14 @@ pub struct CreateLibraryRequest {
     pub description: Option<String>,
     pub icon_url: Option<String>,
     pub default_storage_root: Option<CreateDefaultStorageRootRequest>,
+    pub storage_binding: Option<StorageBindingRequest>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageBindingRequest {
+    pub connection_id: uuid::Uuid,
+    pub namespace: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -32,6 +40,7 @@ pub struct UpdateLibraryRequest {
     pub display_name: String,
     pub description: Option<String>,
     pub icon_url: Option<String>,
+    pub storage_binding: Option<StorageBindingRequest>,
 }
 
 #[derive(Deserialize)]

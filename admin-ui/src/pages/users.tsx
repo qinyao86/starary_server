@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { TeamUser } from "../api";
 import { api } from "../api";
 import type { PageContext } from "../types";
-import { Panel, StatusDot } from "../components/common";
+import { PageFrame, Panel, StatusDot } from "../components/common";
 import { UserDialog } from "../components/dialogs";
 import { canManageServerRole, formatDateTime, isUserOnline, roleLabel } from "../utils/format";
 
@@ -116,7 +116,16 @@ export function UsersPage({ t, token, users, currentUser, refreshAll, setMessage
   };
 
   return (
-    <div className="page-grid">
+    <PageFrame
+      title={t("users")}
+      description={t("usersPageHint")}
+      action={
+        <Button type="button" onClick={openCreateDialog} disabled={!canManageUsers}>
+          <UserPlus size={15} />
+          <span>{t("createUser")}</span>
+        </Button>
+      }
+    >
       <UserDialog
         canAssignOwner={canAssignOwner}
         displayName={displayName}
@@ -136,15 +145,9 @@ export function UsersPage({ t, token, users, currentUser, refreshAll, setMessage
         onSubmit={submitUser}
       />
       <Panel
-        title={t("users")}
+        title={t("teamAccess")}
         icon={Users}
         className="span-12"
-        action={
-          <Button className="panel-action-button" size="sm" type="button" onClick={openCreateDialog} disabled={!canManageUsers}>
-            <UserPlus size={15} />
-            <span>{t("createUser")}</span>
-          </Button>
-        }
       >
         <div className="toolbar-strip">
           <div className="search-box">
@@ -214,6 +217,6 @@ export function UsersPage({ t, token, users, currentUser, refreshAll, setMessage
           </table>
         </div>
       </Panel>
-    </div>
+    </PageFrame>
   );
 }

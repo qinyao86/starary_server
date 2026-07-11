@@ -43,12 +43,41 @@ export type TeamLibrary = {
   storageRootCount?: number;
   enabledStorageRootCount?: number;
   primaryStorageKind?: string | null;
+  primaryStorageConnectionId?: string | null;
+  primaryStorageConnectionName?: string | null;
+  primaryStorageNamespace?: string | null;
   primaryStorageUri?: string | null;
   primaryStorageWindowsPath?: string | null;
   primaryStorageMacosPath?: string | null;
   createdByUserId?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type StorageConnection = {
+  id: string;
+  name: string;
+  kind: string;
+  canonicalUri: string;
+  windowsUncPath?: string | null;
+  windowsMappedDriveAliases: string[];
+  macosSmbUrl?: string | null;
+  macosMountAliases: string[];
+  enabled: boolean;
+  libraryCount: number;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StorageConnectionInput = {
+  name?: string;
+  kind: string;
+  canonicalUri: string;
+  windowsUncPath?: string;
+  windowsMappedDriveAliases?: string[];
+  macosSmbUrl?: string;
+  macosMountAliases?: string[];
 };
 
 export type TeamUser = {
@@ -68,6 +97,9 @@ export type TeamUser = {
 export type StorageRoot = {
   id: string;
   libraryId: string;
+  storageConnectionId: string;
+  storageConnectionName: string;
+  namespace: string;
   name: string;
   kind: string;
   canonicalUri: string;
@@ -81,18 +113,14 @@ export type StorageRoot = {
   updatedAt: string;
 };
 
-export type StorageRootInput = {
-  name: string;
+export type DefaultStorageRootInput = {
+  name?: string;
   kind: string;
   canonicalUri: string;
   windowsUncPath?: string;
   windowsMappedDriveAliases?: string[];
   macosSmbUrl?: string;
   macosMountAliases?: string[];
-};
-
-export type DefaultStorageRootInput = Omit<StorageRootInput, "name"> & {
-  name?: string;
 };
 
 export type LibraryMember = {

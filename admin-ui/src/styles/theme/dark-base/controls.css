@@ -1,5 +1,6 @@
 .theme-dark .field input,
 .theme-dark .field select,
+.theme-dark .select-control-button,
 .theme-dark .readonly-field strong,
 .theme-dark .search-box,
 .theme-dark .select-button,
@@ -13,39 +14,23 @@
   color: #fafafa;
 }
 
-.theme-dark .library-storage-setup {
-  border-color: #2f2f33;
-  background: #111113;
-}
-
-.theme-dark .storage-kind-option {
-  border-color: #34343a;
+.theme-dark .storage-kind-radio {
   color: #d4d4d8;
-  background: #1d1d21;
 }
 
-.theme-dark .storage-kind-option:hover {
-  border-color: #494950;
-  background: #232329;
-}
-
-.theme-dark .storage-kind-option.is-active {
-  border-color: #60a5fa;
-  color: #dbeafe;
-  background: rgba(59, 130, 246, 0.14);
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.14);
-}
-
-.theme-dark .storage-kind-option-description {
+.theme-dark .storage-kind-description {
   color: #a1a1aa;
 }
 
-.theme-dark .library-storage-heading strong {
+.theme-dark .select-control-icon,
+.theme-dark .select-control-button svg {
+  color: #a1a1aa;
+}
+
+.theme-dark .select-control-button:hover {
+  border-color: #52525b;
   color: #fafafa;
-}
-
-.theme-dark .library-storage-heading span {
-  color: #a1a1aa;
+  background: #27272a;
 }
 
 .theme-dark .field input:focus,
@@ -87,33 +72,14 @@
 .theme-dark .select-button:hover,
 .theme-dark .power-button:hover,
 .theme-dark .secondary-button:hover,
-.theme-dark .sidebar-theme-switch:hover,
 .theme-dark .icon-text-button:hover {
   background: #27272a;
   color: #fafafa;
 }
 
-.theme-dark .sidebar-theme-switch,
 .theme-dark .sidebar-logout-button {
   color: #d4d4d8;
-  background: rgba(39, 39, 42, 0.62);
-}
-
-.theme-dark .sidebar-theme-switch {
-  color: #c4c7cf;
-}
-
-.theme-dark .sidebar-theme-switch-thumb {
-  background: #3b82f6;
-  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.24), 0 8px 18px rgba(59, 130, 246, 0.24);
-}
-
-.theme-dark .sidebar-theme-switch-icon.is-light {
-  color: #71717a;
-}
-
-.theme-dark .sidebar-theme-switch-icon.is-dark {
-  color: #dbeafe;
+  background: transparent;
 }
 
 .theme-dark .sidebar-logout-button:hover {

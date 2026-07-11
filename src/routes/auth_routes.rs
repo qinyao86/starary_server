@@ -8,7 +8,7 @@ use crate::{
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
-use super::access::ensure_library_access;
+use super::access::ensure_library_membership;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,7 +140,7 @@ pub async fn update_presence(
     Json(request): Json<PresenceRequest>,
 ) -> AppResult<StatusCode> {
     if let Some(library_id) = request.library_id.as_deref() {
-        ensure_library_access(&state, &user, library_id).await?;
+        ensure_library_membership(&state, &user, library_id).await?;
     }
 
     sqlx::query(

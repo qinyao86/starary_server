@@ -18,3 +18,57 @@
   color: #2563eb;
   background: #e8f0ff;
 }
+
+.appearance-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 58px;
+}
+
+.appearance-setting > div:first-child {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.appearance-setting strong {
+  color: #253244;
+  font-size: 13px;
+}
+
+.appearance-setting > div:first-child span {
+  color: #697586;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.appearance-setting .segmented {
+  flex: 0 0 auto;
+}
+
+.theme-dark .appearance-setting strong {
+  color: #fafafa;
+}
+
+.theme-dark .appearance-setting > div:first-child span {
+  color: #a1a1aa;
+}
+
+@media (max-width: 620px) {
+  .appearance-setting {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .appearance-setting .segmented {
+    width: 100%;
+  }
+
+  .appearance-setting .segmented button {
+    flex: 1;
+    justify-content: center;
+  }
+}

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import type { StorageRoot, TeamLibrary } from "../../api";
 import type { TranslatorContext } from "../../types";
 import { storageKindLabel } from "../../utils/format";
-import { Panel, StatusDot } from "../common";
+import { Panel, SelectField, StatusDot } from "../common";
 
 export function StorageRootsPanel({
   libraries,
@@ -30,14 +30,11 @@ export function StorageRootsPanel({
       className="storage-roots-card"
     >
       <div className="toolbar-strip">
-        <label className="field compact-select-field">
-          <span>{t("selectLibrary")}</span>
-          <select value={selectedLibraryId} onChange={(event) => onLibraryChange(event.target.value)}>
+        <SelectField className="compact-select-field" label={t("selectLibrary")} value={selectedLibraryId} onChange={onLibraryChange}>
             {libraries.map((item) => (
               <option key={item.id} value={item.id}>{item.displayName}</option>
             ))}
-          </select>
-        </label>
+        </SelectField>
         <StatusDot label={storageRoots.length ? t("realData") : t("empty")} tone={storageRoots.length ? "good" : "muted"} />
       </div>
       <div className="table-wrap">

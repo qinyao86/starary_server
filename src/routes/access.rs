@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
 };
 
-pub async fn ensure_library_access(
+pub async fn ensure_library_membership(
     state: &AppState,
     user: &AuthUser,
     library_id: &str,
@@ -43,12 +43,31 @@ pub async fn ensure_library_access(
         .map_err(|_| AppError::Forbidden)
 }
 
+pub async fn ensure_library_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+) -> AppResult<Role> {
+    let role = ensure_library_membership(state, user, library_id).await?;
+    let enabled: Option<bool> =
+        sqlx::query_scalar("SELECT enabled FROM libraries WHERE id = $1 AND deleted_at IS NULL")
+            .bind(library_id)
+            .fetch_optional(&state.pool)
+            .await?;
+
+    match enabled {
+        Some(true) => Ok(role),
+        Some(false) => Err(AppError::LibraryDisabled(library_id.to_string())),
+        None => Err(AppError::NotFound("library not found".to_string())),
+    }
+}
+
 pub async fn ensure_library_manager(
     state: &AppState,
     user: &AuthUser,
     library_id: &str,
 ) -> AppResult<Role> {
-    let role = ensure_library_access(state, user, library_id).await?;
+    let role = ensure_library_membership(state, user, library_id).await?;
     if user.role.can_manage_server() || role.can_manage_library() {
         Ok(role)
     } else {

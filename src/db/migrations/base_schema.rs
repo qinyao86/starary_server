@@ -95,9 +95,31 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
 
     tx.execute(
         r#"
+        CREATE TABLE IF NOT EXISTS storage_connections (
+            id UUID PRIMARY KEY,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('server_filesystem', 'smb', 's3')),
+            canonical_uri TEXT NOT NULL,
+            windows_unc_path TEXT,
+            windows_mapped_drive_aliases JSONB NOT NULL DEFAULT '[]'::jsonb,
+            macos_smb_url TEXT,
+            macos_mount_aliases JSONB NOT NULL DEFAULT '[]'::jsonb,
+            enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            created_by_user_id UUID NOT NULL REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        "#,
+    )
+    .await?;
+
+    tx.execute(
+        r#"
         CREATE TABLE IF NOT EXISTS storage_roots (
             id UUID PRIMARY KEY,
             library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+            storage_connection_id UUID NOT NULL REFERENCES storage_connections(id),
+            namespace TEXT NOT NULL DEFAULT '',
             name TEXT NOT NULL,
             kind TEXT NOT NULL CHECK (kind IN ('server_filesystem', 'smb', 's3')),
             canonical_uri TEXT NOT NULL,

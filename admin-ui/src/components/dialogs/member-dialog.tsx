@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import type { TeamUser } from "../../api";
 import type { TranslatorContext } from "../../types";
+import { SelectField } from "../common";
 import { DialogShell } from "./dialog-shell";
 
 export function MemberDialog({
@@ -40,22 +41,16 @@ export function MemberDialog({
             <div className="placeholder-box">{t("noAvailableUsers")}</div>
           ) : (
             <>
-              <label className="field">
-                <span>{t("users")}</span>
-                <select value={memberUserId} onChange={(event) => onUserChange(event.target.value)}>
+              <SelectField label={t("users")} value={memberUserId} onChange={onUserChange}>
                   {users.map((item) => (
                     <option key={item.id} value={item.id}>{item.displayName} ({item.email})</option>
                   ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>{t("role")}</span>
-                <select value={memberRole} onChange={(event) => onRoleChange(event.target.value)}>
+              </SelectField>
+              <SelectField label={t("role")} value={memberRole} onChange={onRoleChange}>
                   <option value="library_manager">{t("manager")}</option>
                   <option value="editor">{t("editor")}</option>
                   <option value="viewer">{t("viewer")}</option>
-                </select>
-              </label>
+              </SelectField>
             </>
           )}
         </div>

@@ -1,12 +1,12 @@
 import { ShieldCheck } from "lucide-react";
 import type { TranslatorContext } from "../types";
 import { permissions } from "../mockData";
-import { Badge, CheckCell, Panel } from "../components/common";
+import { Badge, CheckCell, PageFrame, Panel } from "../components/common";
 
 export function PermissionsPage({ t }: TranslatorContext) {
   const roles = ["owner", "adminRole", "manager", "editor", "viewer"] as const;
   return (
-    <div className="page-grid">
+    <PageFrame title={t("permissions")} description={t("permissionsPageHint")}>
       <Panel title={t("permissionMatrix")} icon={ShieldCheck} className="span-12" action={<Badge>{t("placeholderData")}</Badge>}>
         <table className="matrix">
           <thead>
@@ -31,6 +31,6 @@ export function PermissionsPage({ t }: TranslatorContext) {
           </tbody>
         </table>
       </Panel>
-    </div>
+    </PageFrame>
   );
 }

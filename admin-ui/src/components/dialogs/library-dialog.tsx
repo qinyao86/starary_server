@@ -1,104 +1,90 @@
 import type { FormEvent } from "react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { StorageConnection } from "../../api";
 import type { TranslatorContext } from "../../types";
-import { TextField } from "../common";
+import { SelectField, TextField } from "../common";
 import { DialogShell } from "./dialog-shell";
 
+const createStorageValue = "__create_storage__";
+
 export function LibraryDialog({
-  open,
-  title,
+  description,
   hint,
   name,
-  description,
+  open,
+  showStorage = false,
+  storageConnectionId = "",
+  storageConnections = [],
   submitLabel,
   t,
+  title,
   onClose,
   onDescriptionChange,
   onNameChange,
-  onSubmit,
-  showWorkspaceSection = false,
-  workspaceCanonicalUri = "",
-  workspaceKind = "smb",
-  onWorkspaceCanonicalUriChange,
-  onWorkspaceKindChange
+  onStorageConnectionChange,
+  onCreateStorage,
+  onSubmit
 }: TranslatorContext & {
-  open: boolean;
-  title: string;
+  description: string;
   hint: string;
   name: string;
-  description: string;
+  open: boolean;
+  showStorage?: boolean;
+  storageConnectionId?: string;
+  storageConnections?: StorageConnection[];
   submitLabel: string;
+  title: string;
   onClose: () => void;
   onDescriptionChange: (value: string) => void;
   onNameChange: (value: string) => void;
+  onStorageConnectionChange?: (value: string) => void;
+  onCreateStorage?: () => void;
   onSubmit: (event: FormEvent) => void | Promise<void>;
-  showWorkspaceSection?: boolean;
-  workspaceCanonicalUri?: string;
-  workspaceKind?: string;
-  onWorkspaceCanonicalUriChange?: (value: string) => void;
-  onWorkspaceKindChange?: (value: string) => void;
 }) {
-  const canEditWorkspace =
-    showWorkspaceSection &&
-    onWorkspaceCanonicalUriChange &&
-    onWorkspaceKindChange;
-  const storageKindOptions = [
-    { value: "smb", label: t("storageKindSmb"), description: t("sharedFolderTypeHint") },
-    { value: "s3", label: t("storageKindS3"), description: t("objectStorageTypeHint") }
-  ];
-  const handleWorkspaceKindChange = (value: string) => onWorkspaceKindChange?.(value);
-  const handleWorkspaceCanonicalUriChange = (value: string) => onWorkspaceCanonicalUriChange?.(value);
+  const availableStorageConnections = storageConnections.filter(
+    (connection) => connection.enabled || connection.id === storageConnectionId
+  );
 
   return (
-    <DialogShell
-      className="library-dialog"
-      closeLabel={t("cancel")}
-      open={open}
-      subtitle={hint}
-      title={title}
-      titleId="library-dialog-title"
-      onClose={onClose}
-    >
+    <DialogShell className="library-dialog" closeLabel={t("cancel")} open={open} subtitle={hint} title={title} titleId="library-dialog-title" onClose={onClose}>
       <form className="dialog-form" onSubmit={onSubmit}>
         <div className="dialog-body">
           <TextField autoFocus required label={t("name")} value={name} onChange={onNameChange} />
           <TextField label={t("description")} value={description} onChange={onDescriptionChange} />
-          {canEditWorkspace && (
-            <div className="library-storage-setup">
-              <div className="library-storage-heading">
-                <strong>{t("libraryStorageLocation")}</strong>
-                <span>{t("libraryStorageLocationHint")}</span>
-              </div>
-              <div className="storage-kind-options" role="radiogroup" aria-label={t("storageLocationType")}>
-                {storageKindOptions.map((option) => (
-                  <button
-                    aria-checked={workspaceKind === option.value}
-                    className={`storage-kind-option${workspaceKind === option.value ? " is-active" : ""}`}
-                    key={option.value}
-                    role="radio"
-                    type="button"
-                    onClick={() => handleWorkspaceKindChange(option.value)}
-                  >
-                    <span className="storage-kind-option-title">{option.label}</span>
-                    <span className="storage-kind-option-description">{option.description}</span>
-                  </button>
+          {showStorage && onStorageConnectionChange && (
+            availableStorageConnections.length > 0 ? (
+              <SelectField
+                required
+                label={t("libraryStorageLocation")}
+                value={storageConnectionId || availableStorageConnections[0].id}
+                onChange={(value) => {
+                  if (value === createStorageValue) {
+                    onCreateStorage?.();
+                    return;
+                  }
+                  onStorageConnectionChange(value);
+                }}
+              >
+                {availableStorageConnections.map((connection) => (
+                  <option key={connection.id} value={connection.id}>{connection.canonicalUri}</option>
                 ))}
-              </div>
-              <div className="library-storage-fields">
-                <TextField
-                  required
-                  label={t("workspaceLocation")}
-                  placeholder={t(workspaceKind === "s3" ? "objectStorageLocationPlaceholder" : "sharedFolderLocationPlaceholder")}
-                  value={workspaceCanonicalUri}
-                  onChange={handleWorkspaceCanonicalUriChange}
-                />
-              </div>
-            </div>
+                {onCreateStorage && <option value={createStorageValue}>{t("createStorageLocationOption")}</option>}
+              </SelectField>
+            ) : (
+              <label className="field">
+                <span>{t("libraryStorageLocation")}</span>
+                <button className="select-control-button" type="button" onClick={onCreateStorage}>
+                  <span>{t("createStorageLocationOption")}</span>
+                  <Plus aria-hidden="true" size={15} />
+                </button>
+              </label>
+            )
           )}
         </div>
         <div className="dialog-footer">
           <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>
-          <Button type="submit">{submitLabel}</Button>
+          <Button disabled={showStorage && !storageConnectionId} type="submit">{submitLabel}</Button>
         </div>
       </form>
     </DialogShell>

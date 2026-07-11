@@ -1,4 +1,5 @@
-import { Copy, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, HardDrive, Images, Pencil, Trash2, UserRound, Users } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { TeamLibrary } from "../../api";
@@ -60,10 +61,10 @@ function smbUrlFromUnc(value?: string | null) {
   return `smb://${parts.join("/")}`;
 }
 
-function LibraryMetric({ label, value }: { label: string; value: string }) {
+function LibraryMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="library-card-metric">
-      <span>{label}</span>
+      <span className="library-card-metric-label"><Icon aria-hidden="true" size={13} />{label}</span>
       <strong>{value}</strong>
     </div>
   );
@@ -90,6 +91,7 @@ async function copyTextToClipboard(value: string) {
 
 export function LibraryCardList({
   libraries,
+  canManageLibrary,
   t,
   onDelete,
   onEdit,
@@ -97,6 +99,7 @@ export function LibraryCardList({
   onToggleEnabled
 }: TranslatorContext & {
   libraries: TeamLibrary[];
+  canManageLibrary: (library: TeamLibrary) => boolean;
   onDelete: (library: TeamLibrary) => void;
   onEdit: (library: TeamLibrary) => void;
   onOpen: (libraryId: string) => void;
@@ -110,6 +113,7 @@ export function LibraryCardList({
     <div className="library-card-grid">
       {libraries.map((library) => {
         const isEnabled = library.enabled !== false;
+        const canManage = canManageLibrary(library);
         const storageMeta = libraryStorageMeta(library, t);
         return (
           <Card className={`library-card${isEnabled ? "" : " is-disabled"}`} key={library.id}>
@@ -123,7 +127,7 @@ export function LibraryCardList({
                 </div>
                 <div className="library-card-description">{library.description || t("noDescription")}</div>
               </div>
-              <button
+              {canManage && <button
                 aria-checked={isEnabled}
                 aria-label={isEnabled ? t("deactivate") : t("activate")}
                 className={`library-card-switch${isEnabled ? " is-on" : ""}`}
@@ -132,7 +136,7 @@ export function LibraryCardList({
                 onClick={() => onToggleEnabled(library, !isEnabled)}
               >
                 <span />
-              </button>
+              </button>}
             </div>
 
             <div className="library-card-storage">
@@ -149,7 +153,7 @@ export function LibraryCardList({
                 </strong>
                 <button
                   aria-label={t("copyMode")}
-                  className="library-card-storage-copy"
+                  className="library-card-storage-tool"
                   disabled={!storageMeta.rawPath}
                   title={t("copyMode")}
                   type="button"
@@ -161,10 +165,10 @@ export function LibraryCardList({
             </div>
 
             <div className="library-card-metrics">
-              <LibraryMetric label={t("totalSize")} value={formatBytes(library.totalSizeBytes)} />
-              <LibraryMetric label={t("membersLabel")} value={formatCount(library.memberNames?.length)} />
-              <LibraryMetric label={t("assets")} value={formatCount(library.assetCount)} />
-              <LibraryMetric label={t("creator")} value={library.creatorName || "-"} />
+              <LibraryMetric icon={HardDrive} label={t("totalSize")} value={formatBytes(library.totalSizeBytes)} />
+              <LibraryMetric icon={Users} label={t("membersLabel")} value={formatCount(library.memberNames?.length)} />
+              <LibraryMetric icon={Images} label={t("assets")} value={formatCount(library.assetCount)} />
+              <LibraryMetric icon={UserRound} label={t("creator")} value={library.creatorName || "-"} />
             </div>
 
             <div className="library-card-actions">
@@ -172,14 +176,14 @@ export function LibraryCardList({
                 <ExternalLink size={15} />
                 <span>{t("openLibrary")}</span>
               </Button>
-              <Button className="library-card-action" size="sm" type="button" variant="outline" onClick={() => onEdit(library)}>
+              {canManage && <Button className="library-card-action" size="sm" type="button" variant="outline" onClick={() => onEdit(library)}>
                 <Pencil size={15} />
                 <span>{t("editLibrary")}</span>
-              </Button>
-              <Button className="library-card-action is-danger" size="sm" type="button" variant="outline" onClick={() => onDelete(library)}>
+              </Button>}
+              {canManage && <Button className="library-card-action is-danger" size="sm" type="button" variant="outline" onClick={() => onDelete(library)}>
                 <Trash2 size={15} />
                 <span>{t("deleteLibrary")}</span>
-              </Button>
+              </Button>}
             </div>
           </Card>
         );

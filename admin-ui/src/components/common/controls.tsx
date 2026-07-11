@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function Segmented({
@@ -58,6 +59,34 @@ export function TextField({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+    </label>
+  );
+}
+
+export function SelectField({
+  children,
+  className = "",
+  label,
+  required = false,
+  value,
+  onChange
+}: {
+  children: ReactNode;
+  className?: string;
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className={`field ${className}`.trim()}>
+      <span>{label}</span>
+      <span className="select-control">
+        <select required={required} value={value} onChange={(event) => onChange(event.target.value)}>
+          {children}
+        </select>
+        <ChevronDown aria-hidden="true" className="select-control-icon" size={15} />
+      </span>
     </label>
   );
 }

@@ -42,79 +42,98 @@
   line-height: 1;
 }
 
-.library-storage-setup {
+.storage-location-fields {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-top: 2px;
-  border: 1px solid #e4e9f0;
-  border-radius: 12px;
-  padding: 13px;
+}
+
+.field select {
+  appearance: none;
+  padding-right: 38px;
+}
+
+.select-control {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.select-control select {
+  display: block;
+}
+
+.select-control-icon {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  color: #7a8697;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.select-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 38px;
+  border: 1px solid #d2dae6;
+  border-radius: 8px;
+  padding: 0 12px 0 10px;
+  color: #1f2937;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.select-control-button:hover {
+  border-color: #b9c5d5;
   background: #f8fafc;
 }
 
-.library-storage-heading {
-  display: grid;
-  gap: 4px;
+.select-control-button:focus-visible {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
-.library-storage-heading strong {
-  color: #1f2937;
-  font-size: 13px;
-  font-weight: 740;
+.select-control-button svg {
+  flex: 0 0 auto;
+  color: #7a8697;
 }
 
-.library-storage-heading span {
-  color: #697586;
-  font-size: 12px;
-  line-height: 18px;
+.storage-kind-radios {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 22px;
 }
 
-.storage-kind-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.storage-kind-option {
-  display: grid;
-  gap: 5px;
-  min-height: 70px;
-  border: 1px solid #dbe3ee;
-  border-radius: 11px;
-  padding: 11px 12px;
+.storage-kind-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   color: #526071;
-  text-align: left;
-  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
   cursor: pointer;
 }
 
-.storage-kind-option:hover {
-  border-color: #cbd6e5;
-  background: #f9fbfd;
+.storage-kind-radio input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #168fa8;
 }
 
-.storage-kind-option.is-active {
-  border-color: #2563eb;
-  color: #1d4ed8;
-  background: #eff6ff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.storage-kind-option-title {
-  color: inherit;
-  font-size: 13px;
-  font-weight: 760;
-  line-height: 18px;
-}
-
-.storage-kind-option-description {
+.storage-kind-description {
+  min-height: 18px;
+  margin: -2px 0 0;
   color: #697586;
   font-size: 12px;
-  font-weight: 560;
-  line-height: 17px;
-}
-
-.library-storage-fields {
-  display: grid;
-  gap: 12px;
+  line-height: 18px;
 }

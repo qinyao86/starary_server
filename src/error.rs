@@ -18,6 +18,8 @@ pub enum AppError {
     NotFound(String),
     #[error("conflict: {0}")]
     Conflict(String),
+    #[error("library is temporarily closed")]
+    LibraryDisabled(String),
     #[error(transparent)]
     Database(#[from] sqlx::Error),
     #[error(transparent)]
@@ -31,6 +33,10 @@ pub enum AppError {
 #[derive(Serialize)]
 struct ErrorBody {
     error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<&'static str>,
+    #[serde(rename = "libraryId", skip_serializing_if = "Option::is_none")]
+    library_id: Option<String>,
 }
 
 impl IntoResponse for AppError {
@@ -41,14 +47,25 @@ impl IntoResponse for AppError {
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
+            AppError::LibraryDisabled(_) => StatusCode::LOCKED,
             AppError::Database(_)
             | AppError::Jwt(_)
             | AppError::Json(_)
             | AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
+        let code = match &self {
+            AppError::LibraryDisabled(_) => Some("library_disabled"),
+            _ => None,
+        };
+        let library_id = match &self {
+            AppError::LibraryDisabled(library_id) => Some(library_id.clone()),
+            _ => None,
+        };
         let body = Json(ErrorBody {
             error: self.to_string(),
+            code,
+            library_id,
         });
 
         (status, body).into_response()

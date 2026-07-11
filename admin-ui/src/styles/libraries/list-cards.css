@@ -221,7 +221,7 @@
   display: none;
 }
 
-.library-card-storage-copy {
+.library-card-storage-tool {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -235,13 +235,13 @@
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
 }
 
-.library-card-storage-copy:hover:not(:disabled) {
+.library-card-storage-tool:hover:not(:disabled) {
   border-color: rgba(37, 99, 235, 0.34);
   color: #1d4ed8;
   background: #ffffff;
 }
 
-.library-card-storage-copy:disabled {
+.library-card-storage-tool:disabled {
   opacity: 0.42;
   cursor: not-allowed;
 }
@@ -259,12 +259,20 @@
   min-width: 0;
 }
 
-.library-card-metric span {
-  display: block;
+.library-card-metric-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
   color: #7a8697;
   font-size: 11px;
   font-weight: 680;
   line-height: 14px;
+}
+
+.library-card-metric-label svg {
+  flex: 0 0 auto;
+  color: #94a3b8;
 }
 
 .library-card-metric strong {

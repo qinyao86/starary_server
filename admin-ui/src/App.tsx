@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AdminShell } from "./components/admin-shell";
-import { AuthShell, LoginForm, SetupOwnerForm } from "./components/auth";
+import { AuthShell, FirstRunSetup, LoginForm } from "./components/auth";
 import { colorThemeStorageKey, sectionStorageKey } from "./constants";
 import { useAdminRuntime } from "./hooks/use-admin-runtime";
 import { createTranslator, type Language } from "./i18n";
@@ -12,6 +12,7 @@ import { buildPreviewLibraries, buildPreviewUsers, previewCurrentUser } from "./
 export function App() {
   const [language, setLanguage] = useState<Language>("zh");
   const [section, setSection] = useState<Section>(() => readStoredSection());
+  const [showFirstLibrarySetup, setShowFirstLibrarySetup] = useState(false);
   const runtime = useAdminRuntime();
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     const stored = localStorage.getItem(colorThemeStorageKey);
@@ -41,6 +42,7 @@ export function App() {
     setMessage,
     setPreviewMode,
     storageRoots,
+    storageConnections,
     token,
     users
   } = runtime;
@@ -55,19 +57,25 @@ export function App() {
     (previewMode ? previewCurrentUser : null);
   const signedIn = previewMode || Boolean(token && currentUser);
   const selectedLibrary = effectiveLibraries.find((item) => item.id === selectedLibraryId) ?? effectiveLibraries[0] ?? null;
-  const title = t(navItems.find((item) => item.id === section)?.label ?? "overview");
+  const title = t(navItems.find((item) => item.id === section)?.label ?? "libraries");
 
-  const toggleColorTheme = () => {
-    setColorTheme((value) => {
-      const next = value === "dark" ? "light" : "dark";
-      localStorage.setItem(colorThemeStorageKey, next);
-      return next;
-    });
+  const updateColorTheme = (nextTheme: ColorTheme) => {
+    localStorage.setItem(colorThemeStorageKey, nextTheme);
+    setColorTheme(nextTheme);
   };
 
   const selectSection = (nextSection: Section) => {
     localStorage.setItem(sectionStorageKey, nextSection);
     setSection(nextSection);
+  };
+
+  const finishFirstLibrarySetup = async (libraryId?: string) => {
+    if (libraryId) {
+      selectLibrary(libraryId);
+      await refreshAll();
+    }
+    selectSection("libraries");
+    setShowFirstLibrarySetup(false);
   };
 
   if (apiState === "loading" && needsOwner === null) {
@@ -87,11 +95,21 @@ export function App() {
     );
   }
 
-  if (needsOwner && !previewMode) {
+  if ((needsOwner || showFirstLibrarySetup) && !previewMode) {
     return (
-      <AuthShell t={t} language={language} setLanguage={setLanguage} title={t("setupRequired")} colorTheme={colorTheme}>
-        <SetupOwnerForm t={t} onDone={onAuthenticated} />
-      </AuthShell>
+      <FirstRunSetup
+        colorTheme={colorTheme}
+        language={language}
+        setLanguage={setLanguage}
+        t={t}
+        token={token}
+        onOwnerDone={(response) => {
+          onAuthenticated(response);
+          setShowFirstLibrarySetup(true);
+        }}
+        onLibraryDone={(libraryId) => finishFirstLibrarySetup(libraryId)}
+        onSkip={() => void finishFirstLibrarySetup()}
+      />
     );
   }
 
@@ -107,6 +125,8 @@ export function App() {
     t,
     language,
     setLanguage,
+    colorTheme,
+    setColorTheme: updateColorTheme,
     deploymentMode,
     setDeploymentMode,
     serviceRunning,
@@ -115,6 +135,7 @@ export function App() {
     libraries: effectiveLibraries,
     users: effectiveUsers,
     storageRoots,
+    storageConnections,
     libraryMembers,
     selectedLibrary,
     selectedLibraryId: selectedLibrary?.id ?? selectedLibraryId,
@@ -124,6 +145,7 @@ export function App() {
     activityItems,
     libraryActivityItems,
     refreshAll,
+    navigateToSection: selectSection,
     setMessage,
     previewMode
   };
@@ -144,7 +166,6 @@ export function App() {
       onRefresh={refreshAll}
       onSelectSection={selectSection}
       onSetDeploymentMode={setDeploymentMode}
-      onToggleColorTheme={toggleColorTheme}
     >
       {renderSection(section, context)}
     </AdminShell>

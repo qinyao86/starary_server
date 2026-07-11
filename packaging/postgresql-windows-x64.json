@@ -1,0 +1,35 @@
+{
+  "version": "16.14-2",
+  "archiveFileName": "postgresql-16.14-2-windows-x64-binaries.zip",
+  "sourceUrl": "https://get.enterprisedb.com/postgresql/postgresql-16.14-2-windows-x64-binaries.zip",
+  "archiveSha256": "8A7F54C1968D5D49BDCD3F66B1291F736C74B8CB6A26E9874771FCC7837DBF38",
+  "requiredBinFiles": [
+    "postgres.exe",
+    "initdb.exe",
+    "pg_ctl.exe",
+    "createdb.exe",
+    "zlib1.dll",
+    "libssl-3-x64.dll",
+    "libcrypto-3-x64.dll",
+    "libintl-9.dll",
+    "libiconv-2.dll",
+    "libwinpthread-1.dll",
+    "icuin67.dll",
+    "icuuc67.dll",
+    "icudt67.dll",
+    "libxml2.dll",
+    "liblz4.dll",
+    "libzstd.dll",
+    "libpq.dll",
+    "vcruntime140.dll"
+  ],
+  "requiredFiles": [
+    "lib\\plpgsql.dll",
+    "lib\\dict_snowball.dll",
+    "share\\postgres.bki",
+    "share\\extension\\plpgsql.control",
+    "share\\extension\\plpgsql--1.0.sql",
+    "server_license.txt",
+    "commandlinetools_3rd_party_licenses.txt"
+  ]
+}

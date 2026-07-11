@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
+  ApiError,
   clearStoredToken,
   getStoredToken,
   storeToken,
@@ -8,6 +9,7 @@ import {
   type CurrentUser,
   type LibraryMember,
   type ServerInfo,
+  type StorageConnection,
   type StorageRoot,
   type TeamLibrary,
   type TeamUser
@@ -26,6 +28,7 @@ export function useAdminRuntime() {
   const [libraries, setLibraries] = useState<TeamLibrary[]>([]);
   const [users, setUsers] = useState<TeamUser[]>([]);
   const [storageRoots, setStorageRoots] = useState<StorageRoot[]>([]);
+  const [storageConnections, setStorageConnections] = useState<StorageConnection[]>([]);
   const [libraryMembers, setLibraryMembers] = useState<LibraryMember[]>([]);
   const [selectedLibraryId, setSelectedLibraryId] = useState("");
   const [assetTotal, setAssetTotal] = useState(0);
@@ -49,7 +52,12 @@ export function useAdminRuntime() {
     }
   }, []);
 
-  const loadLibraryScopedState = useCallback(async (nextToken: string | null, libraryId: string, canManageLibrary = true) => {
+  const loadLibraryScopedState = useCallback(async (
+    nextToken: string | null,
+    libraryId: string,
+    canManageLibrary = true,
+    libraryEnabled = true,
+  ) => {
     if (!nextToken || !libraryId) {
       setStorageRoots([]);
       setLibraryMembers([]);
@@ -61,8 +69,8 @@ export function useAdminRuntime() {
     const [roots, members, assets, activity] = await Promise.all([
       api.listStorageRoots(nextToken, libraryId),
       canManageLibrary ? api.listLibraryMembers(nextToken, libraryId) : Promise.resolve([]),
-      api.listAssets(nextToken, libraryId),
-      api.listActivity(nextToken, libraryId)
+      libraryEnabled ? api.listAssets(nextToken, libraryId) : Promise.resolve({ items: [], total: 0, limit: 0, offset: 0 }),
+      libraryEnabled ? api.listActivity(nextToken, libraryId) : Promise.resolve({ items: [], limit: 0, offset: 0 })
     ]);
     setStorageRoots(roots);
     setLibraryMembers(members);
@@ -75,27 +83,36 @@ export function useAdminRuntime() {
       if (!nextToken) return;
       try {
         const me = await api.me(nextToken);
-        const [nextLibraries, nextUsers, nextActivity] = await Promise.all([
+        const [nextLibraries, nextUsers, nextActivity, nextStorageConnections] = await Promise.all([
           api.listLibraries(nextToken),
           canManageServerRole(me.role) ? api.listUsers(nextToken) : Promise.resolve([]),
-          api.listServerActivity(nextToken)
+          api.listServerActivity(nextToken),
+          api.listStorageConnections(nextToken)
         ]);
         setCurrentUser(me);
         setLibraries(nextLibraries);
         setUsers(nextUsers);
         setActivityItems(nextActivity.items);
+        setStorageConnections(nextStorageConnections);
         const nextLibraryId = nextLibraries.some((item) => item.id === selectedLibraryId)
           ? selectedLibraryId
           : nextLibraries[0]?.id || "";
         setSelectedLibraryId(nextLibraryId);
         const nextLibrary = nextLibraries.find((item) => item.id === nextLibraryId);
-        await loadLibraryScopedState(nextToken, nextLibraryId, isLibraryManagerRole(nextLibrary?.currentUserRole ?? me.role));
+        await loadLibraryScopedState(
+          nextToken,
+          nextLibraryId,
+          isLibraryManagerRole(nextLibrary?.currentUserRole ?? me.role),
+          nextLibrary?.enabled !== false,
+        );
       } catch (error) {
-        clearStoredToken();
-        setToken(null);
-        setCurrentUser(null);
-        setActivityItems([]);
-        setLibraryActivityItems([]);
+        if (error instanceof ApiError && error.status === 401) {
+          clearStoredToken();
+          setToken(null);
+          setCurrentUser(null);
+          setActivityItems([]);
+          setLibraryActivityItems([]);
+        }
         setMessage(error instanceof Error ? error.message : String(error));
       }
     },
@@ -152,7 +169,12 @@ export function useAdminRuntime() {
     setSelectedLibraryId(id);
     if (token) {
       const library = libraries.find((item) => item.id === id);
-      void loadLibraryScopedState(token, id, isLibraryManagerRole(library?.currentUserRole ?? currentUser?.role ?? "")).catch((error) => {
+      void loadLibraryScopedState(
+        token,
+        id,
+        isLibraryManagerRole(library?.currentUserRole ?? currentUser?.role ?? ""),
+        library?.enabled !== false,
+      ).catch((error) => {
         setMessage(error instanceof Error ? error.message : String(error));
       });
     }
@@ -173,6 +195,7 @@ export function useAdminRuntime() {
     setLibraries([]);
     setUsers([]);
     setStorageRoots([]);
+    setStorageConnections([]);
     setActivityItems([]);
     setLibraryActivityItems([]);
   };
@@ -200,6 +223,7 @@ export function useAdminRuntime() {
     setMessage,
     setPreviewMode,
     storageRoots,
+    storageConnections,
     token,
     users
   };

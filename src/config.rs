@@ -23,6 +23,13 @@ pub struct ServerConfig {
     #[arg(long, env = "MADLIBRARY_STORAGE_DIR")]
     pub storage_dir: PathBuf,
 
+    #[arg(
+        long,
+        env = "MADLIBRARY_ALLOW_PERSONAL_STORAGE_PATHS",
+        default_value_t = false
+    )]
+    pub allow_personal_storage_paths: bool,
+
     #[arg(long, env = "MADLIBRARY_ADMIN_ASSETS_DIR")]
     pub admin_assets_dir: Option<PathBuf>,
 
@@ -37,8 +44,8 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
-    pub fn from_env() -> Self {
-        Self::parse().normalize_paths()
+    pub fn from_env(app_home: &std::path::Path) -> Self {
+        Self::parse().normalize_paths(app_home)
     }
 
     pub fn bind_addr(&self) -> String {
@@ -46,22 +53,21 @@ impl ServerConfig {
     }
 
     pub fn resolved_admin_assets_dir(&self) -> PathBuf {
-        self.admin_assets_dir.clone().unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("admin-ui")
-                .join("dist")
-        })
+        self.admin_assets_dir
+            .clone()
+            .expect("admin assets directory is normalized during startup")
     }
 
-    fn normalize_paths(mut self) -> Self {
-        let server_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    fn normalize_paths(mut self, app_home: &std::path::Path) -> Self {
         if self.storage_dir.is_relative() {
-            self.storage_dir = server_dir.join(&self.storage_dir);
+            self.storage_dir = app_home.join(&self.storage_dir);
         }
         if let Some(admin_assets_dir) = &self.admin_assets_dir {
             if admin_assets_dir.is_relative() {
-                self.admin_assets_dir = Some(server_dir.join(admin_assets_dir));
+                self.admin_assets_dir = Some(app_home.join(admin_assets_dir));
             }
+        } else {
+            self.admin_assets_dir = Some(app_home.join("admin-ui").join("dist"));
         }
         self
     }

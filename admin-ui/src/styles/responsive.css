@@ -1,17 +1,9 @@
 @media (max-width: 1180px) {
-  body {
-    min-width: 960px;
-  }
-
   .admin-shell {
     grid-template-columns: 220px minmax(0, 1fr);
   }
 
   .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .library-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -43,5 +35,73 @@
   .auth-card {
     border-left: 0;
     border-top: 1px solid rgba(15, 23, 42, 0.08);
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-shell {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    height: 100vh;
+    margin: 0;
+  }
+
+  .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .brand > :last-child,
+  .sidebar-status-area,
+  .nav-item span,
+  .sidebar-logout-button span {
+    display: none;
+  }
+
+  .nav-list {
+    padding: 8px;
+  }
+
+  .nav-item {
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+
+  .sidebar-footer {
+    padding: 8px;
+  }
+
+  .sidebar-logout-button {
+    width: 56px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .content {
+    padding: 18px 12px;
+  }
+
+  .page-intro {
+    margin: -18px -12px 0;
+    padding-inline: 12px;
+  }
+
+  .page-intro-copy p {
+    display: none;
+  }
+
+  .dialog-backdrop {
+    padding: 12px;
+  }
+
+  .dialog-panel {
+    max-height: calc(100vh - 24px);
+  }
+
+  .library-card {
+    padding: 16px;
   }
 }

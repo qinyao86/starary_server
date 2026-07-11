@@ -1,10 +1,11 @@
 import { Archive, Lock, RefreshCw } from "lucide-react";
 import type { DeploymentMode, TranslatorContext } from "../types";
-import { InfoStack, Panel } from "../components/common";
+import { InfoStack, PageFrame, Panel } from "../components/common";
 
 export function BackupsPage({ t, deploymentMode }: TranslatorContext & { deploymentMode: DeploymentMode }) {
   return (
-    <div className="page-grid">
+    <PageFrame title={t("backups")} description={t("backupsPageHint")}>
+      <div className="page-grid">
       <Panel title={t("backups")} icon={Archive} className="span-7" action={<button className="primary-button is-disabled" type="button">{t("backupNow")}</button>}>
         <InfoStack
           items={[
@@ -20,6 +21,7 @@ export function BackupsPage({ t, deploymentMode }: TranslatorContext & { deploym
           <span>{t("plannedNote")}</span>
         </div>
       </Panel>
-    </div>
+      </div>
+    </PageFrame>
   );
 }

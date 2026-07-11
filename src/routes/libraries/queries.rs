@@ -1,4 +1,8 @@
-use crate::{error::AppResult, models::LibraryWithRole, state::AppState};
+use crate::{
+    error::AppResult,
+    models::{LibraryStatusRecord, LibraryWithRole},
+    state::AppState,
+};
 use uuid::Uuid;
 
 const LIBRARY_STATS_CTES: &str = r#"
@@ -41,15 +45,19 @@ tag_stats AS (
 ),
 storage_stats AS (
     SELECT
-        library_id,
+        sr.library_id,
         COUNT(*)::BIGINT AS storage_root_count,
-        COUNT(*) FILTER (WHERE enabled)::BIGINT AS enabled_storage_root_count,
-        (ARRAY_AGG(kind ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_kind,
-        (ARRAY_AGG(canonical_uri ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_uri,
-        (ARRAY_AGG(windows_unc_path ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_windows_path,
-        (ARRAY_AGG(macos_smb_url ORDER BY enabled DESC, created_at ASC))[1] AS primary_storage_macos_path
-    FROM storage_roots
-    GROUP BY library_id
+        COUNT(*) FILTER (WHERE sr.enabled AND sc.enabled)::BIGINT AS enabled_storage_root_count,
+        (ARRAY_AGG(sc.kind ORDER BY sr.enabled DESC, sr.created_at ASC))[1] AS primary_storage_kind,
+        (ARRAY_AGG(sc.id ORDER BY sr.enabled DESC, sr.created_at ASC))[1] AS primary_storage_connection_id,
+        (ARRAY_AGG(sc.name ORDER BY sr.enabled DESC, sr.created_at ASC))[1] AS primary_storage_connection_name,
+        (ARRAY_AGG(sr.namespace ORDER BY sr.enabled DESC, sr.created_at ASC))[1] AS primary_storage_namespace,
+        (ARRAY_AGG(sr.canonical_uri ORDER BY sr.enabled DESC, sr.created_at ASC))[1] AS primary_storage_uri,
+        (ARRAY_AGG(sr.windows_unc_path ORDER BY sr.enabled DESC, sr.created_at ASC))[1] AS primary_storage_windows_path,
+        (ARRAY_AGG(sr.macos_smb_url ORDER BY sr.enabled DESC, sr.created_at ASC))[1] AS primary_storage_macos_path
+    FROM storage_roots sr
+    INNER JOIN storage_connections sc ON sc.id = sr.storage_connection_id
+    GROUP BY sr.library_id
 )
 "#;
 
@@ -70,6 +78,9 @@ SELECT
     COALESCE(ss.storage_root_count, 0) AS storage_root_count,
     COALESCE(ss.enabled_storage_root_count, 0) AS enabled_storage_root_count,
     ss.primary_storage_kind,
+    ss.primary_storage_connection_id,
+    ss.primary_storage_connection_name,
+    ss.primary_storage_namespace,
     ss.primary_storage_uri,
     ss.primary_storage_windows_path,
     ss.primary_storage_macos_path,
@@ -132,4 +143,37 @@ pub async fn list_libraries_for_member(
         .bind(user_id)
         .fetch_all(&state.pool)
         .await?)
+}
+
+pub async fn list_library_statuses_for_server_manager(
+    state: &AppState,
+) -> AppResult<Vec<LibraryStatusRecord>> {
+    Ok(sqlx::query_as::<_, LibraryStatusRecord>(
+        r#"
+        SELECT id, enabled, updated_at
+        FROM libraries
+        WHERE deleted_at IS NULL
+        ORDER BY id ASC
+        "#,
+    )
+    .fetch_all(&state.pool)
+    .await?)
+}
+
+pub async fn list_library_statuses_for_member(
+    state: &AppState,
+    user_id: Uuid,
+) -> AppResult<Vec<LibraryStatusRecord>> {
+    Ok(sqlx::query_as::<_, LibraryStatusRecord>(
+        r#"
+        SELECT l.id, l.enabled, l.updated_at
+        FROM libraries l
+        INNER JOIN library_memberships m ON m.library_id = l.id
+        WHERE l.deleted_at IS NULL AND m.user_id = $1
+        ORDER BY l.id ASC
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?)
 }

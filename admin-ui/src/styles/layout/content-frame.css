@@ -7,7 +7,7 @@
   overflow: auto;
   border: 1px solid #d8e0ea;
   border-right: 0;
-  border-radius: 18px 0 0 18px;
+  border-radius: 18px 0 0 0;
   background: #ffffff;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.055);
 }
@@ -24,17 +24,33 @@
   justify-content: space-between;
   gap: 16px;
   margin: -24px -18px 0;
-  height: 48px;
+  height: 64px;
   padding: 0 18px;
-  border-bottom: 1px solid #e4e9f0;
+  border-bottom: 0;
 }
 
 .page-intro h2 {
   margin: 0;
   color: #111827;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 740;
   line-height: 20px;
+}
+
+.page-intro-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.page-intro-copy p {
+  overflow: hidden;
+  margin: 0;
+  color: #7b8796;
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .page-back-button {
@@ -71,8 +87,8 @@
 }
 
 .page-intro-action button {
-  height: 28px;
-  padding-inline: 9px;
+  height: 32px;
+  padding-inline: 11px;
   font-size: 13px;
   border-radius: 7px;
 }
@@ -82,7 +98,7 @@
   height: 13px;
 }
 
-.page-frame > :not(.page-intro) {
+.page-frame > :not(.page-intro):not(.dialog-backdrop) {
   width: min(100%, var(--page-content-max));
   margin-inline: auto;
 }
@@ -92,10 +108,9 @@
     display: grid;
     grid-template-columns: minmax(180px, 1fr) minmax(0, var(--page-content-max)) minmax(180px, 1fr);
     column-gap: 18px;
-    border-bottom: 0;
   }
 
-  .page-intro h2 {
+  .page-intro-copy {
     grid-column: 1;
   }
 
