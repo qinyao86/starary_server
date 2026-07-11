@@ -1,10 +1,10 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { StorageConnection } from "../api";
 import { api } from "../api";
-import { PageFrame, StatusDot } from "../components/common";
+import { PageFrame } from "../components/common";
 import { StorageConnectionDialog } from "../components/dialogs";
 import type { PageContext } from "../types";
 import { storageKindLabel } from "../utils/format";
@@ -14,14 +14,12 @@ export function StoragePage({ t, token, currentUser, storageConnections, refresh
   const [editing, setEditing] = useState<StorageConnection | null>(null);
   const [kind, setKind] = useState("server_filesystem");
   const [location, setLocation] = useState("");
-  const [enabled, setEnabled] = useState(true);
   const canManageStorage = currentUser?.role === "owner" || currentUser?.role === "admin";
 
   const openCreate = () => {
     setEditing(null);
     setKind("server_filesystem");
     setLocation("");
-    setEnabled(true);
     setOpen(true);
   };
 
@@ -29,7 +27,6 @@ export function StoragePage({ t, token, currentUser, storageConnections, refresh
     setEditing(connection);
     setKind(connection.kind);
     setLocation(connection.canonicalUri);
-    setEnabled(connection.enabled);
     setOpen(true);
   };
 
@@ -49,27 +46,10 @@ export function StoragePage({ t, token, currentUser, storageConnections, refresh
         macosSmbUrl: preservePlatformMappings ? editing?.macosSmbUrl ?? undefined : undefined,
         macosMountAliases: preservePlatformMappings ? editing?.macosMountAliases ?? [] : []
       };
-      if (editing) await api.updateStorageConnection(token, editing.id, { ...payload, enabled });
+      if (editing) await api.updateStorageConnection(token, editing.id, { ...payload, enabled: editing.enabled });
       else await api.createStorageConnection(token, payload);
       setOpen(false);
       setMessage(t("saved"));
-      await refreshAll();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const toggle = async (connection: StorageConnection) => {
-    try {
-      await api.updateStorageConnection(token, connection.id, {
-        kind: connection.kind,
-        canonicalUri: connection.canonicalUri,
-        windowsUncPath: connection.windowsUncPath ?? undefined,
-        windowsMappedDriveAliases: connection.windowsMappedDriveAliases,
-        macosSmbUrl: connection.macosSmbUrl ?? undefined,
-        macosMountAliases: connection.macosMountAliases,
-        enabled: !connection.enabled
-      });
       await refreshAll();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -86,6 +66,27 @@ export function StoragePage({ t, token, currentUser, storageConnections, refresh
     }
   };
 
+  const copyPath = async (path: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(path);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = path;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setMessage(t("storagePathCopied"));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   return (
     <PageFrame
       title={t("storage")}
@@ -94,31 +95,28 @@ export function StoragePage({ t, token, currentUser, storageConnections, refresh
     >
       <StorageConnectionDialog
         connection={editing}
-        enabled={enabled}
         kind={kind}
         location={location}
         open={open}
         t={t}
         onClose={() => setOpen(false)}
-        onEnabledChange={setEnabled}
         onKindChange={setKind}
         onLocationChange={setLocation}
         onSubmit={submit}
       />
       <div className="table-wrap storage-connections-table">
         <table className="data-table">
-          <thead><tr><th>{t("libraryStorageLocation")}</th><th>{t("kind")}</th><th>{t("linkedLibraries")}</th><th>{t("status")}</th>{canManageStorage && <th>{t("action")}</th>}</tr></thead>
+          <thead><tr><th className="storage-path-column">{t("libraryStorageLocation")}</th><th className="storage-kind-column">{t("kind")}</th><th className="storage-count-column">{t("linkedLibraries")}</th>{canManageStorage && <th className="storage-actions-column">{t("action")}</th>}</tr></thead>
           <tbody>
-            {storageConnections.length === 0 ? <tr><td colSpan={canManageStorage ? 5 : 4}>{t("noStorageConnections")}</td></tr> : storageConnections.map((connection) => (
+            {storageConnections.length === 0 ? <tr><td colSpan={canManageStorage ? 4 : 3}>{t("noStorageConnections")}</td></tr> : storageConnections.map((connection) => (
               <tr key={connection.id}>
-                <td className="storage-connection-path"><strong>{connection.canonicalUri}</strong></td>
-                <td>{storageKindLabel(t, connection.kind)}</td>
-                <td>{connection.libraryCount}</td>
-                <td><StatusDot label={connection.enabled ? t("enabled") : t("disabled")} tone={connection.enabled ? "good" : "muted"} /></td>
-                {canManageStorage && <td><div className="table-actions">
-                  <Button size="icon" type="button" variant="outline" title={t("edit")} onClick={() => openEdit(connection)}><Pencil size={14} /></Button>
-                  <Button size="icon" type="button" variant="outline" title={connection.enabled ? t("deactivate") : t("activate")} onClick={() => void toggle(connection)}><Power size={14} /></Button>
-                  <Button size="icon" type="button" variant="outline" title={t("delete")} disabled={connection.libraryCount > 0} onClick={() => void remove(connection)}><Trash2 size={14} /></Button>
+                <td className="storage-path-column storage-connection-path"><strong title={connection.canonicalUri}>{connection.canonicalUri}</strong></td>
+                <td className="storage-kind-column">{storageKindLabel(t, connection.kind)}</td>
+                <td className="storage-count-column">{connection.libraryCount}</td>
+                {canManageStorage && <td className="storage-actions-column"><div className="storage-connection-actions">
+                  <Button className="storage-action-button" size="icon" type="button" variant="ghost" title={t("copyStoragePath")} aria-label={t("copyStoragePath")} onClick={() => void copyPath(connection.canonicalUri)}><Copy size={14} /></Button>
+                  <Button className="storage-action-button" size="icon" type="button" variant="ghost" title={t("edit")} aria-label={t("edit")} onClick={() => openEdit(connection)}><Pencil size={15} /></Button>
+                  <Button className="storage-action-button is-danger" size="icon" type="button" variant="ghost" title={t("delete")} aria-label={t("delete")} disabled={connection.libraryCount > 0} onClick={() => void remove(connection)}><Trash2 size={15} /></Button>
                 </div></td>}
               </tr>
             ))}

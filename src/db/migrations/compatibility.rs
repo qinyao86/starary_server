@@ -24,6 +24,8 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
     .await?;
     tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;")
         .await?;
+    tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS storage_locked_at TIMESTAMPTZ;")
+        .await?;
     tx.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;")
         .await?;
     tx.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;")
@@ -48,6 +50,8 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
         "ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS namespace TEXT NOT NULL DEFAULT '';",
     )
     .await?;
+    tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS storage_identity TEXT;")
+        .await?;
     tx.execute(
         r#"
         INSERT INTO storage_connections (
@@ -102,6 +106,16 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
     .await?;
     tx.execute("ALTER TABLE storage_roots ALTER COLUMN storage_connection_id SET NOT NULL;")
         .await?;
+    tx.execute(
+        r#"
+        UPDATE storage_roots
+        SET storage_identity = lower(regexp_replace(replace(btrim(canonical_uri), '\', '/'), '/+$', ''))
+        WHERE storage_identity IS NULL OR btrim(storage_identity) = ''
+        "#,
+    )
+    .await?;
+    tx.execute("ALTER TABLE storage_roots ALTER COLUMN storage_identity SET NOT NULL;")
+        .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS storage_key TEXT;")
         .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS storage_root_id UUID REFERENCES storage_roots(id);")
@@ -124,6 +138,21 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
     .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS restored_by_user_id UUID REFERENCES users(id);")
         .await?;
+    tx.execute(
+        r#"
+        UPDATE libraries l
+        SET storage_locked_at = COALESCE(l.storage_locked_at, first_asset.created_at)
+        FROM (
+            SELECT library_id, MIN(created_at) AS created_at
+            FROM assets
+            WHERE storage_root_id IS NOT NULL
+            GROUP BY library_id
+        ) first_asset
+        WHERE first_asset.library_id = l.id
+          AND l.storage_locked_at IS NULL
+        "#,
+    )
+    .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS imported_at TIMESTAMPTZ;")
         .await?;
     tx.execute("ALTER TABLE assets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")

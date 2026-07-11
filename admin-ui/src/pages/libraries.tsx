@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import type { LibraryMember, TeamLibrary } from "../api";
 import { api } from "../api";
+import { ApiError } from "../api/request";
 import { StorageConnectionDialog } from "../components/dialogs";
 import { LibraryDetailPageView, LibraryListPageView } from "../components/libraries/library-page-views";
 import { useAvailableLibraryUsers } from "../hooks/use-available-library-users";
@@ -29,6 +30,15 @@ export function LibrariesPage({
   const canCreateLibrary = currentUser?.role === "owner" || currentUser?.role === "admin";
   const canManageLibrary = (library: TeamLibrary) =>
     ["owner", "admin", "library_manager"].includes(library.currentUserRole ?? currentUser?.role ?? "");
+  const storageErrorMessage = (error: unknown) => {
+    if (error instanceof ApiError && error.code === "storage_location_conflict") {
+      return t("storageLocationConflict");
+    }
+    if (error instanceof ApiError && error.code === "storage_migration_required") {
+      return t("libraryStorageMigrationRequired");
+    }
+    return error instanceof Error ? error.message : String(error);
+  };
 
   const openCreateLibraryDialog = () => {
     cancelEditLibrary();
@@ -88,7 +98,7 @@ export function LibrariesPage({
       setStorageDialogOpen(false);
       await refreshAll();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(storageErrorMessage(error));
     }
   };
 
@@ -119,7 +129,7 @@ export function LibrariesPage({
       await refreshAll();
       setViewLibraryId(null);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(storageErrorMessage(error));
     }
   };
 
@@ -143,7 +153,7 @@ export function LibrariesPage({
       setMessage(t("saved"));
       await refreshAll();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(storageErrorMessage(error));
     }
   };
 
@@ -240,7 +250,6 @@ export function LibrariesPage({
     <>
       <StorageConnectionDialog
         connection={null}
-        enabled
         kind={storageKind}
         location={storageLocation}
         open={storageDialogOpen}
@@ -248,7 +257,6 @@ export function LibrariesPage({
         t={t}
         title={t("createStorageLocation")}
         onClose={() => setStorageDialogOpen(false)}
-        onEnabledChange={() => undefined}
         onKindChange={setStorageKind}
         onLocationChange={setStorageLocation}
         onSubmit={createStorageConnection}
@@ -259,6 +267,7 @@ export function LibrariesPage({
       editDescription={editDescription}
       editName={editName}
       editingLibraryId={storageDialogOpen ? null : editingLibraryId}
+      editingStorageLocked={Boolean(libraries.find((library) => library.id === editingLibraryId)?.storageLockedAt)}
       libraries={libraries}
       canCreateLibrary={canCreateLibrary}
       canManageLibrary={canManageLibrary}

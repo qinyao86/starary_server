@@ -80,6 +80,7 @@ export function LibraryListPageView({
   editDescription,
   editName,
   editingLibraryId,
+  editingStorageLocked,
   libraries,
   canCreateLibrary,
   canManageLibrary,
@@ -108,6 +109,7 @@ export function LibraryListPageView({
   editDescription: string;
   editName: string;
   editingLibraryId: string | null;
+  editingStorageLocked: boolean;
   libraries: TeamLibrary[];
   canCreateLibrary: boolean;
   canManageLibrary: (library: TeamLibrary) => boolean;
@@ -169,6 +171,7 @@ export function LibraryListPageView({
           submitLabel={t("submit")}
           t={t}
           showStorage
+          storageLocked={editingStorageLocked}
           storageConnectionId={storageConnectionId}
           storageConnections={storageConnections}
           onClose={onCancelEdit}

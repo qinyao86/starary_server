@@ -220,6 +220,26 @@ pub fn normalize_existing_storage_namespace(value: &str) -> AppResult<String> {
     normalize_storage_namespace(Some(value), "unused")
 }
 
+pub fn storage_locations_overlap(first: &str, second: &str) -> bool {
+    let first = storage_identity(first);
+    let second = storage_identity(second);
+    first == second
+        || first
+            .strip_prefix(&second)
+            .is_some_and(|suffix| suffix.starts_with('/'))
+        || second
+            .strip_prefix(&first)
+            .is_some_and(|suffix| suffix.starts_with('/'))
+}
+
+pub fn storage_identity(value: &str) -> String {
+    value
+        .trim()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase()
+}
+
 #[cfg(test)]
 fn validate_library_storage_id(value: &str) -> AppResult<()> {
     use crate::ids::is_prefixed_id;
@@ -795,5 +815,29 @@ mod tests {
             .unwrap_err();
 
         assert!(error.to_string().contains("does not exist"));
+    }
+
+    #[test]
+    fn detects_overlapping_storage_locations_at_path_boundaries() {
+        assert!(storage_locations_overlap(
+            r"C:\MadLibrary\LibraryA",
+            "c:/madlibrary/librarya"
+        ));
+        assert!(storage_locations_overlap(
+            "smb://nas/libraries/team-a",
+            "smb://NAS/libraries/team-a/assets"
+        ));
+        assert!(storage_locations_overlap(
+            "s3://bucket/libraries/team-a/previews",
+            "s3://bucket/libraries/team-a"
+        ));
+        assert!(!storage_locations_overlap(
+            "smb://nas/libraries/team-a",
+            "smb://nas/libraries/team-a-old"
+        ));
+        assert!(!storage_locations_overlap(
+            r"C:\MadLibrary\LibraryA",
+            r"C:\MadLibrary\LibraryB"
+        ));
     }
 }

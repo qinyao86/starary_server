@@ -1,7 +1,48 @@
 use super::MigrationTx;
+use crate::path_resolver::storage_locations_overlap;
 use sqlx::Executor;
 
 pub(super) async fn create_indexes(tx: &mut MigrationTx<'_>) -> anyhow::Result<()> {
+    let duplicate_library: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT library_id
+        FROM storage_roots
+        GROUP BY library_id
+        HAVING COUNT(*) > 1
+        LIMIT 1
+        "#,
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    if let Some(library_id) = duplicate_library {
+        anyhow::bail!(
+            "library {library_id} has multiple storage bindings; migrate it to one exclusive storage location before upgrading"
+        );
+    }
+
+    let storage_locations: Vec<(String, String, String)> = sqlx::query_as(
+        r#"
+        SELECT library_id, kind, canonical_uri
+        FROM storage_roots
+        ORDER BY library_id
+        "#,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    for (index, (library_id, kind, canonical_uri)) in storage_locations.iter().enumerate() {
+        if let Some((other_library_id, _, other_uri)) =
+            storage_locations[index + 1..]
+                .iter()
+                .find(|(_, other_kind, other_uri)| {
+                    other_kind == kind && storage_locations_overlap(canonical_uri, other_uri)
+                })
+        {
+            anyhow::bail!(
+                "storage paths for libraries {library_id} and {other_library_id} overlap ({canonical_uri} and {other_uri}); migrate one library before upgrading"
+            );
+        }
+    }
+
     tx.execute("CREATE INDEX IF NOT EXISTS idx_assets_library_id ON assets(library_id);")
         .await?;
     tx.execute("CREATE INDEX IF NOT EXISTS idx_assets_storage_root_id ON assets(storage_root_id);")
@@ -10,6 +51,24 @@ pub(super) async fn create_indexes(tx: &mut MigrationTx<'_>) -> anyhow::Result<(
         .await?;
     tx.execute("CREATE INDEX IF NOT EXISTS idx_storage_roots_connection_id ON storage_roots(storage_connection_id);")
         .await?;
+    tx.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_storage_roots_library_unique ON storage_roots(library_id);",
+    )
+    .await?;
+    tx.execute(
+        r#"
+        DO $$
+        BEGIN
+            IF to_regclass('public.idx_storage_roots_location_unique') IS NOT NULL
+               AND position('storage_identity' IN pg_get_indexdef('public.idx_storage_roots_location_unique'::regclass)) = 0 THEN
+                DROP INDEX idx_storage_roots_location_unique;
+            END IF;
+        END $$;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_storage_roots_location_unique
+            ON storage_roots(storage_identity);
+        "#,
+    )
+    .await?;
     tx.execute(
         "CREATE INDEX IF NOT EXISTS idx_folders_library_parent ON folders(library_id, parent_id);",
     )

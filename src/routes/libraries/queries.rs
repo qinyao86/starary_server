@@ -68,6 +68,7 @@ SELECT
     l.description,
     l.icon_url,
     l.enabled,
+    l.storage_locked_at,
     {role_expression} AS current_user_role,
     creator.display_name AS creator_name,
     COALESCE(ms.member_names, ARRAY[]::TEXT[]) AS member_names,

@@ -188,6 +188,7 @@ pub async fn import_assets(
     let default_storage_root_id = find_default_storage_root_id(&state, &library_id).await?;
     let mut tx = state.pool.begin().await?;
     let mut imported_asset_ids = Vec::with_capacity(request.assets.len());
+    let mut storage_was_used = false;
 
     for asset in request.assets {
         let derived_files = asset.derived_files;
@@ -221,6 +222,7 @@ pub async fn import_assets(
             ));
         }
         if let Some(root_id) = storage_root_id {
+            storage_was_used = true;
             ensure_storage_root_in_library(&mut tx, &library_id, root_id).await?;
             if let Some(source_file) = source_file.as_ref() {
                 write_asset_source_file(&state, root_id, &asset_id, source_file).await?;
@@ -318,6 +320,15 @@ pub async fn import_assets(
     }))
     .execute(&mut *tx)
     .await?;
+
+    if storage_was_used {
+        sqlx::query(
+            "UPDATE libraries SET storage_locked_at = COALESCE(storage_locked_at, NOW()) WHERE id = $1",
+        )
+        .bind(&library_id)
+        .execute(&mut *tx)
+        .await?;
+    }
 
     tx.commit().await?;
 

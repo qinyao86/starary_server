@@ -14,6 +14,7 @@ export function LibraryDialog({
   name,
   open,
   showStorage = false,
+  storageLocked = false,
   storageConnectionId = "",
   storageConnections = [],
   submitLabel,
@@ -31,6 +32,7 @@ export function LibraryDialog({
   name: string;
   open: boolean;
   showStorage?: boolean;
+  storageLocked?: boolean;
   storageConnectionId?: string;
   storageConnections?: StorageConnection[];
   submitLabel: string;
@@ -55,6 +57,7 @@ export function LibraryDialog({
           {showStorage && onStorageConnectionChange && (
             availableStorageConnections.length > 0 ? (
               <SelectField
+                disabled={storageLocked}
                 required
                 label={t("libraryStorageLocation")}
                 value={storageConnectionId || availableStorageConnections[0].id}
@@ -81,6 +84,7 @@ export function LibraryDialog({
               </label>
             )
           )}
+          {showStorage && storageLocked && <p className="dialog-hint">{t("libraryStorageMigrationRequired")}</p>}
         </div>
         <div className="dialog-footer">
           <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>

@@ -34,6 +34,7 @@ export type TeamLibrary = {
   description?: string | null;
   currentUserRole?: string;
   enabled: boolean;
+  storageLockedAt?: string | null;
   creatorName?: string;
   memberNames?: string[];
   assetCount?: number;

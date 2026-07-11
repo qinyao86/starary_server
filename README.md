@@ -112,6 +112,8 @@ The server console can currently:
 - Log in with JWT-backed sessions.
 - Create, edit, activate, deactivate, and reset passwords for server users.
 - Create, edit, soft-delete, and summarize team libraries.
+- Reserve one exclusive final storage directory per library while allowing
+  multiple libraries to share the same storage connection.
 - Add and remove library members while preserving at least one manager-capable member.
 - Create, edit, enable, disable, and delete shared storage roots when they are not referenced by active assets.
 - Show global activity and per-library activity with readable actors and targets.

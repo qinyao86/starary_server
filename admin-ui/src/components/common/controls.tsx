@@ -66,6 +66,7 @@ export function TextField({
 export function SelectField({
   children,
   className = "",
+  disabled = false,
   label,
   required = false,
   value,
@@ -73,6 +74,7 @@ export function SelectField({
 }: {
   children: ReactNode;
   className?: string;
+  disabled?: boolean;
   label: string;
   required?: boolean;
   value: string;
@@ -82,7 +84,7 @@ export function SelectField({
     <label className={`field ${className}`.trim()}>
       <span>{label}</span>
       <span className="select-control">
-        <select required={required} value={value} onChange={(event) => onChange(event.target.value)}>
+        <select disabled={disabled} required={required} value={value} onChange={(event) => onChange(event.target.value)}>
           {children}
         </select>
         <ChevronDown aria-hidden="true" className="select-control-icon" size={15} />

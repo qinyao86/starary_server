@@ -7,7 +7,8 @@ use crate::{
         ensure_storage_location_exists, ensure_storage_namespace_exists,
         normalize_existing_storage_namespace, normalize_storage_namespace,
         resolve_storage_location_with_policy, resolve_storage_namespace_with_policy,
-        validate_aliases_with_policy, validate_storage_root_with_policy,
+        storage_identity, storage_locations_overlap, validate_aliases_with_policy,
+        validate_storage_root_with_policy,
     },
     routes::access::ensure_library_manager,
     state::AppState,
@@ -328,15 +329,23 @@ pub async fn update_library(
             })
             .unwrap_or(true);
         if changed {
-            let active_assets: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM assets WHERE library_id = $1 AND deleted_at IS NULL",
+            let storage_locked: bool = sqlx::query_scalar(
+                r#"
+                SELECT storage_locked_at IS NOT NULL
+                    OR EXISTS(
+                        SELECT 1 FROM assets
+                        WHERE library_id = $1 AND storage_root_id IS NOT NULL
+                    )
+                FROM libraries
+                WHERE id = $1
+                "#,
             )
             .bind(&library_id)
             .fetch_one(&mut *tx)
             .await?;
-            if active_assets > 0 {
-                return Err(AppError::Conflict(
-                    "library storage cannot be changed while assets still reference its workspace"
+            if storage_locked {
+                return Err(AppError::StorageMigrationRequired(
+                    "this library has used its current storage; move it with the storage migration workflow"
                         .to_string(),
                 ));
             }
@@ -386,6 +395,9 @@ async fn bind_library_storage(
     binding: StorageBindingRequest,
     workspace_name: &str,
 ) -> AppResult<()> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.storage-bindings'))")
+        .execute(&mut **tx)
+        .await?;
     let connection = get_enabled_connection(tx, binding.connection_id).await?;
     let kind = StorageRootKind::from_str(&connection.kind).map_err(AppError::BadRequest)?;
     let namespace = normalize_storage_namespace(binding.namespace.as_deref(), library_id)?;
@@ -397,16 +409,18 @@ async fn bind_library_storage(
         connection.macos_smb_url,
         state.config.allow_personal_storage_paths,
     )?;
+    ensure_exclusive_storage_location(tx, library_id, kind, &location.canonical_uri).await?;
     ensure_storage_namespace_exists(kind, &location)?;
+    let identity = storage_identity(&location.canonical_uri);
     let root_id = Uuid::new_v4();
     sqlx::query(
         r#"
         INSERT INTO storage_roots (
             id, library_id, storage_connection_id, namespace, name, kind,
-            canonical_uri, windows_unc_path, windows_mapped_drive_aliases,
+            canonical_uri, storage_identity, windows_unc_path, windows_mapped_drive_aliases,
             macos_smb_url, macos_mount_aliases, created_by_user_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb, $13)
         "#,
     )
     .bind(root_id)
@@ -416,14 +430,57 @@ async fn bind_library_storage(
     .bind(workspace_name)
     .bind(kind.as_str())
     .bind(location.canonical_uri)
+    .bind(identity)
     .bind(location.windows_unc_path)
     .bind(connection.windows_mapped_drive_aliases)
     .bind(location.macos_smb_url)
     .bind(connection.macos_mount_aliases)
     .bind(user_id)
     .execute(&mut **tx)
-    .await?;
+    .await
+    .map_err(map_storage_binding_error)?;
     Ok(())
+}
+
+async fn ensure_exclusive_storage_location(
+    tx: &mut Transaction<'_, Postgres>,
+    library_id: &str,
+    kind: StorageRootKind,
+    canonical_uri: &str,
+) -> AppResult<()> {
+    let existing_locations: Vec<(String, String)> = sqlx::query_as(
+        r#"
+        SELECT sr.canonical_uri, l.display_name
+        FROM storage_roots sr
+        INNER JOIN libraries l ON l.id = sr.library_id
+        WHERE sr.library_id <> $1 AND sr.kind = $2
+        "#,
+    )
+    .bind(library_id)
+    .bind(kind.as_str())
+    .fetch_all(&mut **tx)
+    .await?;
+
+    if let Some((_, library_name)) = existing_locations
+        .into_iter()
+        .find(|(existing, _)| storage_locations_overlap(existing, canonical_uri))
+    {
+        return Err(AppError::StorageLocationConflict(format!(
+            "the final path overlaps the path reserved by library '{library_name}'"
+        )));
+    }
+    Ok(())
+}
+
+fn map_storage_binding_error(error: sqlx::Error) -> AppError {
+    if let sqlx::Error::Database(database_error) = &error {
+        if database_error.code().as_deref() == Some("23505") {
+            return AppError::StorageLocationConflict(
+                "the final path is already reserved by another library".to_string(),
+            );
+        }
+    }
+    AppError::Database(error)
 }
 
 async fn get_enabled_connection(

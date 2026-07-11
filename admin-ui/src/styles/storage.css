@@ -30,3 +30,122 @@
 .theme-dark .storage-roots-card .table-wrap {
   border-color: #2f2f33;
 }
+
+.storage-connections-table {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.storage-connections-table .data-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.storage-connections-table .storage-path-column {
+  width: auto;
+}
+
+.storage-connections-table .storage-kind-column {
+  width: 150px;
+}
+
+.storage-connections-table .storage-count-column {
+  width: 140px;
+}
+
+.storage-connections-table .storage-actions-column {
+  width: 108px;
+  padding-right: 4px;
+  text-align: right;
+}
+
+.storage-connection-path {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.storage-connection-path strong {
+  display: block;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  color: inherit;
+  text-overflow: clip;
+  white-space: nowrap;
+  cursor: text;
+  scrollbar-width: none;
+  user-select: text;
+}
+
+.storage-connection-path strong::-webkit-scrollbar {
+  display: none;
+}
+
+.storage-connection-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.storage-action-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #526071;
+  box-shadow: none;
+}
+
+.storage-action-button:hover {
+  color: #1f2937;
+  background: #eef2f6;
+}
+
+.storage-action-button.is-danger:hover {
+  color: #b42318;
+  background: #fff1f0;
+}
+
+.theme-dark .storage-action-button {
+  color: #a1a1aa;
+}
+
+.theme-dark .storage-action-button:hover {
+  color: #fafafa;
+  background: #27272a;
+}
+
+.theme-dark .storage-action-button.is-danger:hover {
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.24);
+}
+
+@media (max-width: 900px) {
+  .storage-connections-table .storage-kind-column {
+    width: 120px;
+  }
+
+  .storage-connections-table .storage-count-column {
+    width: 104px;
+  }
+
+  .storage-connections-table .storage-actions-column {
+    width: 100px;
+  }
+}
+
+@media (max-width: 640px) {
+  .storage-connections-table .storage-kind-column {
+    display: none;
+  }
+
+  .storage-connections-table .storage-count-column {
+    width: 104px;
+  }
+
+  .storage-connections-table .storage-actions-column {
+    width: 100px;
+  }
+}

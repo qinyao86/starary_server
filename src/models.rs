@@ -153,6 +153,7 @@ pub struct LibraryWithRole {
     pub description: Option<String>,
     pub icon_url: Option<String>,
     pub enabled: bool,
+    pub storage_locked_at: Option<DateTime<Utc>>,
     pub current_user_role: String,
     pub creator_name: String,
     pub member_names: Vec<String>,

@@ -53,6 +53,17 @@ are opened. The sync model must represent cloud-only, downloading, local,
 uploading, synchronized, conflict, and failed states. A kernel filesystem
 driver is intentionally deferred.
 
+Storage connections describe reusable physical roots such as a disk folder,
+SMB share, or object-storage bucket. Each library receives exactly one exclusive
+final directory below a connection. Two libraries may share a connection, but
+their final directories must not be equal, parents, or children of each other.
+Soft-deleted and disabled libraries retain their directory reservation.
+
+An empty library may change its binding directly. Once an asset has referenced
+the library storage, the binding is permanently marked as in use. Further
+changes must use a storage migration workflow that copies and verifies files,
+atomically switches the binding, and retains the old location for rollback.
+
 ## Commercial Licensing
 
 - Keep source repositories private and distribute proprietary binaries.
