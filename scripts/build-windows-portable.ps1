@@ -4,12 +4,13 @@ $serverDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $postgresManifestPath = Join-Path $serverDir "packaging\postgresql-windows-x64.json"
 $postgresManifest = Get-Content -Raw -LiteralPath $postgresManifestPath | ConvertFrom-Json
 $postgresSource = Join-Path $serverDir "binaries\windows-x64\postgresql"
+$coreTarget = Join-Path $serverDir "target\core"
 
-$outputDir = Join-Path $serverDir "release"
+$outputDir = Join-Path $serverDir "artifacts\windows-x64"
 $packageWorkDir = Join-Path $serverDir "target\package"
 $stagingDir = Join-Path $packageWorkDir "windows-x64"
 $packageDir = Join-Path $stagingDir "madlibrary-server-windows-x64"
-$packageZip = Join-Path $outputDir "madlibrary-server-windows-x64.zip"
+$packageZip = Join-Path $outputDir "Mad-Library-Server_0.1.0_windows-x64-portable.zip"
 
 function Assert-WorkspacePath([string]$Path) {
   $fullPath = [System.IO.Path]::GetFullPath($Path)
@@ -43,6 +44,7 @@ try {
 Write-Host "Building release server..."
 Push-Location $serverDir
 try {
+  $env:CARGO_TARGET_DIR = $coreTarget
   cargo build --release --locked
 } finally {
   Pop-Location
@@ -54,7 +56,7 @@ $postgresDestination = Join-Path $packageDir "postgresql"
 New-Item -ItemType Directory -Force -Path $postgresDestination | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $packageDir "admin-ui") | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $serverDir "target\release\madlibrary-server.exe") -Destination $packageDir
+Copy-Item -LiteralPath (Join-Path $coreTarget "release\madlibrary-server.exe") -Destination $packageDir
 Copy-Item -Path (Join-Path $serverDir "admin-ui\dist\*") -Destination (Join-Path $packageDir "admin-ui") -Recurse
 Copy-Item -LiteralPath (Join-Path $serverDir "packaging\windows\start-server.cmd") -Destination $packageDir
 Copy-Item -LiteralPath (Join-Path $serverDir "packaging\windows\README.txt") -Destination $packageDir

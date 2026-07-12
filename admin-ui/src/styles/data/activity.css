@@ -17,7 +17,7 @@
   align-items: center;
   gap: 11px;
   min-height: 54px;
-  border-bottom: 1px solid #e8edf4;
+  border-bottom: 1px solid #e8e8e5;
 }
 
 .activity-list.is-compact .activity-item {

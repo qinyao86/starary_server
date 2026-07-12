@@ -7,10 +7,9 @@ export function buildPreviewLibraries(t: TranslatorContext["t"]): TeamLibrary[] 
   return designLibraries.map((item, index) => ({
     id: `preview-library-${index}`,
     displayName: item.name,
-    description: t(item.policy),
     currentUserRole: index === 0 ? "owner" : "library_manager",
     enabled: index !== 2,
-    creatorName: designUsers[index % designUsers.length]?.name ?? "Qin Yao",
+    libraryManagerNames: [designUsers[index % designUsers.length]?.name ?? "Qin Yao"],
     memberNames: designUsers.slice(0, Math.min(3, item.members)).map((user) => user.name),
     assetCount: Number(item.assets.replace(/,/g, "")),
     folderCount: Math.max(0, Math.round(Number(item.assets.replace(/,/g, "")) / 120)),

@@ -19,7 +19,7 @@ use axum::{
     Json,
 };
 use sqlx::{FromRow, Postgres, Transaction};
-use std::str::FromStr;
+use std::{fs, path::Path as FilePath, str::FromStr};
 use uuid::Uuid;
 
 mod queries;
@@ -30,8 +30,8 @@ use queries::{
     list_library_statuses_for_server_manager,
 };
 use requests::{
-    CreateDefaultStorageRootRequest, CreateLibraryRequest, StorageBindingRequest,
-    UpdateLibraryEnabledRequest, UpdateLibraryRequest,
+    CreateDefaultStorageRootRequest, CreateLibraryRequest, DeleteLibraryRequest,
+    StorageBindingRequest, UpdateLibraryEnabledRequest, UpdateLibraryRequest,
 };
 
 #[derive(FromRow)]
@@ -44,6 +44,18 @@ struct StorageConnectionLocation {
     macos_smb_url: Option<String>,
     macos_mount_aliases: serde_json::Value,
     enabled: bool,
+}
+
+#[derive(FromRow)]
+struct LibraryStorageDeletionTarget {
+    kind: String,
+    canonical_uri: String,
+    storage_identity: String,
+    namespace: String,
+    connection_kind: String,
+    connection_canonical_uri: String,
+    connection_windows_unc_path: Option<String>,
+    connection_macos_smb_url: Option<String>,
 }
 
 fn normalize_optional_text(value: Option<String>) -> Option<String> {
@@ -125,6 +137,13 @@ pub async fn list_libraries(
     Ok(Json(libraries))
 }
 
+pub async fn list_my_libraries(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Vec<LibraryWithRole>>> {
+    Ok(Json(list_libraries_for_member(&state, user.id).await?))
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryStatusResponse {
@@ -144,6 +163,14 @@ pub async fn list_library_statuses(
     Ok(Json(LibraryStatusResponse { libraries }))
 }
 
+pub async fn list_my_library_statuses(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<LibraryStatusResponse>> {
+    let libraries = list_library_statuses_for_member(&state, user.id).await?;
+    Ok(Json(LibraryStatusResponse { libraries }))
+}
+
 pub async fn create_library(
     State(state): State<AppState>,
     user: AuthUser,
@@ -158,7 +185,6 @@ pub async fn create_library(
         return Err(AppError::BadRequest("library name is required".to_string()));
     }
     ensure_unique_library_display_name(&state, display_name, None).await?;
-    let description = normalize_optional_text(request.description);
     let icon_url = normalize_optional_text(request.icon_url);
     if request.default_storage_root.is_some() && request.storage_binding.is_some() {
         return Err(AppError::BadRequest(
@@ -182,14 +208,13 @@ pub async fn create_library(
 
     let library = sqlx::query_as::<_, LibraryRecord>(
         r#"
-        INSERT INTO libraries (id, display_name, description, icon_url, created_by_user_id)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, display_name, description, icon_url, enabled, created_by_user_id, created_at, updated_at
+        INSERT INTO libraries (id, display_name, icon_url, created_by_user_id)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, display_name, icon_url, enabled, created_by_user_id, created_at, updated_at
         "#,
     )
     .bind(&library_id)
     .bind(display_name)
-    .bind(description)
     .bind(icon_url)
     .bind(user.id)
     .fetch_one(&mut *tx)
@@ -290,21 +315,19 @@ pub async fn update_library(
         return Err(AppError::BadRequest("library name is required".to_string()));
     }
     ensure_unique_library_display_name(&state, display_name, Some(&library_id)).await?;
-    let description = normalize_optional_text(request.description);
     let icon_url = normalize_optional_text(request.icon_url);
 
     let mut tx = state.pool.begin().await?;
     let library = sqlx::query_as::<_, LibraryRecord>(
         r#"
         UPDATE libraries
-        SET display_name = $2, description = $3, icon_url = $4, updated_at = NOW()
+        SET display_name = $2, icon_url = $3, updated_at = NOW()
         WHERE id = $1 AND deleted_at IS NULL
-        RETURNING id, display_name, description, icon_url, enabled, created_by_user_id, created_at, updated_at
+        RETURNING id, display_name, icon_url, enabled, created_by_user_id, created_at, updated_at
         "#,
     )
     .bind(&library_id)
     .bind(display_name)
-    .bind(description)
     .bind(icon_url)
     .fetch_optional(&mut *tx)
     .await?
@@ -541,7 +564,7 @@ pub async fn update_library_enabled(
         UPDATE libraries
         SET enabled = $2, updated_at = NOW()
         WHERE id = $1 AND deleted_at IS NULL
-        RETURNING id, display_name, description, icon_url, enabled, created_by_user_id, created_at, updated_at
+        RETURNING id, display_name, icon_url, enabled, created_by_user_id, created_at, updated_at
         "#,
     )
     .bind(&library_id)
@@ -577,10 +600,28 @@ pub async fn delete_library(
     State(state): State<AppState>,
     user: AuthUser,
     Path(library_id): Path<String>,
+    request: Option<Json<DeleteLibraryRequest>>,
 ) -> AppResult<StatusCode> {
-    ensure_library_manager(&state, &user, &library_id).await?;
+    if !user.role.can_manage_server() {
+        return Err(AppError::Forbidden);
+    }
+    let request = request.map(|Json(request)| request).unwrap_or_default();
 
     let mut tx = state.pool.begin().await?;
+    let exists: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM libraries WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+    )
+    .bind(&library_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if exists.is_none() {
+        return Err(AppError::NotFound("library not found".to_string()));
+    }
+
+    if request.delete_files {
+        delete_library_storage_files(&state, &mut tx, &library_id).await?;
+    }
+
     let deleted = sqlx::query(
         r#"
         UPDATE libraries
@@ -598,17 +639,134 @@ pub async fn delete_library(
 
     sqlx::query(
         r#"
-        INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id)
-        VALUES ($1, $2, $3, 'library.deleted', 'library', $2)
+        INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id, details)
+        VALUES ($1, $2, $3, 'library.deleted', 'library', $2, $4::jsonb)
         "#,
     )
     .bind(Uuid::new_v4())
     .bind(&library_id)
     .bind(user.id)
+    .bind(serde_json::json!({ "deleteFiles": request.delete_files }))
     .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn delete_library_storage_files(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    library_id: &str,
+) -> AppResult<()> {
+    let targets = sqlx::query_as::<_, LibraryStorageDeletionTarget>(
+        r#"
+        SELECT
+            sr.kind,
+            sr.canonical_uri,
+            sr.storage_identity,
+            sr.namespace,
+            sc.kind AS connection_kind,
+            sc.canonical_uri AS connection_canonical_uri,
+            sc.windows_unc_path AS connection_windows_unc_path,
+            sc.macos_smb_url AS connection_macos_smb_url
+        FROM storage_roots sr
+        INNER JOIN storage_connections sc ON sc.id = sr.storage_connection_id
+        WHERE sr.library_id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(library_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    if targets.len() > 1 {
+        return Err(AppError::Conflict(
+            "library has multiple storage bindings; remove files with the storage migration workflow"
+                .to_string(),
+        ));
+    }
+
+    let Some(target) = targets.into_iter().next() else {
+        return Ok(());
+    };
+    let kind = StorageRootKind::from_str(&target.kind).map_err(AppError::BadRequest)?;
+    if target.connection_kind != target.kind {
+        return Err(AppError::Conflict(
+            "storage binding no longer matches its storage connection".to_string(),
+        ));
+    }
+
+    let namespace = normalize_existing_storage_namespace(&target.namespace)?;
+    if namespace.is_empty() {
+        return Err(AppError::BadRequest(
+            "library files can only be deleted from an isolated library storage folder".to_string(),
+        ));
+    }
+    let expected_location = resolve_storage_namespace_with_policy(
+        kind,
+        &target.connection_canonical_uri,
+        &namespace,
+        target.connection_windows_unc_path,
+        target.connection_macos_smb_url,
+        state.config.allow_personal_storage_paths,
+    )?;
+    if storage_identity(&expected_location.canonical_uri) != target.storage_identity
+        || storage_identity(&target.canonical_uri) != target.storage_identity
+    {
+        return Err(AppError::Conflict(
+            "storage binding does not resolve to its recorded library folder".to_string(),
+        ));
+    }
+
+    let path = match kind {
+        StorageRootKind::ServerFilesystem => expected_location.canonical_uri,
+        StorageRootKind::Smb => expected_location.windows_unc_path.ok_or_else(|| {
+            AppError::BadRequest(
+                "shared folder files can only be deleted by a Windows server with a resolved UNC path"
+                    .to_string(),
+            )
+        })?,
+        StorageRootKind::S3 => {
+            return Err(AppError::BadRequest(
+                "deleting object storage files is not supported yet; remove them with the object storage lifecycle workflow"
+                    .to_string(),
+            ));
+        }
+    };
+
+    remove_library_storage_directory(&path)
+}
+
+fn remove_library_storage_directory(path: &str) -> AppResult<()> {
+    let path = FilePath::new(path);
+    if path.as_os_str().is_empty() || path.parent().is_none() {
+        return Err(AppError::BadRequest(
+            "library storage folder is not a deletable directory".to_string(),
+        ));
+    }
+
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(AppError::Internal(anyhow::anyhow!(
+                "could not inspect library storage folder {}: {error}",
+                path.display()
+            )));
+        }
+    };
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(AppError::BadRequest(
+            "library storage folder must be a real directory before it can be deleted".to_string(),
+        ));
+    }
+
+    fs::remove_dir_all(path).map_err(|error| {
+        AppError::Internal(anyhow::anyhow!(
+            "could not delete library storage folder {}: {error}",
+            path.display()
+        ))
+    })
 }

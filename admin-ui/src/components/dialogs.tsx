@@ -1,4 +1,10 @@
 export { LibraryDialog } from "./dialogs/library-dialog";
+export { DeleteLibraryDialog } from "./dialogs/delete-library-dialog";
+export { DeleteBackupDialog } from "./dialogs/delete-backup-dialog";
 export { MemberDialog } from "./dialogs/member-dialog";
 export { StorageConnectionDialog } from "./dialogs/storage-connection-dialog";
+export { ShutdownServerDialog } from "./dialogs/shutdown-server-dialog";
+export { RestoreBackupDialog } from "./dialogs/restore-backup-dialog";
+export { InitializeServerDialog } from "./dialogs/initialize-server-dialog";
 export { UserDialog } from "./dialogs/user-dialog";
+export { UserLibraryAccessDialog } from "./dialogs/user-library-access-dialog";

@@ -104,7 +104,7 @@ export function StoragePage({ t, token, currentUser, storageConnections, refresh
         onLocationChange={setLocation}
         onSubmit={submit}
       />
-      <div className="table-wrap storage-connections-table">
+      <div className="table-wrap management-list-card storage-connections-table">
         <table className="data-table">
           <thead><tr><th className="storage-path-column">{t("libraryStorageLocation")}</th><th className="storage-kind-column">{t("kind")}</th><th className="storage-count-column">{t("linkedLibraries")}</th>{canManageStorage && <th className="storage-actions-column">{t("action")}</th>}</tr></thead>
           <tbody>

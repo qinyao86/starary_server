@@ -4,14 +4,19 @@ use crate::{
     models::{Role, UserRecord},
     state::AppState,
 };
-use axum::{extract::State, Json};
+use axum::{
+    extract::{ConnectInfo, State},
+    Json,
+};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use uuid::Uuid;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetupStatusResponse {
     needs_owner: bool,
+    owner_setup_allowed: bool,
 }
 
 #[derive(Deserialize)]
@@ -30,7 +35,10 @@ pub struct CreateOwnerResponse {
     token_type: &'static str,
 }
 
-pub async fn setup_status(State(state): State<AppState>) -> AppResult<Json<SetupStatusResponse>> {
+pub async fn setup_status(
+    State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+) -> AppResult<Json<SetupStatusResponse>> {
     let owner_count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE global_role = 'owner'")
             .fetch_one(&state.pool)
@@ -38,13 +46,18 @@ pub async fn setup_status(State(state): State<AppState>) -> AppResult<Json<Setup
 
     Ok(Json(SetupStatusResponse {
         needs_owner: owner_count == 0,
+        owner_setup_allowed: peer.ip().is_loopback(),
     }))
 }
 
 pub async fn create_owner(
     State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Json(request): Json<CreateOwnerRequest>,
 ) -> AppResult<Json<CreateOwnerResponse>> {
+    if !peer.ip().is_loopback() {
+        return Err(AppError::Forbidden);
+    }
     let email = request.email.trim().to_ascii_lowercase();
     if email.is_empty() || !email.contains('@') {
         return Err(AppError::BadRequest("valid email is required".to_string()));

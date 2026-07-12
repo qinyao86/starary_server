@@ -6,6 +6,7 @@
 madlibrary-server/
 |- src/                         Rust server source
 |- admin-ui/src/                React administration source
+|- desktop/                     Tauri desktop shell source and NSIS config
 |- scripts/                     Development and release build scripts
 |- packaging/windows/           Files copied into the Windows package
 |- binaries/windows-x64/        Tracked Windows runtimes (Git LFS)
@@ -18,21 +19,22 @@ madlibrary-server/
 
 ```text
 vendor/postgresql/archives/     Original third-party PostgreSQL ZIP
-target/                         Rust output and temporary package assembly
-  |- debug/                     `cargo build` and `cargo run`
-  |- release/                   `cargo build --release`
-  `- package/windows-x64/       Temporary portable package staging
+target/                         Disposable compiler and package caches
+  |- core/                      Server core build output for desktop packaging
+  `- desktop/                   Tauri desktop build output
 admin-ui/node_modules/          Installed frontend development dependencies
 admin-ui/dist/                  Vite production build output
 .dev/                           Local development data and storage
-release/                        Final distributable artifacts only
-  `- madlibrary-server-windows-x64.zip
+artifacts/windows-x64/           Final distributable artifacts only
+  |- Mad-Library-Server_0.1.0_windows-x64-setup.exe
+  |- Mad-Library-Server_0.1.0_windows-x64-portable.zip
+  `- SHA256SUMS.txt
 ```
 
-All directories in the second list are ignored by Git. `target/package` is
-deleted after a successful portable build. `release/` must contain only files
-that are ready to distribute; never run the server directly from it and never
-put initialized `data/` directories there.
+All directories in the second list are ignored by Git. Never run the server
+from `artifacts/` and never put initialized data directories there. Installed
+desktop builds keep mutable data in `%ProgramData%\Mad Library Server`; program
+files and the bundled PostgreSQL runtime remain read-only in the install folder.
 
 ## Common commands
 
@@ -42,7 +44,17 @@ Run the server from source with the development `.env` configuration:
 cargo run --manifest-path .\Cargo.toml
 ```
 
-Build the Windows portable release:
+Build the Windows desktop installer:
+
+```powershell
+npm run release:windows
+```
+
+The NSIS installer lets the user choose a current-user or all-users install.
+The Tauri shell starts the server without a console window and enforces a single
+running server for the machine data directory.
+
+Build the headless Windows portable release for a dedicated or cloud server:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-portable.ps1

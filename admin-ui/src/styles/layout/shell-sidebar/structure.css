@@ -1,22 +1,26 @@
 .admin-shell {
   display: grid;
   grid-template-columns: 272px minmax(0, 1fr);
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   padding: 0;
   overflow: hidden;
-  background: #f7f9fb;
+  background: #f6f6f5;
+}
+
+.admin-shell.is-sidebar-collapsed {
+  grid-template-columns: 64px minmax(0, 1fr);
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: calc(100vh - 24px);
-  margin: 12px 0;
+  height: calc(100% - 12px);
+  margin: 12px 0 0;
   overflow-x: hidden;
   overflow-y: auto;
-  background: #f7f9fb;
+  background: #f6f6f5;
   border-right: 0;
   box-shadow: none;
 }
@@ -92,7 +96,7 @@
 }
 
 .nav-item:hover {
-  background: #eef3f7;
+  background: #eeeeec;
   color: #1e3a8a;
 }
 
@@ -106,4 +110,44 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar {
+  height: 100%;
+  margin-top: 0;
+}
+
+.admin-shell.is-sidebar-collapsed .brand {
+  justify-content: center;
+  height: 54px;
+  padding: 0;
+}
+
+.admin-shell.is-sidebar-collapsed .brand > :last-child,
+.admin-shell.is-sidebar-collapsed .sidebar-runtime-heading strong,
+.admin-shell.is-sidebar-collapsed .sidebar-runtime-heading > span:last-child,
+.admin-shell.is-sidebar-collapsed .sidebar-runtime-address,
+.admin-shell.is-sidebar-collapsed .nav-item span,
+.admin-shell.is-sidebar-collapsed .sidebar-logout-button span {
+  display: none;
+}
+
+.admin-shell.is-sidebar-collapsed .brand-mark {
+  width: 32px;
+  height: 32px;
+}
+
+.admin-shell.is-sidebar-collapsed .nav-list {
+  padding: 8px 10px;
+}
+
+.admin-shell.is-sidebar-collapsed .nav-item {
+  justify-content: center;
+  height: 40px;
+  gap: 0;
+  padding: 0;
+}
+
+.admin-shell.is-sidebar-collapsed .nav-item.is-active {
+  box-shadow: inset 2px 0 0 #3b82f6;
 }

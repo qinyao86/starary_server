@@ -13,10 +13,10 @@
 
 .metric-card,
 .panel {
-  border: 1px solid #d3dce8;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.055);
+  border: 1px solid var(--admin-card-border);
+  border-radius: var(--admin-card-radius);
+  background: var(--admin-card-background);
+  box-shadow: var(--admin-card-shadow);
 }
 
 .metric-card {

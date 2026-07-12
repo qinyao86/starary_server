@@ -92,7 +92,31 @@
   background: #111113;
 }
 
+.theme-dark .member-role-control select {
+  border-color: #3f3f46;
+  color: #e4e4e7;
+  background: #18181b;
+}
+
+.theme-dark .member-role-control select:disabled {
+  border-color: transparent;
+  color: #a1a1aa;
+  background: #27272a;
+}
+
+.theme-dark .member-role-control svg {
+  color: #a1a1aa;
+}
+
 .theme-dark .library-card-metrics {
-  border-top-color: rgba(244, 244, 245, 0.07);
-  border-bottom-color: rgba(244, 244, 245, 0.07);
+  border-color: transparent;
+}
+
+.theme-dark .library-card-metric {
+  border-color: rgba(63, 63, 70, 0.78);
+  background: rgba(24, 24, 27, 0.72);
+}
+
+.theme-dark .health-row strong {
+  color: #fafafa;
 }

@@ -4,6 +4,11 @@ export type ServerInfo = {
   apiVersion: string;
   deploymentMode: string;
   serverUrl: string;
+  localUrl: string;
+  lanUrl?: string | null;
+  localAdminUrl: string;
+  lanAdminUrl?: string | null;
+  bindAddress: string;
   storageDir: string;
   adminAvailable: boolean;
   databaseStatus: string;
@@ -13,6 +18,7 @@ export type ServerInfo = {
 
 export type SetupStatus = {
   needsOwner: boolean;
+  ownerSetupAllowed: boolean;
 };
 
 export type CurrentUser = {
@@ -31,11 +37,10 @@ export type LoginResponse = {
 export type TeamLibrary = {
   id: string;
   displayName: string;
-  description?: string | null;
   currentUserRole?: string;
   enabled: boolean;
   storageLockedAt?: string | null;
-  creatorName?: string;
+  libraryManagerNames?: string[];
   memberNames?: string[];
   assetCount?: number;
   folderCount?: number;
@@ -53,6 +58,37 @@ export type TeamLibrary = {
   createdByUserId?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type RuntimeSettings = {
+  currentPort: number;
+  configuredPort: number;
+  restartRequired: boolean;
+  serviceControlAvailable: boolean;
+};
+
+export type BackupSettings = {
+  automaticEnabled: boolean;
+  automaticTime: string;
+  retentionCount: number;
+};
+
+export type BackupStatus = {
+  available: boolean;
+  backupDir: string;
+  settings: BackupSettings;
+};
+
+export type BackupRecord = {
+  id: string;
+  kind: "automatic" | "manual" | "pre_restore" | "pre_initialize";
+  sizeBytes: number;
+  createdAt: string;
+};
+
+export type BackupOverview = {
+  status: BackupStatus;
+  backups: BackupRecord[];
 };
 
 export type StorageConnection = {
@@ -91,8 +127,15 @@ export type TeamUser = {
   lastSeenAt?: string | null;
   lastSeenLibraryId?: string | null;
   lastSeenLibraryName?: string | null;
+  libraryMemberships?: UserLibraryMembership[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type UserLibraryMembership = {
+  libraryId: string;
+  libraryName: string;
+  role: string;
 };
 
 export type StorageRoot = {

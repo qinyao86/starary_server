@@ -2,6 +2,43 @@
   overflow-x: auto;
 }
 
+.management-list-card {
+  overflow: hidden;
+  border: 1px solid var(--admin-card-border);
+  border-radius: var(--admin-card-radius);
+  background: var(--admin-card-background);
+  box-shadow: var(--admin-card-shadow);
+}
+
+.management-list-card .data-table th,
+.management-list-card .data-table td {
+  background: transparent;
+}
+
+.management-list-card .data-table th:first-child,
+.management-list-card .data-table td:first-child {
+  padding-left: 14px;
+}
+
+.management-list-card .data-table th:last-child,
+.management-list-card .data-table td:last-child {
+  padding-right: 14px;
+}
+
+.management-list-card .data-table tbody td {
+  height: 60px;
+}
+
+.management-list-card .data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.theme-dark .management-list-card {
+  border-color: var(--admin-card-border);
+  background: var(--admin-card-background);
+  box-shadow: var(--admin-card-shadow);
+}
+
 .table-actions {
   display: inline-flex;
   align-items: center;
@@ -57,7 +94,7 @@
   border-radius: 999px;
   padding: 0 9px;
   color: #526071;
-  background: #f3f6fa;
+  background: #f2f2f0;
   font-size: 12px;
   font-weight: 680;
   line-height: 1;
@@ -70,9 +107,9 @@
 }
 
 .status-pill.is-off {
-  border-color: #e4e9f0;
+  border-color: #e5e5e2;
   color: #7a8697;
-  background: #eef2f6;
+  background: #efefed;
 }
 
 .compact-select-field {
@@ -92,7 +129,7 @@
 .matrix th,
 .matrix td {
   height: 42px;
-  border-bottom: 1px solid #e8edf4;
+  border-bottom: 1px solid #e8e8e5;
   padding: 0 10px;
   text-align: left;
   white-space: nowrap;

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, Parser)]
 #[command(name = "madlibrary-server")]
 pub struct ServerConfig {
-    #[arg(long, env = "MADLIBRARY_SERVER_HOST", default_value = "127.0.0.1")]
+    #[arg(long, env = "MADLIBRARY_SERVER_HOST", default_value = "0.0.0.0")]
     pub host: String,
 
     #[arg(long, env = "MADLIBRARY_SERVER_PORT", default_value_t = 3789)]
@@ -38,6 +38,9 @@ pub struct ServerConfig {
 
     #[arg(long, env = "MADLIBRARY_JWT_SECRET")]
     pub jwt_secret: String,
+
+    #[arg(long, env = "MADLIBRARY_DESKTOP_CONTROL_TOKEN")]
+    pub desktop_control_token: Option<String>,
 
     #[arg(long, env = "MADLIBRARY_TOKEN_TTL_HOURS", default_value_t = 168)]
     pub token_ttl_hours: i64,

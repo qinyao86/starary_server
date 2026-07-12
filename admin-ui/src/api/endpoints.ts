@@ -1,11 +1,16 @@
-import { request } from "./request";
+import { request, requestBlob } from "./request";
 import type {
   ActivityListResponse,
   AssetListResponse,
+  BackupOverview,
+  BackupRecord,
+  BackupSettings,
+  BackupStatus,
   CurrentUser,
   DefaultStorageRootInput,
   LibraryMember,
   LoginResponse,
+  RuntimeSettings,
   ServerInfo,
   SetupStatus,
   StorageConnection,
@@ -18,7 +23,37 @@ import type {
 export const api = {
   health: () => request<{ status: string }>("/health"),
   serverInfo: () => request<ServerInfo>("/api/v1/server/info"),
+  runtimeSettings: (token: string) => request<RuntimeSettings>("/api/v1/server/runtime", { token }),
+  updateRuntimeSettings: (token: string, payload: { port: number }) =>
+    request<RuntimeSettings>("/api/v1/server/runtime", {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload)
+    }),
+  shutdownServer: (token: string) =>
+    request<void>("/api/v1/server/shutdown", { method: "POST", token }),
   setupStatus: () => request<SetupStatus>("/api/v1/setup/status"),
+  backupOverview: (token: string) => request<BackupOverview>("/api/v1/backups", { token }),
+  updateBackupSettings: (token: string, payload: BackupSettings) =>
+    request<BackupStatus>("/api/v1/backups/settings", {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload)
+    }),
+  createBackup: (token: string) =>
+    request<BackupRecord>("/api/v1/backups", { method: "POST", token }),
+  downloadBackup: (token: string, backupId: string) =>
+    requestBlob(`/api/v1/backups/${encodeURIComponent(backupId)}`, token),
+  deleteBackup: (token: string, backupId: string) =>
+    request<void>(`/api/v1/backups/${encodeURIComponent(backupId)}`, { method: "DELETE", token }),
+  restoreBackup: (token: string, backupId: string) =>
+    request<void>("/api/v1/backups/restore", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ backupId })
+    }),
+  initializeServer: (token: string) =>
+    request<void>("/api/v1/server/initialize", { method: "POST", token }),
   createOwner: (payload: { email: string; password: string; displayName?: string }) =>
     request<LoginResponse>("/api/v1/setup/owner", {
       method: "POST",
@@ -37,26 +72,26 @@ export const api = {
       body: JSON.stringify(payload)
     }),
   listUsers: (token: string) => request<TeamUser[]>("/api/v1/users", { token }),
-  createUser: (token: string, payload: { email: string; password: string; displayName?: string; role?: string }) =>
+  createUser: (token: string, payload: { email: string; password: string; displayName?: string; role?: string; libraryMemberships?: Array<{ libraryId: string; role: string }> }) =>
     request<TeamUser>("/api/v1/users", {
       method: "POST",
       token,
       body: JSON.stringify(payload)
     }),
-  updateUser: (token: string, userId: string, payload: { displayName?: string; role?: string; isActive?: boolean; password?: string }) =>
+  updateUser: (token: string, userId: string, payload: { displayName?: string; role?: string; isActive?: boolean; password?: string; libraryMemberships?: Array<{ libraryId: string; role: string }> }) =>
     request<TeamUser>(`/api/v1/users/${userId}`, {
       method: "PATCH",
       token,
       body: JSON.stringify(payload)
     }),
   listLibraries: (token: string) => request<TeamLibrary[]>("/api/v1/libraries", { token }),
-  createLibrary: (token: string, payload: { displayName: string; description?: string; defaultStorageRoot?: DefaultStorageRootInput; storageBinding?: { connectionId: string; namespace?: string } }) =>
+  createLibrary: (token: string, payload: { displayName: string; defaultStorageRoot?: DefaultStorageRootInput; storageBinding?: { connectionId: string; namespace?: string } }) =>
     request<TeamLibrary>("/api/v1/libraries", {
       method: "POST",
       token,
       body: JSON.stringify(payload)
     }),
-  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; description?: string; storageBinding?: { connectionId: string; namespace?: string } }) =>
+  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; storageBinding?: { connectionId: string; namespace?: string } }) =>
     request<TeamLibrary>(`/api/v1/libraries/${libraryId}`, {
       method: "PATCH",
       token,
@@ -68,10 +103,11 @@ export const api = {
       token,
       body: JSON.stringify(payload)
     }),
-  deleteLibrary: (token: string, libraryId: string) =>
+  deleteLibrary: (token: string, libraryId: string, payload: { deleteFiles: boolean }) =>
     request<void>(`/api/v1/libraries/${libraryId}`, {
       method: "DELETE",
-      token
+      token,
+      body: JSON.stringify(payload)
     }),
   listLibraryMembers: (token: string, libraryId: string) =>
     request<LibraryMember[]>(`/api/v1/libraries/${libraryId}/members`, { token }),

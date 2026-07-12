@@ -12,10 +12,14 @@ export default defineConfig({
     }
   },
   server: {
+    strictPort: true,
     proxy: {
       "/api": "http://127.0.0.1:3789",
       "/health": "http://127.0.0.1:3789"
     }
+  },
+  preview: {
+    strictPort: true
   },
   build: {
     outDir: "dist",

@@ -2,7 +2,9 @@ Mad Library Team Server - Windows x64 portable package
 
 START
   Double-click start-server.cmd.
-  The management console opens at http://127.0.0.1:3789/admin/
+  The management console opens at http://127.0.0.1:3789/admin/ by default.
+  Owners and administrators can change the port in Settings. Restart the
+  executable after saving; start-server.cmd reads the saved port automatically.
 
 STOP
   Press Ctrl+C in the server window and wait for PostgreSQL to stop.

@@ -56,7 +56,6 @@ export function SetupLibraryForm({
   onSkip: () => void;
 }) {
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [workspaceKind, setWorkspaceKind] = useState("server_filesystem");
   const [workspaceCanonicalUri, setWorkspaceCanonicalUri] = useState("");
   const [error, setError] = useState("");
@@ -73,7 +72,6 @@ export function SetupLibraryForm({
     try {
       const library = await api.createLibrary(token, {
         displayName: name.trim(),
-        description: description.trim() || undefined,
         defaultStorageRoot: {
           kind: workspaceKind,
           canonicalUri: workspaceCanonicalUri.trim()
@@ -91,7 +89,6 @@ export function SetupLibraryForm({
     <form className="auth-form auth-library-form setup-form" onSubmit={submit}>
       <p>{t("firstLibraryHint")}</p>
       <TextField required label={t("name")} value={name} onChange={setName} />
-      <TextField label={t("description")} value={description} onChange={setDescription} />
       <StorageLocationFields
         kind={workspaceKind}
         location={workspaceCanonicalUri}
@@ -284,7 +281,7 @@ export function AuthShell({
             <div className="auth-system-card">
               <Server size={18} />
               <span>{t("localNode")}</span>
-              <strong>127.0.0.1</strong>
+              <strong>{window.location.hostname || "127.0.0.1"}</strong>
             </div>
             <div className="auth-system-card">
               <Database size={18} />

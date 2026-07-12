@@ -92,6 +92,8 @@ export function activityActionLabel(t: ReturnType<typeof createTranslator>, acti
       return t("userCreated");
     case "user.updated":
       return t("userUpdated");
+    case "user.password_changed":
+      return t("userUpdated");
     case "storage_root.created":
       return t("storageRootCreated");
     case "storage_root.updated":

@@ -33,7 +33,7 @@
 .member-role-badge {
   min-width: 58px;
   color: #526071;
-  background: #f3f6fa;
+  background: #f2f2f0;
 }
 
 .panel-action-button,
@@ -52,7 +52,7 @@
 .panel-action-button:disabled {
   opacity: 1;
   color: #7a8697;
-  background: #eef3f7;
+  background: #eeeeec;
   border-color: rgba(148, 163, 184, 0.18);
 }
 

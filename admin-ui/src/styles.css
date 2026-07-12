@@ -8,8 +8,10 @@
 @import "./styles/panels.css";
 @import "./styles/libraries.css";
 @import "./styles/storage.css";
+@import "./styles/users.css";
 @import "./styles/dialogs.css";
 @import "./styles/data.css";
 @import "./styles/settings.css";
+@import "./styles/backups.css";
 @import "./styles/theme-dark.css";
 @import "./styles/responsive.css";

@@ -2,13 +2,13 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   margin: 0;
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: #f7f9fb;
+  background: #f6f6f5;
   box-shadow: none;
 }
 
@@ -50,7 +50,7 @@ h1 {
   align-items: center;
   height: 34px;
   padding: 3px;
-  border: 1px solid #cad4e2;
+  border: 1px solid #d0d0cd;
   border-radius: 8px;
   background: #ffffff;
 }
@@ -82,7 +82,7 @@ h1 {
   justify-content: center;
   gap: 8px;
   height: 34px;
-  border: 1px solid #cad4e2;
+  border: 1px solid #d0d0cd;
   border-radius: 8px;
   background: #ffffff;
   color: #253244;
@@ -118,7 +118,7 @@ h1 {
 .select-button:hover,
 .power-button:hover,
 .secondary-button:hover {
-  background: #f4f7fb;
+  background: #f3f3f1;
 }
 
 .primary-button:hover {

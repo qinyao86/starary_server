@@ -30,7 +30,7 @@
   font-family:
     Inter, "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --radius: 0.5rem;
-  --background: #f7f9fb;
+  --background: #f6f6f5;
   --foreground: #18202c;
   --card: #ffffff;
   --card-foreground: #18202c;
@@ -38,17 +38,21 @@
   --popover-foreground: #18202c;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --secondary: #eef3f7;
+  --secondary: #eeeeec;
   --secondary-foreground: #253244;
-  --muted: #eef3f7;
+  --muted: #eeeeec;
   --muted-foreground: #697586;
   --accent: #e8f0ff;
   --accent-foreground: #1e3a8a;
   --destructive: #dc2626;
-  --border: #d8e0ea;
-  --input: #d2dae6;
+  --border: #dededb;
+  --input: #d7d7d4;
   --ring: #2563eb;
-  background: #f7f9fb;
+  --admin-card-radius: 18px;
+  --admin-card-border: #d9d9d6;
+  --admin-card-background: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  --admin-card-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+  background: #f6f6f5;
   color: #18202c;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -69,15 +73,15 @@ body {
   min-width: 0;
   min-height: 100vh;
   overflow: hidden;
-  background: #f7f9fb;
+  background: #f6f6f5;
 }
 
 body:has(.admin-shell.theme-dark) {
-  background: #18181b;
+  background: #202023;
 }
 
 body:has(.auth-shell.theme-dark) {
-  background: #18181b;
+  background: #202023;
 }
 
 button {

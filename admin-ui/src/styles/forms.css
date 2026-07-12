@@ -11,7 +11,7 @@
 .field select {
   width: 100%;
   height: 38px;
-  border: 1px solid #d2dae6;
+  border: 1px solid #d7d7d4;
   border-radius: 8px;
   padding: 0 10px;
   outline: none;
@@ -79,7 +79,7 @@
   gap: 12px;
   width: 100%;
   height: 38px;
-  border: 1px solid #d2dae6;
+  border: 1px solid #d7d7d4;
   border-radius: 8px;
   padding: 0 12px 0 10px;
   color: #1f2937;
@@ -92,7 +92,7 @@
 
 .select-control-button:hover {
   border-color: #b9c5d5;
-  background: #f8fafc;
+  background: #f8f8f7;
 }
 
 .select-control-button:focus-visible {

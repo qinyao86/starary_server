@@ -36,7 +36,6 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
         CREATE TABLE IF NOT EXISTS libraries (
             id TEXT PRIMARY KEY,
             display_name TEXT NOT NULL,
-            description TEXT,
             icon_url TEXT,
             enabled BOOLEAN NOT NULL DEFAULT TRUE,
             storage_locked_at TIMESTAMPTZ,

@@ -18,12 +18,15 @@
   --border: #2f2f33;
   --input: #3f3f46;
   --ring: #60a5fa;
-  background: #18181b;
+  --admin-card-border: #343438;
+  --admin-card-background: linear-gradient(180deg, #222225 0%, #1f1f22 100%);
+  --admin-card-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  background: #202023;
   color: #fafafa;
 }
 
 .theme-dark .sidebar {
-  background: #18181b;
+  background: #202023;
 }
 
 .theme-dark .brand-title,
@@ -52,9 +55,8 @@
 .theme-dark .health-label,
 .theme-dark .activity-meta,
 .theme-dark .activity-time,
-.theme-dark .library-card-description,
 .theme-dark .library-card-metric span,
-.theme-dark .library-card-storage-header span,
+.theme-dark .library-card-storage-kind,
 .theme-dark .library-detail-hero p,
 .theme-dark .library-detail-stat span,
 .theme-dark .member-row span,
@@ -66,29 +68,25 @@
   color: #a1a1aa;
 }
 
-.theme-dark .library-card-storage-header em {
-  color: #d4d4d8;
-}
-
 .theme-dark .main {
-  background: #18181b;
+  background: #202023;
   box-shadow: none;
 }
 
 .theme-dark .topbar,
 .theme-dark .panel-header {
   border-color: #2f2f33;
-  background: #18181b;
+  background: #202023;
 }
 
 .theme-dark .content {
-  border-color: #2f2f33;
-  background: #09090b;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+  border-color: #343438;
+  background: #18181b;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
 }
 
 .theme-dark .page-intro {
-  background: #09090b;
+  background: #18181b;
 }
 
 .theme-dark .page-intro {

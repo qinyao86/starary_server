@@ -1,4 +1,5 @@
 mod auth;
+mod backup;
 mod config;
 mod db;
 mod error;
@@ -12,8 +13,8 @@ mod state;
 use anyhow::Context;
 use config::ServerConfig;
 use sqlx::postgres::PgPoolOptions;
-use state::AppState;
-use std::time::Duration;
+use state::{AppState, ServiceControl};
+use std::{net::SocketAddr, time::Duration};
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -37,6 +38,15 @@ async fn main() -> anyhow::Result<()> {
         )
     })?;
 
+    let backup_service = backup::BackupService::new(
+        &portable_runtime.app_home,
+        &config.storage_dir,
+        &config.database_url,
+    )?;
+    if backup_service.apply_pending_restore()? {
+        tracing::info!("Pending database restore completed");
+    }
+
     let pool = PgPoolOptions::new()
         .max_connections(config.database_max_connections)
         .acquire_timeout(Duration::from_secs(5))
@@ -47,7 +57,15 @@ async fn main() -> anyhow::Result<()> {
     db::run_migrations(&pool).await?;
 
     let bind_addr = config.bind_addr();
-    let state = AppState::new(config, pool);
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+    let scheduler_stop_tx = shutdown_tx.clone();
+    let service_control = ServiceControl::new(
+        shutdown_tx,
+        portable_runtime.runtime_config_path(),
+        config.port,
+        portable_runtime.server_port_managed(),
+    );
+    let state = AppState::new(config, pool, service_control, backup_service.clone());
     let app = routes::router(state)
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive());
@@ -58,9 +76,20 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Mad Library Team Server listening on http://{bind_addr}");
 
-    let server_result = axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await;
+    let scheduler_shutdown = shutdown_rx.clone();
+    let scheduler = tokio::spawn(async move {
+        backup_service.run_scheduler(scheduler_shutdown).await;
+    });
+
+    let server_result = axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal(shutdown_rx))
+    .await;
+
+    let _ = scheduler_stop_tx.send(true);
+    let _ = scheduler.await;
 
     portable_runtime.stop();
     server_result?;
@@ -68,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn shutdown_signal() {
+async fn shutdown_signal(mut service_shutdown: tokio::sync::watch::Receiver<bool>) {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
@@ -86,8 +115,17 @@ async fn shutdown_signal() {
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
 
+    let managed_shutdown = async move {
+        while !*service_shutdown.borrow() {
+            if service_shutdown.changed().await.is_err() {
+                return;
+            }
+        }
+    };
+
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+        _ = managed_shutdown => {},
     }
 }

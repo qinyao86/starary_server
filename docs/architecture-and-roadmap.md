@@ -42,6 +42,14 @@ PostgreSQL listens only on `127.0.0.1` in bundled mode. The server generates a
 random database password and JWT secret on first startup and stores them under
 `data/config/`. Application schema migrations remain automatic and idempotent.
 
+The HTTP service listens on `0.0.0.0` by default and exposes both the client API
+and browser administration UI on the configured server port. The desktop shell
+is a local launcher and owner console, not the only administration surface.
+Initial Owner creation is restricted to loopback connections; subsequent
+administration is available over authenticated LAN browser sessions. Production
+internet deployments must terminate TLS at a reverse proxy and should not
+expose the bundled PostgreSQL port.
+
 ## Storage Model
 
 Filesystem storage covers server-local disks, SMB, and NFS. Desktop clients use
@@ -72,6 +80,26 @@ atomically switches the binding, and retains the old location for rollback.
   internet deployments.
 - Keep required PostgreSQL and third-party license notices in every package.
 - Audit Rust and npm dependency licenses before commercial releases.
+
+## Account Lifecycle
+
+Team access is invite-first rather than open registration. An owner or
+administrator creates an invitation with the user's email, initial server role,
+and optional library assignments. The recipient accepts the invitation and sets
+their own password. LAN deployments can expose the invitation as a copyable
+one-time link or code without requiring an email service; internet deployments
+may send the same link by email.
+
+Servers may optionally accept join requests. A request never creates an active
+account, consumes a licensed seat, or grants library access until an
+administrator approves it. Approval can happen asynchronously, so an
+administrator does not need to remain online.
+
+Signed-in users can change their own password after confirming the current
+password. Initially, forgotten passwords are reset by an administrator using a
+temporary one-time credential. Email-based password recovery is added only for
+deployments with a configured mail provider. Invitations, approvals, password
+changes, resets, and account activation changes are audit events.
 
 ## Delivery Phases
 

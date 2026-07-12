@@ -22,6 +22,12 @@
   grid-column: span 12;
 }
 
+.health-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .panel {
   min-width: 0;
   overflow: hidden;
@@ -33,7 +39,7 @@
   justify-content: space-between;
   min-height: 52px;
   padding: 0 15px;
-  border-bottom: 1px solid #e4e9f0;
+  border-bottom: 1px solid #e5e5e2;
   background: #ffffff;
 }
 

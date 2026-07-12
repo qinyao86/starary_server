@@ -9,7 +9,6 @@ import { DialogShell } from "./dialog-shell";
 const createStorageValue = "__create_storage__";
 
 export function LibraryDialog({
-  description,
   hint,
   name,
   open,
@@ -21,13 +20,11 @@ export function LibraryDialog({
   t,
   title,
   onClose,
-  onDescriptionChange,
   onNameChange,
   onStorageConnectionChange,
   onCreateStorage,
   onSubmit
 }: TranslatorContext & {
-  description: string;
   hint: string;
   name: string;
   open: boolean;
@@ -38,7 +35,6 @@ export function LibraryDialog({
   submitLabel: string;
   title: string;
   onClose: () => void;
-  onDescriptionChange: (value: string) => void;
   onNameChange: (value: string) => void;
   onStorageConnectionChange?: (value: string) => void;
   onCreateStorage?: () => void;
@@ -53,7 +49,6 @@ export function LibraryDialog({
       <form className="dialog-form" onSubmit={onSubmit}>
         <div className="dialog-body">
           <TextField autoFocus required label={t("name")} value={name} onChange={onNameChange} />
-          <TextField label={t("description")} value={description} onChange={onDescriptionChange} />
           {showStorage && onStorageConnectionChange && (
             availableStorageConnections.length > 0 ? (
               <SelectField

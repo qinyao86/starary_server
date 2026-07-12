@@ -50,3 +50,25 @@
 .theme-dark .message-bar button:hover {
   background: rgba(253, 230, 138, 0.1);
 }
+
+.theme-dark .delete-library-target strong {
+  color: #fafafa;
+}
+
+.theme-dark .delete-library-target {
+  color: #fca5a5;
+}
+
+.theme-dark .delete-library-files-option {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(127, 29, 29, 0.16);
+}
+
+.theme-dark .delete-library-files-option strong {
+  color: #fecaca;
+}
+
+.theme-dark .delete-library-files-option small,
+.theme-dark .delete-library-note {
+  color: #d4d4d8;
+}

@@ -6,7 +6,7 @@
 
 .select-card {
   height: 46px;
-  border: 1px solid #d2dae6;
+  border: 1px solid #d7d7d4;
   border-radius: 8px;
   background: #ffffff;
   color: #253244;
@@ -48,12 +48,115 @@
   flex: 0 0 auto;
 }
 
+.runtime-settings {
+  display: grid;
+  gap: 18px;
+}
+
+.runtime-port-form,
+.runtime-danger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px auto;
+  align-items: end;
+  gap: 18px;
+}
+
+.runtime-setting-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.runtime-setting-copy strong {
+  color: #253244;
+  font-size: 13px;
+}
+
+.runtime-setting-copy span,
+.runtime-setting-copy small,
+.runtime-unavailable {
+  margin: 0;
+  color: #697586;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.runtime-setting-copy em {
+  color: #a35b00;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.runtime-port-field {
+  gap: 5px;
+}
+
+.runtime-port-field > span {
+  color: #697586;
+  font-size: 11px;
+}
+
+.runtime-port-field input {
+  height: 32px;
+}
+
+.runtime-danger-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-top: 1px solid #e8e8e5;
+  padding-top: 18px;
+}
+
+.runtime-danger-row .runtime-setting-copy strong {
+  color: #9f2b24;
+}
+
+.shutdown-server-dialog {
+  width: min(460px, 100%);
+}
+
+.shutdown-server-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px 20px 2px;
+  color: #b42318;
+}
+
+.shutdown-server-body p {
+  margin: 0;
+  color: #526071;
+  font-size: 13px;
+  line-height: 20px;
+}
+
 .theme-dark .appearance-setting strong {
   color: #fafafa;
 }
 
 .theme-dark .appearance-setting > div:first-child span {
   color: #a1a1aa;
+}
+
+.theme-dark .runtime-setting-copy strong,
+.theme-dark .shutdown-server-body p {
+  color: #fafafa;
+}
+
+.theme-dark .runtime-setting-copy span,
+.theme-dark .runtime-setting-copy small,
+.theme-dark .runtime-port-field > span,
+.theme-dark .runtime-unavailable {
+  color: #a1a1aa;
+}
+
+.theme-dark .runtime-danger-row {
+  border-color: #2f2f33;
+}
+
+.theme-dark .runtime-danger-row .runtime-setting-copy strong,
+.theme-dark .shutdown-server-body {
+  color: #fca5a5;
 }
 
 @media (max-width: 620px) {
@@ -70,5 +173,11 @@
   .appearance-setting .segmented button {
     flex: 1;
     justify-content: center;
+  }
+
+  .runtime-port-form,
+  .runtime-danger-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 }

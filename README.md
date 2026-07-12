@@ -39,6 +39,20 @@ Then open:
 http://127.0.0.1:3789/admin/
 ```
 
+The server listens on `0.0.0.0:3789` by default so the admin UI and client API
+are available to other computers on the LAN. Use the LAN address shown in the
+server Settings page, for example `http://192.168.0.51:3789/admin/`. The
+desktop shell itself always connects through `127.0.0.1`.
+
+On Windows, set the host network profile to **Private** and allow inbound TCP
+port `3789` for Private and Domain profiles. Do not expose the port on a Public
+network. Bundled PostgreSQL remains private on `127.0.0.1:54329` and must not
+be added to the firewall.
+
+The first Owner account can only be created from the server host. After initial
+setup, authorized administrators may use the browser UI from any permitted LAN
+computer.
+
 Optional Docker Desktop path:
 
 ```powershell
@@ -57,9 +71,24 @@ Check development status:
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-status.ps1
 ```
 
+## Windows Desktop Release
+
+The desktop installer is the default deployment for a LAN host. It provides a
+Tauri management window, starts the server and bundled PostgreSQL without a
+console window, and prevents duplicate service instances on the same machine.
+The NSIS installer supports both current-user and all-users installation.
+
+```powershell
+npm run release:windows
+```
+
+The installer and SHA-256 checksum are written to
+`artifacts/windows-x64/`. Mutable server data lives in
+`%ProgramData%\Mad Library Server`, outside the application install directory.
+
 ## Windows Portable Release
 
-The Windows x64 release bundles a private PostgreSQL runtime. End users do not
+The headless Windows x64 release bundles a private PostgreSQL runtime. End users do not
 need to install PostgreSQL, Docker, Node.js, or Rust.
 
 The minimized PostgreSQL runtime is committed under
@@ -73,7 +102,7 @@ Normal builds do not download or extract PostgreSQL. The original archive is
 only required when intentionally regenerating the tracked runtime with
 `scripts/prepare-postgresql-runtime.ps1`.
 
-The output is `release/madlibrary-server-windows-x64.zip`. Extract it and
+The output is `artifacts/windows-x64/Mad-Library-Server_0.1.0_windows-x64-portable.zip`. Extract it and
 double-click `start-server.cmd`. On first startup the server generates private
 local credentials, initializes PostgreSQL, creates the application database,
 runs schema migrations, and opens the admin console.

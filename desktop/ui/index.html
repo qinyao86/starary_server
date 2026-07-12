@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mad Library Server</title>
+    <style>
+      :root { color-scheme: light dark; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; min-height: 100vh; overflow: hidden; background: #f4f4f2; color: #17191d; }
+      .titlebar { display: flex; align-items: center; height: 38px; border-bottom: 0; background: #f6f6f5; color: #526071; user-select: none; }
+      .titlebar-brand { display: inline-flex; align-items: center; gap: 8px; height: 100%; padding: 0 8px; color: #253244; font-size: 12px; font-weight: 650; }
+      .titlebar-brand img { width: 18px; height: 18px; object-fit: contain; }
+      .drag-region { flex: 1; align-self: stretch; min-width: 12px; }
+      .window-actions { display: inline-flex; align-items: center; gap: 14px; padding: 0 6px; }
+      .window-actions button { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; }
+      .window-actions button:hover { background: #e8e8e5; color: #111827; }
+      .window-actions .close:hover { background: #c42b1c; color: #fff; }
+      .window-actions svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+      main { height: calc(100vh - 38px); display: grid; place-items: center; padding: 32px; text-align: center; }
+      .content { width: min(420px, 100%); }
+      img { width: 72px; height: 72px; object-fit: contain; }
+      h1 { margin: 22px 0 8px; font-size: 24px; font-weight: 650; letter-spacing: 0; }
+      p { margin: 0; color: #6b7078; font-size: 14px; line-height: 1.6; }
+      .progress { width: 180px; height: 3px; margin: 28px auto 0; overflow: hidden; border-radius: 2px; background: #dfe2e7; }
+      .progress::after { display: block; width: 42%; height: 100%; content: ""; background: #20242a; animation: loading 1.25s ease-in-out infinite alternate; }
+      @keyframes loading { from { transform: translateX(-100%); } to { transform: translateX(240%); } }
+      @media (prefers-color-scheme: dark) {
+        body { background: #18181b; color: #f5f6f8; }
+        .titlebar { background: #202023; color: #a1a1aa; }
+        .titlebar-brand { color: #e4e4e7; }
+        .window-actions button:hover { background: #2b2b2f; color: #fafafa; }
+        .window-actions .close:hover { background: #c42b1c; color: #fff; }
+        p { color: #9ba0a8; }
+        .progress { background: #30343a; }
+        .progress::after { background: #f0f2f5; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="titlebar">
+      <div class="titlebar-brand"><img src="logo.png" alt="" /><span>Mad Library Server</span></div>
+      <div class="drag-region" data-tauri-drag-region></div>
+      <div class="window-actions">
+        <button aria-label="最小化" data-window-action="minimize" type="button">
+          <svg aria-hidden="true" viewBox="0 0 14 14"><path d="M2.5 7.5h9" /></svg>
+        </button>
+        <button aria-label="最大化" data-window-action="maximize" type="button">
+          <svg aria-hidden="true" viewBox="0 0 14 14"><rect x="2.5" y="2.5" width="9" height="9" /></svg>
+        </button>
+        <button aria-label="关闭" class="close" data-window-action="close" type="button">
+          <svg aria-hidden="true" viewBox="0 0 14 14"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9" /></svg>
+        </button>
+      </div>
+    </header>
+    <main>
+      <div class="content">
+        <img src="logo.png" alt="" />
+        <h1>Mad Library Server</h1>
+        <p>正在启动服务与数据存储...</p>
+        <div class="progress" aria-label="正在启动"></div>
+      </div>
+    </main>
+    <script>
+      const appWindow = window.__TAURI__?.window?.getCurrentWindow?.();
+      document.querySelectorAll("[data-window-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.windowAction;
+          if (action === "minimize") appWindow?.minimize();
+          if (action === "maximize") appWindow?.toggleMaximize();
+          if (action === "close") appWindow?.close();
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -16,5 +16,10 @@ target_*/
 *.sqlite3
 .dev/
 /release/
+/artifacts/
+/desktop/node_modules/
+/desktop/gen/
+/desktop/bundle-resources/runtime/*
+!/desktop/bundle-resources/runtime/.gitkeep
 Thumbs.db
 .DS_Store

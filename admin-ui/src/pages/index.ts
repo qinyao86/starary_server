@@ -3,6 +3,5 @@ export { UsersPage } from "./users";
 export { PermissionsPage } from "./permissions";
 export { StoragePage } from "./storage";
 export { StatisticsPage } from "./statistics";
-export { ActivityPage } from "./activity";
 export { BackupsPage } from "./backups";
 export { SettingsPage } from "./settings";

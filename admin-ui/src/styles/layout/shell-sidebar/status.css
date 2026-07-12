@@ -3,8 +3,8 @@
 }
 
 .sidebar-footer {
-  padding: 10px 12px 2px;
-  border-top: 1px solid #e2e7ee;
+  padding: 8px;
+  border-top: 1px solid #e2e2df;
   background: transparent;
 }
 
@@ -68,11 +68,29 @@
 
 .sidebar-runtime-address {
   gap: 6px;
+  width: 100%;
   margin-top: 7px;
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 6px;
   color: #7a8697;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-runtime-address:hover {
+  color: #1f2937;
+  background: #eeeeec;
+}
+
+.sidebar-runtime-address:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
 
 .sidebar-runtime-address code {
+  flex: 1;
   overflow: hidden;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
@@ -80,12 +98,17 @@
   white-space: nowrap;
 }
 
+.theme-dark .sidebar-runtime-address:hover {
+  color: #fafafa;
+  background: #2a2a2e;
+}
+
 .sidebar-logout-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  height: 38px;
+  height: 30px;
   border: 0;
   border-radius: 7px;
   padding: 0 11px;
@@ -94,4 +117,36 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 650;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-status-area {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 10px;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-runtime {
+  width: 36px;
+  height: 28px;
+  padding: 0;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-runtime::before {
+  top: 4px;
+  bottom: 4px;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-runtime-heading {
+  justify-content: center;
+  height: 100%;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-footer {
+  padding: 7px 10px;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-logout-button {
+  justify-content: center;
+  width: 44px;
+  padding: 0;
 }

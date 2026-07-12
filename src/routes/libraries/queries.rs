@@ -14,6 +14,15 @@ WITH member_stats AS (
     INNER JOIN users u ON u.id = m.user_id
     GROUP BY m.library_id
 ),
+library_manager_stats AS (
+    SELECT
+        m.library_id,
+        ARRAY_AGG(u.display_name ORDER BY u.display_name) AS library_manager_names
+    FROM library_memberships m
+    INNER JOIN users u ON u.id = m.user_id
+    WHERE m.role IN ('owner', 'admin', 'library_manager')
+    GROUP BY m.library_id
+),
 asset_stats AS (
     SELECT
         library_id,
@@ -65,12 +74,11 @@ const LIBRARY_SELECT_COLUMNS: &str = r#"
 SELECT
     l.id,
     l.display_name,
-    l.description,
     l.icon_url,
     l.enabled,
     l.storage_locked_at,
     {role_expression} AS current_user_role,
-    creator.display_name AS creator_name,
+    COALESCE(lms.library_manager_names, ARRAY[]::TEXT[]) AS library_manager_names,
     COALESCE(ms.member_names, ARRAY[]::TEXT[]) AS member_names,
     COALESCE(ast.asset_count, 0) AS asset_count,
     COALESCE(fs.folder_count, 0) AS folder_count,
@@ -89,7 +97,6 @@ SELECT
     l.created_at,
     l.updated_at
 FROM libraries l
-INNER JOIN users creator ON creator.id = l.created_by_user_id
 "#;
 
 pub async fn list_libraries_for_server_manager(
@@ -103,6 +110,7 @@ pub async fn list_libraries_for_server_manager(
         LIBRARY_SELECT_COLUMNS.replace("{role_expression}", "COALESCE(m.role, $2)"),
         r#"
         LEFT JOIN library_memberships m ON m.library_id = l.id AND m.user_id = $1
+        LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
@@ -130,6 +138,7 @@ pub async fn list_libraries_for_member(
         LIBRARY_SELECT_COLUMNS.replace("{role_expression}", "m.role"),
         r#"
         INNER JOIN library_memberships m ON m.library_id = l.id
+        LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id

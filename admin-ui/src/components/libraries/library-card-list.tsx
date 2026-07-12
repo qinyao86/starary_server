@@ -1,10 +1,9 @@
-import { Copy, ExternalLink, HardDrive, Images, Pencil, Trash2, UserRound, Users } from "lucide-react";
+import { Copy, HardDrive, Images, UserRound, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { TeamLibrary } from "../../api";
 import type { TranslatorContext } from "../../types";
-import { formatBytes, formatCount, storageKindLabel } from "../../utils/format";
+import { formatBytes, formatCount, formatMemberNames, storageKindLabel } from "../../utils/format";
 
 function libraryStorageMeta(library: TeamLibrary, t: TranslatorContext["t"]) {
   const storagePath = preferredStoragePath(library);
@@ -64,7 +63,8 @@ function smbUrlFromUnc(value?: string | null) {
 function LibraryMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="library-card-metric">
-      <span className="library-card-metric-label"><Icon aria-hidden="true" size={13} />{label}</span>
+      <Icon aria-hidden="true" size={15} />
+      <span className="library-card-metric-label">{label}</span>
       <strong>{value}</strong>
     </div>
   );
@@ -93,15 +93,11 @@ export function LibraryCardList({
   libraries,
   canManageLibrary,
   t,
-  onDelete,
-  onEdit,
   onOpen,
   onToggleEnabled
 }: TranslatorContext & {
   libraries: TeamLibrary[];
   canManageLibrary: (library: TeamLibrary) => boolean;
-  onDelete: (library: TeamLibrary) => void;
-  onEdit: (library: TeamLibrary) => void;
   onOpen: (libraryId: string) => void;
   onToggleEnabled: (library: TeamLibrary, enabled: boolean) => void;
 }) {
@@ -116,7 +112,19 @@ export function LibraryCardList({
         const canManage = canManageLibrary(library);
         const storageMeta = libraryStorageMeta(library, t);
         return (
-          <Card className={`library-card${isEnabled ? "" : " is-disabled"}`} key={library.id}>
+          <Card
+            className={`library-card${isEnabled ? "" : " is-disabled"}`}
+            key={library.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpen(library.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen(library.id);
+              }
+            }}
+          >
             <div className="library-card-top">
               <div className="library-card-heading">
                 <div className="library-card-title-row">
@@ -125,7 +133,35 @@ export function LibraryCardList({
                     {isEnabled ? t("libraryStarted") : t("libraryNotStarted")}
                   </span>
                 </div>
-                <div className="library-card-description">{library.description || t("noDescription")}</div>
+                <div className="library-card-path-row">
+                  <HardDrive aria-hidden="true" size={14} />
+                  <strong
+                    className="library-card-storage-path"
+                    title={storageMeta.path}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    {storageMeta.path}
+                  </strong>
+                  <span className="library-card-storage-kind">
+                    {storageMeta.kind}
+                    {storageMeta.extraCount > 0 ? ` +${storageMeta.extraCount}` : ""}
+                  </span>
+                  <button
+                    aria-label={t("copyMode")}
+                    className="library-card-storage-tool"
+                    disabled={!storageMeta.rawPath}
+                    title={t("copyMode")}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void copyTextToClipboard(storageMeta.rawPath);
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
               </div>
               {canManage && <button
                 aria-checked={isEnabled}
@@ -133,57 +169,20 @@ export function LibraryCardList({
                 className={`library-card-switch${isEnabled ? " is-on" : ""}`}
                 role="switch"
                 type="button"
-                onClick={() => onToggleEnabled(library, !isEnabled)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleEnabled(library, !isEnabled);
+                }}
+                onKeyDown={(event) => event.stopPropagation()}
               >
                 <span />
               </button>}
             </div>
-
-            <div className="library-card-storage">
-              <div className="library-card-storage-header">
-                <span>{t("storageLocation")}</span>
-                <em>
-                  {storageMeta.kind}
-                  {storageMeta.extraCount > 0 ? ` +${storageMeta.extraCount}` : ""}
-                </em>
-              </div>
-              <div className="library-card-storage-path-row">
-                <strong className="library-card-storage-path" title={storageMeta.path}>
-                  {storageMeta.path}
-                </strong>
-                <button
-                  aria-label={t("copyMode")}
-                  className="library-card-storage-tool"
-                  disabled={!storageMeta.rawPath}
-                  title={t("copyMode")}
-                  type="button"
-                  onClick={() => void copyTextToClipboard(storageMeta.rawPath)}
-                >
-                  <Copy size={14} />
-                </button>
-              </div>
-            </div>
-
             <div className="library-card-metrics">
               <LibraryMetric icon={HardDrive} label={t("totalSize")} value={formatBytes(library.totalSizeBytes)} />
               <LibraryMetric icon={Users} label={t("membersLabel")} value={formatCount(library.memberNames?.length)} />
               <LibraryMetric icon={Images} label={t("assets")} value={formatCount(library.assetCount)} />
-              <LibraryMetric icon={UserRound} label={t("creator")} value={library.creatorName || "-"} />
-            </div>
-
-            <div className="library-card-actions">
-              <Button className="library-card-action is-primary" size="sm" type="button" onClick={() => onOpen(library.id)}>
-                <ExternalLink size={15} />
-                <span>{t("openLibrary")}</span>
-              </Button>
-              {canManage && <Button className="library-card-action" size="sm" type="button" variant="outline" onClick={() => onEdit(library)}>
-                <Pencil size={15} />
-                <span>{t("editLibrary")}</span>
-              </Button>}
-              {canManage && <Button className="library-card-action is-danger" size="sm" type="button" variant="outline" onClick={() => onDelete(library)}>
-                <Trash2 size={15} />
-                <span>{t("deleteLibrary")}</span>
-              </Button>}
+              <LibraryMetric icon={UserRound} label={t("libraryManager")} value={formatMemberNames(library.libraryManagerNames, "-")} />
             </div>
           </Card>
         );

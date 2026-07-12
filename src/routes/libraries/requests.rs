@@ -6,7 +6,6 @@ use serde::Deserialize;
 pub struct CreateLibraryRequest {
     #[serde(alias = "name")]
     pub display_name: String,
-    pub description: Option<String>,
     pub icon_url: Option<String>,
     pub default_storage_root: Option<CreateDefaultStorageRootRequest>,
     pub storage_binding: Option<StorageBindingRequest>,
@@ -38,7 +37,6 @@ pub struct CreateDefaultStorageRootRequest {
 pub struct UpdateLibraryRequest {
     #[serde(alias = "name")]
     pub display_name: String,
-    pub description: Option<String>,
     pub icon_url: Option<String>,
     pub storage_binding: Option<StorageBindingRequest>,
 }
@@ -47,4 +45,11 @@ pub struct UpdateLibraryRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateLibraryEnabledRequest {
     pub enabled: bool,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteLibraryRequest {
+    #[serde(default)]
+    pub delete_files: bool,
 }

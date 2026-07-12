@@ -23,6 +23,7 @@ export function useAdminRuntime() {
   const [apiState, setApiState] = useState<ApiState>("loading");
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [needsOwner, setNeedsOwner] = useState<boolean | null>(null);
+  const [ownerSetupAllowed, setOwnerSetupAllowed] = useState(false);
   const [token, setToken] = useState<string | null>(() => getStoredToken());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [libraries, setLibraries] = useState<TeamLibrary[]>([]);
@@ -43,6 +44,7 @@ export function useAdminRuntime() {
       const [health, info, setup] = await Promise.all([api.health(), api.serverInfo(), api.setupStatus()]);
       setServerInfo(info);
       setNeedsOwner(setup.needsOwner);
+      setOwnerSetupAllowed(setup.ownerSetupAllowed);
       setServiceRunning(health.status === "ok");
       setDeploymentMode(info.deploymentMode === "local" ? "local" : "cloud");
       setApiState("connected");
@@ -200,6 +202,13 @@ export function useAdminRuntime() {
     setLibraryActivityItems([]);
   };
 
+  const resetAfterInitialization = async () => {
+    logout();
+    setNeedsOwner(true);
+    setMessage(null);
+    await loadPublicState();
+  };
+
   return {
     activityItems,
     apiState,
@@ -212,9 +221,11 @@ export function useAdminRuntime() {
     logout,
     message,
     needsOwner,
+    ownerSetupAllowed,
     onAuthenticated,
     previewMode,
     refreshAll,
+    resetAfterInitialization,
     selectLibrary,
     selectedLibraryId,
     serverInfo,

@@ -2,11 +2,14 @@ mod access;
 mod activity;
 mod assets;
 mod auth_routes;
+mod backups;
 mod health;
+mod initialization;
 mod libraries;
 mod library_structure;
 mod members;
 mod presets;
+mod runtime;
 mod setup;
 mod storage_connections;
 mod storage_roots;
@@ -25,14 +28,37 @@ use tower_http::services::{ServeDir, ServeFile};
 pub fn router(state: AppState) -> Router {
     let admin_assets_dir = state.config.resolved_admin_assets_dir();
     let admin_index = admin_assets_dir.join("index.html");
-    let admin_service =
-        ServeDir::new(admin_assets_dir).not_found_service(ServeFile::new(admin_index));
+    let admin_service = ServeDir::new(admin_assets_dir).fallback(ServeFile::new(admin_index));
 
     Router::new()
+        .route("/", get(|| async { Redirect::temporary("/admin/") }))
         .route("/admin", get(|| async { Redirect::permanent("/admin/") }))
         .nest_service("/admin/", admin_service)
         .route("/health", get(health::health))
         .route("/api/v1/server/info", get(health::server_info))
+        .route(
+            "/api/v1/server/runtime",
+            get(runtime::settings).patch(runtime::update_settings),
+        )
+        .route("/api/v1/server/shutdown", post(runtime::shutdown))
+        .route(
+            "/api/v1/server/desktop/shutdown",
+            post(runtime::desktop_shutdown),
+        )
+        .route(
+            "/api/v1/backups",
+            get(backups::overview).post(backups::create),
+        )
+        .route("/api/v1/backups/settings", patch(backups::update_settings))
+        .route("/api/v1/backups/restore", post(backups::restore))
+        .route(
+            "/api/v1/server/initialize",
+            post(initialization::initialize),
+        )
+        .route(
+            "/api/v1/backups/:backup_id",
+            get(backups::download).delete(backups::delete),
+        )
         .route("/api/v1/setup/status", get(setup::setup_status))
         .route("/api/v1/setup/owner", post(setup::create_owner))
         .route("/api/v1/auth/login", post(auth_routes::login))
@@ -40,7 +66,13 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/me",
             get(auth_routes::me).patch(auth_routes::update_me),
         )
+        .route("/api/v1/me/password", post(auth_routes::change_my_password))
         .route("/api/v1/me/presence", patch(auth_routes::update_presence))
+        .route("/api/v1/me/libraries", get(libraries::list_my_libraries))
+        .route(
+            "/api/v1/me/library-status",
+            get(libraries::list_my_library_statuses),
+        )
         .route(
             "/api/v1/users",
             get(users::list_users).post(users::create_user),

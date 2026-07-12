@@ -1,4 +1,5 @@
-import { Cloud, LogOut, RefreshCw, Server } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { Cloud, ExternalLink, LogOut, RefreshCw, Server } from "lucide-react";
 import type { ReactNode } from "react";
 import logoImage from "../assets/logo.png";
 import type { ServerInfo } from "../api";
@@ -14,6 +15,7 @@ export function AdminShell({
   message,
   previewMode,
   section,
+  sidebarCollapsed,
   serverInfo,
   serviceRunning,
   t,
@@ -30,6 +32,7 @@ export function AdminShell({
   message: string | null;
   previewMode: boolean;
   section: Section;
+  sidebarCollapsed: boolean;
   serverInfo: ServerInfo | null;
   serviceRunning: boolean;
   title: string;
@@ -40,7 +43,7 @@ export function AdminShell({
   onSetDeploymentMode: (mode: DeploymentMode) => void;
 }) {
   return (
-    <div className={`admin-shell ${colorTheme === "dark" ? "dark theme-dark" : "theme-light"}`}>
+    <div className={`admin-shell${sidebarCollapsed ? " is-sidebar-collapsed" : ""} ${colorTheme === "dark" ? "dark theme-dark" : "theme-light"}`}>
       <aside className="sidebar">
         <SidebarBrand t={t} />
         <SidebarStatus deploymentMode={deploymentMode} serverInfo={serverInfo} serviceRunning={serviceRunning} t={t} />
@@ -106,18 +109,36 @@ function SidebarStatus({ deploymentMode, serverInfo, serviceRunning, t }: Transl
   serverInfo: ServerInfo | null;
   serviceRunning: boolean;
 }) {
+  const adminUrl = serverInfo?.lanAdminUrl ?? serverInfo?.localAdminUrl ?? `${serverInfo?.serverUrl ?? "http://127.0.0.1:3789"}/admin/`;
+  const address = adminUrl.replace(/^https?:\/\//, "").replace(/\/admin\/?$/, "");
+
+  const openAdmin = () => {
+    if ("__TAURI_INTERNALS__" in window) {
+      void openUrl(adminUrl);
+    } else {
+      window.open(adminUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
-    <div className="sidebar-status-area">
+    <div className="sidebar-status-area" title={`${t(serviceRunning ? "running" : "stopped")} - ${address}`}>
       <div className={`sidebar-runtime${serviceRunning ? " is-running" : " is-stopped"}`}>
         <div className="sidebar-runtime-heading">
           <span className="sidebar-runtime-indicator" aria-hidden="true" />
           <strong>{t(serviceRunning ? "running" : "stopped")}</strong>
           <span>{deploymentModeLabel(t, deploymentMode)}</span>
         </div>
-        <div className="sidebar-runtime-address">
+        <button
+          aria-label={t("openAdminInBrowser")}
+          className="sidebar-runtime-address"
+          title={t("openAdminInBrowser")}
+          type="button"
+          onClick={openAdmin}
+        >
           <Server size={12} aria-hidden="true" />
-          <code>{serverInfo?.serverUrl.replace("http://", "") ?? "127.0.0.1:3789"}</code>
-        </div>
+          <code>{address}</code>
+          <ExternalLink size={11} aria-hidden="true" />
+        </button>
       </div>
     </div>
   );
@@ -137,6 +158,7 @@ function SidebarNav({ section, t, onSelectSection }: TranslatorContext & {
             className={`nav-item${active ? " is-active" : ""}`}
             key={item.id}
             type="button"
+            title={t(item.label)}
             onClick={() => onSelectSection(item.id)}
           >
             <Icon size={17} />
@@ -153,7 +175,7 @@ function SidebarFooter({ t, onLogout }: TranslatorContext & {
 }) {
   return (
     <div className="sidebar-footer">
-      <button className="sidebar-logout-button" type="button" onClick={onLogout}>
+      <button className="sidebar-logout-button" type="button" onClick={onLogout} title={t("logout")}>
         <LogOut size={15} />
         <span>{t("logout")}</span>
       </button>

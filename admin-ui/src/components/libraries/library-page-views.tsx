@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import type { ActivityItem, LibraryMember, StorageConnection, StorageRoot, TeamLibrary, TeamUser } from "../../api";
@@ -16,14 +16,19 @@ export function LibraryDetailPageView({
   memberDialogOpen,
   memberRole,
   memberUserId,
+  canDeleteLibrary,
+  canManageLibrary,
   storageRoots,
   t,
   onBack,
+  onDelete,
+  onEdit,
   onMemberDialogClose,
   onMemberDialogOpen,
   onMemberRoleChange,
   onMemberSubmit,
   onMemberUserChange,
+  onMemberRoleUpdate,
   onRemoveMember
 }: TranslatorContext & {
   activeLibrary: TeamLibrary;
@@ -33,13 +38,18 @@ export function LibraryDetailPageView({
   memberDialogOpen: boolean;
   memberRole: string;
   memberUserId: string;
+  canDeleteLibrary: boolean;
+  canManageLibrary: boolean;
   storageRoots: StorageRoot[];
   onBack: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
   onMemberDialogClose: () => void;
   onMemberDialogOpen: () => void;
   onMemberRoleChange: (value: string) => void;
   onMemberSubmit: (event: FormEvent) => void | Promise<void>;
   onMemberUserChange: (value: string) => void;
+  onMemberRoleUpdate: (member: LibraryMember, role: string) => void;
   onRemoveMember: (member: LibraryMember) => void;
 }) {
   return (
@@ -51,6 +61,18 @@ export function LibraryDetailPageView({
           <ArrowLeft size={16} />
           <span>{t("backToLibraries")}</span>
         </button>
+      }
+      action={
+        <div className="library-detail-page-actions">
+          {canManageLibrary && <Button size="sm" type="button" variant="outline" onClick={onEdit}>
+            <Pencil size={15} />
+            <span>{t("editLibrary")}</span>
+          </Button>}
+          {canDeleteLibrary && <Button size="sm" type="button" variant="destructive" onClick={onDelete}>
+            <Trash2 size={15} />
+            <span>{t("deleteLibrary")}</span>
+          </Button>}
+        </div>
       }
     >
       <LibraryDetailView
@@ -68,6 +90,7 @@ export function LibraryDetailPageView({
         onMemberRoleChange={onMemberRoleChange}
         onMemberSubmit={onMemberSubmit}
         onMemberUserChange={onMemberUserChange}
+        onMemberRoleUpdate={onMemberRoleUpdate}
         onRemoveMember={onRemoveMember}
       />
     </PageFrame>
@@ -75,9 +98,7 @@ export function LibraryDetailPageView({
 }
 
 export function LibraryListPageView({
-  createDescription,
   createName,
-  editDescription,
   editName,
   editingLibraryId,
   editingStorageLocked,
@@ -91,11 +112,7 @@ export function LibraryListPageView({
   onCloseCreate,
   onCancelEdit,
   onCreate,
-  onCreateDescriptionChange,
   onCreateNameChange,
-  onDelete,
-  onEdit,
-  onEditDescriptionChange,
   onEditNameChange,
   onOpen,
   onOpenCreate,
@@ -104,9 +121,7 @@ export function LibraryListPageView({
   onUpdate,
   onStorageConnectionChange
 }: TranslatorContext & {
-  createDescription: string;
   createName: string;
-  editDescription: string;
   editName: string;
   editingLibraryId: string | null;
   editingStorageLocked: boolean;
@@ -119,11 +134,7 @@ export function LibraryListPageView({
   onCloseCreate: () => void;
   onCancelEdit: () => void;
   onCreate: (event: FormEvent) => void | Promise<void>;
-  onCreateDescriptionChange: (value: string) => void;
   onCreateNameChange: (value: string) => void;
-  onDelete: (library: TeamLibrary) => void;
-  onEdit: (library: TeamLibrary) => void;
-  onEditDescriptionChange: (value: string) => void;
   onEditNameChange: (value: string) => void;
   onOpen: (libraryId: string) => void;
   onOpenCreate: () => void;
@@ -149,14 +160,12 @@ export function LibraryListPageView({
           title={t("createLibrary")}
           hint={t("createLibraryDialogHint")}
           name={createName}
-          description={createDescription}
           submitLabel={t("submit")}
           t={t}
           showStorage
           storageConnectionId={storageConnectionId}
           storageConnections={storageConnections}
           onClose={onCloseCreate}
-          onDescriptionChange={onCreateDescriptionChange}
           onNameChange={onCreateNameChange}
           onSubmit={onCreate}
           onStorageConnectionChange={onStorageConnectionChange}
@@ -167,7 +176,6 @@ export function LibraryListPageView({
           title={t("updateLibrary")}
           hint={t("editLibraryDialogHint")}
           name={editName}
-          description={editDescription}
           submitLabel={t("submit")}
           t={t}
           showStorage
@@ -175,7 +183,6 @@ export function LibraryListPageView({
           storageConnectionId={storageConnectionId}
           storageConnections={storageConnections}
           onClose={onCancelEdit}
-          onDescriptionChange={onEditDescriptionChange}
           onNameChange={onEditNameChange}
           onStorageConnectionChange={onStorageConnectionChange}
           onCreateStorage={onOpenStorageCreate}
@@ -185,8 +192,6 @@ export function LibraryListPageView({
           libraries={libraries}
           canManageLibrary={canManageLibrary}
           t={t}
-          onDelete={onDelete}
-          onEdit={onEdit}
           onOpen={onOpen}
           onToggleEnabled={onToggleEnabled}
         />

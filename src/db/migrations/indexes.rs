@@ -57,14 +57,8 @@ pub(super) async fn create_indexes(tx: &mut MigrationTx<'_>) -> anyhow::Result<(
     .await?;
     tx.execute(
         r#"
-        DO $$
-        BEGIN
-            IF to_regclass('public.idx_storage_roots_location_unique') IS NOT NULL
-               AND position('storage_identity' IN pg_get_indexdef('public.idx_storage_roots_location_unique'::regclass)) = 0 THEN
-                DROP INDEX idx_storage_roots_location_unique;
-            END IF;
-        END $$;
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_storage_roots_location_unique
+        DROP INDEX IF EXISTS idx_storage_roots_location_unique;
+        CREATE UNIQUE INDEX idx_storage_roots_location_unique
             ON storage_roots(storage_identity);
         "#,
     )

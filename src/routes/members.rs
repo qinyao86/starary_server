@@ -1,7 +1,7 @@
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    models::LibraryMemberRecord,
+    models::{LibraryMemberRecord, Role},
     routes::access::ensure_library_manager,
     state::AppState,
 };
@@ -55,6 +55,9 @@ pub async fn upsert_member(
     Json(request): Json<UpsertMemberRequest>,
 ) -> AppResult<Json<LibraryMemberRecord>> {
     ensure_library_manager(&state, &actor, &library_id).await?;
+    if matches!(request.role, Role::Owner | Role::Admin) && actor.role != Role::Owner {
+        return Err(AppError::Forbidden);
+    }
 
     let target_is_active: Option<bool> =
         sqlx::query_scalar("SELECT is_active FROM users WHERE id = $1")

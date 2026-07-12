@@ -18,6 +18,8 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
         .await?;
     tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS icon_url TEXT;")
         .await?;
+    tx.execute("ALTER TABLE libraries DROP COLUMN IF EXISTS description;")
+        .await?;
     tx.execute(
         "ALTER TABLE libraries ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;",
     )

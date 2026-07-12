@@ -38,3 +38,20 @@ export async function request<T>(path: string, options: RequestInit & { token?: 
   }
   return (await response.json()) as T;
 }
+
+export async function requestBlob(path: string, token: string): Promise<Blob> {
+  const response = await fetch(path, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      // Keep the HTTP status fallback.
+    }
+    throw new ApiError(message, response.status);
+  }
+  return response.blob();
+}

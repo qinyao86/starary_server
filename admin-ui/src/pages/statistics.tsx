@@ -17,17 +17,37 @@ export function StatisticsPage({ activityItems, libraries, serverInfo, serviceRu
         <MetricCard label={t("onlineUsers")} value={`${onlineUsers}/${users.length}`} change={t("realData")} tone="green" />
       </div>
       <div className="page-grid">
-        <Panel title={t("healthChecks")} icon={Server} className="span-5">
+        <Panel title={t("healthChecks")} icon={Server} className="span-12">
           <div className="health-list">
-            <div className="health-row"><span><Server size={16} />{t("serverProcess")}</span><strong>{t(serviceRunning ? "running" : "stopped")}</strong></div>
-            <div className="health-row"><span><Database size={16} />{t("database")}</span><strong>{serverInfo?.databaseStatus ?? "-"}</strong></div>
-            <div className="health-row"><span><HardDrive size={16} />{t("storage")}</span><strong>{storageStatusLabel(t, serverInfo)}</strong></div>
+            <HealthCheck icon={Server} label={t("serverProcess")} value={t(serviceRunning ? "running" : "stopped")} tone={serviceRunning ? "good" : "warn"} />
+            <HealthCheck icon={Database} label={t("database")} value={serverInfo?.databaseStatus ?? "-"} tone={serverInfo?.databaseStatus === "connected" ? "good" : "muted"} />
+            <HealthCheck icon={HardDrive} label={t("storage")} value={storageStatusLabel(t, serverInfo)} tone={serverInfo?.storageWritable ? "good" : "warn"} />
           </div>
         </Panel>
-        <Panel title={t("recentActivity")} icon={Activity} className="span-7">
-          <ActivityList t={t} activityItems={activityItems.slice(0, 8)} />
+        <Panel title={t("recentActivity")} icon={Activity} className="span-12">
+          <ActivityList t={t} activityItems={activityItems.slice(0, 16)} />
         </Panel>
       </div>
     </PageFrame>
+  );
+}
+
+function HealthCheck({
+  icon: Icon,
+  label,
+  tone,
+  value
+}: {
+  icon: typeof Server;
+  label: string;
+  tone: "good" | "muted" | "warn";
+  value: string;
+}) {
+  return (
+    <div className={`health-row tone-${tone}`}>
+      <span className="health-icon"><Icon size={17} /></span>
+      <span className="health-label">{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }

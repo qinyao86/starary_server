@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminShell } from "./components/admin-shell";
 import { AuthShell, FirstRunSetup, LoginForm } from "./components/auth";
-import { colorThemeStorageKey, sectionStorageKey } from "./constants";
+import { DesktopTitlebar } from "./components/desktop-titlebar";
+import { colorThemeStorageKey, historyMaxIndexStorageKey, sectionStorageKey, sidebarCollapsedStorageKey } from "./constants";
 import { useAdminRuntime } from "./hooks/use-admin-runtime";
 import { createTranslator, type Language } from "./i18n";
-import { navItems, readStoredSection } from "./navigation";
+import { navItems, readStoredSection, sectionFromPath, sectionPath } from "./navigation";
 import { renderSection } from "./pages/render-section";
 import type { ColorTheme, PageContext, Section } from "./types";
 import { buildPreviewLibraries, buildPreviewUsers, previewCurrentUser } from "./utils/preview";
@@ -12,6 +13,10 @@ import { buildPreviewLibraries, buildPreviewUsers, previewCurrentUser } from "./
 export function App() {
   const [language, setLanguage] = useState<Language>("zh");
   const [section, setSection] = useState<Section>(() => readStoredSection());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(sidebarCollapsedStorageKey) === "true");
+  const [historyIndex, setHistoryIndex] = useState(() => readHistoryIndex());
+  const [historyMaxIndex, setHistoryMaxIndex] = useState(() => readHistoryMaxIndex());
+  const [libraryListViewVersion, setLibraryListViewVersion] = useState(0);
   const [showFirstLibrarySetup, setShowFirstLibrarySetup] = useState(false);
   const runtime = useAdminRuntime();
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
@@ -31,9 +36,11 @@ export function App() {
     logout,
     message,
     needsOwner,
+    ownerSetupAllowed,
     onAuthenticated,
     previewMode,
     refreshAll,
+    resetAfterInitialization,
     selectLibrary,
     selectedLibraryId,
     serverInfo,
@@ -64,10 +71,73 @@ export function App() {
     setColorTheme(nextTheme);
   };
 
+  useEffect(() => {
+    const hasExistingHistoryState = typeof (window.history.state as { index?: number } | null)?.index === "number";
+    const initialIndex = readHistoryIndex();
+    const initialSection = sectionFromPath(window.location.pathname) ?? section;
+    window.history.replaceState({ section: initialSection, index: initialIndex }, "", sectionPath(initialSection));
+    setHistoryIndex(initialIndex);
+    setHistoryMaxIndex(hasExistingHistoryState ? Math.max(readHistoryMaxIndex(), initialIndex) : initialIndex);
+    if (!hasExistingHistoryState) {
+      sessionStorage.setItem(historyMaxIndexStorageKey, String(initialIndex));
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state as { section?: Section; index?: number } | null;
+      const nextSection = state?.section ?? sectionFromPath(window.location.pathname) ?? "libraries";
+      const nextIndex = typeof state?.index === "number" ? state.index : 0;
+      localStorage.setItem(sectionStorageKey, nextSection);
+      setSection(nextSection);
+      setHistoryIndex(nextIndex);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const selectSection = (nextSection: Section) => {
     localStorage.setItem(sectionStorageKey, nextSection);
-    setSection(nextSection);
+    if (nextSection === "libraries") {
+      setLibraryListViewVersion((value) => value + 1);
+    }
+    if (nextSection !== section) {
+      const nextIndex = historyIndex + 1;
+      window.history.pushState({ section: nextSection, index: nextIndex }, "", sectionPath(nextSection));
+      sessionStorage.setItem(historyMaxIndexStorageKey, String(nextIndex));
+      setHistoryIndex(nextIndex);
+      setHistoryMaxIndex(nextIndex);
+      setSection(nextSection);
+    } else {
+      void refreshAll();
+    }
   };
+
+  useEffect(() => {
+    if (signedIn) {
+      void refreshAll();
+    }
+  }, [section]);
+
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    localStorage.setItem(sidebarCollapsedStorageKey, String(next));
+    setSidebarCollapsed(next);
+  };
+
+  const withDesktopFrame = (content: ReactNode, navigationVisible = false) => (
+    <div className={`desktop-app-frame ${colorTheme === "dark" ? "theme-dark" : "theme-light"}`}>
+      <DesktopTitlebar
+        canNavigateBack={historyIndex > 0}
+        canNavigateForward={historyIndex < historyMaxIndex}
+        collapsed={sidebarCollapsed}
+        navigationVisible={navigationVisible}
+        t={t}
+        onNavigateBack={() => window.history.back()}
+        onNavigateForward={() => window.history.forward()}
+        onToggleSidebar={toggleSidebar}
+      />
+      <div className="desktop-app-content">{content}</div>
+    </div>
+  );
 
   const finishFirstLibrarySetup = async (libraryId?: string) => {
     if (libraryId) {
@@ -79,11 +149,11 @@ export function App() {
   };
 
   if (apiState === "loading" && needsOwner === null) {
-    return <AuthShell t={t} language={language} setLanguage={setLanguage} title={t("loading")} colorTheme={colorTheme} />;
+    return withDesktopFrame(<AuthShell t={t} language={language} setLanguage={setLanguage} title={t("loading")} colorTheme={colorTheme} />);
   }
 
   if (apiState === "unavailable" && !previewMode) {
-    return (
+    return withDesktopFrame(
       <AuthShell t={t} language={language} setLanguage={setLanguage} title={t("apiUnavailable")} colorTheme={colorTheme}>
         <div className="auth-note">{message}</div>
         <div className="auth-actions">
@@ -96,7 +166,14 @@ export function App() {
   }
 
   if ((needsOwner || showFirstLibrarySetup) && !previewMode) {
-    return (
+    if (needsOwner && !ownerSetupAllowed) {
+      return withDesktopFrame(
+        <AuthShell t={t} language={language} setLanguage={setLanguage} title={t("setupOnServerTitle")} colorTheme={colorTheme}>
+          <div className="auth-note">{t("setupOnServerHint")}</div>
+        </AuthShell>
+      );
+    }
+    return withDesktopFrame(
       <FirstRunSetup
         colorTheme={colorTheme}
         language={language}
@@ -114,7 +191,7 @@ export function App() {
   }
 
   if (!signedIn) {
-    return (
+    return withDesktopFrame(
       <AuthShell t={t} language={language} setLanguage={setLanguage} title={t("login")} colorTheme={colorTheme}>
         <LoginForm t={t} onDone={onAuthenticated} />
       </AuthShell>
@@ -145,18 +222,21 @@ export function App() {
     activityItems,
     libraryActivityItems,
     refreshAll,
+    resetAfterInitialization,
     navigateToSection: selectSection,
+    libraryListViewVersion,
     setMessage,
     previewMode
   };
 
-  return (
+  return withDesktopFrame(
     <AdminShell
       colorTheme={colorTheme}
       deploymentMode={deploymentMode}
       message={message}
       previewMode={previewMode}
       section={section}
+      sidebarCollapsed={sidebarCollapsed}
       serverInfo={serverInfo}
       serviceRunning={serviceRunning}
       t={t}
@@ -168,6 +248,17 @@ export function App() {
       onSetDeploymentMode={setDeploymentMode}
     >
       {renderSection(section, context)}
-    </AdminShell>
+    </AdminShell>,
+    true
   );
+}
+
+function readHistoryIndex() {
+  const state = window.history.state as { index?: number } | null;
+  return typeof state?.index === "number" ? state.index : 0;
+}
+
+function readHistoryMaxIndex() {
+  const stored = Number(sessionStorage.getItem(historyMaxIndexStorageKey));
+  return Number.isFinite(stored) && stored >= 0 ? stored : readHistoryIndex();
 }

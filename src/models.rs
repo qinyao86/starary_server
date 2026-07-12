@@ -137,7 +137,6 @@ pub struct UserWithPassword {
 pub struct LibraryRecord {
     pub id: String,
     pub display_name: String,
-    pub description: Option<String>,
     pub icon_url: Option<String>,
     pub enabled: bool,
     pub created_by_user_id: Uuid,
@@ -150,12 +149,11 @@ pub struct LibraryRecord {
 pub struct LibraryWithRole {
     pub id: String,
     pub display_name: String,
-    pub description: Option<String>,
     pub icon_url: Option<String>,
     pub enabled: bool,
     pub storage_locked_at: Option<DateTime<Utc>>,
     pub current_user_role: String,
-    pub creator_name: String,
+    pub library_manager_names: Vec<String>,
     pub member_names: Vec<String>,
     pub asset_count: i64,
     pub folder_count: i64,
@@ -181,6 +179,22 @@ pub struct LibraryStatusRecord {
     pub id: String,
     pub enabled: bool,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserLibraryMembershipRecord {
+    pub library_id: String,
+    pub library_name: String,
+    pub role: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserWithMemberships {
+    #[serde(flatten)]
+    pub user: UserRecord,
+    pub library_memberships: Vec<UserLibraryMembershipRecord>,
 }
 
 #[derive(Debug, FromRow, Serialize)]

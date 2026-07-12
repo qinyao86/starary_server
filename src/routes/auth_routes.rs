@@ -1,5 +1,5 @@
 use crate::{
-    auth::{issue_token, verify_password, AuthUser},
+    auth::{hash_password, issue_token, verify_password, AuthUser},
     error::{AppError, AppResult},
     models::UserWithPassword,
     routes::users::guards::ensure_unique_display_name,
@@ -7,6 +7,7 @@ use crate::{
 };
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use super::access::ensure_library_membership;
 
@@ -27,6 +28,13 @@ pub struct PresenceRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCurrentUserRequest {
     display_name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeCurrentUserPasswordRequest {
+    current_password: String,
+    new_password: String,
 }
 
 #[derive(Serialize)]
@@ -132,6 +140,54 @@ pub async fn update_me(
         display_name,
         role: user.role.to_string(),
     }))
+}
+
+pub async fn change_my_password(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(request): Json<ChangeCurrentUserPasswordRequest>,
+) -> AppResult<StatusCode> {
+    if request.new_password.len() < 8 {
+        return Err(AppError::BadRequest(
+            "password must be at least 8 characters".to_string(),
+        ));
+    }
+
+    let password_hash: String = sqlx::query_scalar("SELECT password_hash FROM users WHERE id = $1")
+        .bind(user.id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
+    if !verify_password(&request.current_password, &password_hash) {
+        return Err(AppError::Unauthorized);
+    }
+
+    let new_password_hash = hash_password(&request.new_password)?;
+    let mut tx = state.pool.begin().await?;
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET password_hash = $2, updated_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(user.id)
+    .bind(new_password_hash)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO activity_log (id, actor_user_id, action, target_type, target_id)
+        VALUES ($1, $2, 'user.password_changed', 'user', $2)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn update_presence(

@@ -8,7 +8,6 @@ export type Section =
   | "permissions"
   | "storage"
   | "statistics"
-  | "activity"
   | "backups"
   | "settings";
 
@@ -45,7 +44,9 @@ export type PageContext = TranslatorContext & {
   activityItems: ActivityItem[];
   libraryActivityItems: ActivityItem[];
   refreshAll: () => Promise<void>;
+  resetAfterInitialization: () => Promise<void>;
   navigateToSection: (section: Section) => void;
+  libraryListViewVersion: number;
   setMessage: (message: string | null) => void;
   previewMode: boolean;
 };

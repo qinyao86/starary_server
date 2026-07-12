@@ -1,6 +1,5 @@
 import type { PageContext, Section } from "../types";
 import {
-  ActivityPage,
   BackupsPage,
   LibrariesPage,
   PermissionsPage,
@@ -22,8 +21,6 @@ export function renderSection(section: Section, context: PageContext) {
       return <StoragePage {...context} />;
     case "statistics":
       return <StatisticsPage {...context} />;
-    case "activity":
-      return <ActivityPage {...context} />;
     case "backups":
       return <BackupsPage {...context} />;
     case "settings":
