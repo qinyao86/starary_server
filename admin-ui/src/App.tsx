@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { api } from "./api";
 import { AdminShell } from "./components/admin-shell";
 import { AuthShell, FirstRunSetup, LoginForm } from "./components/auth";
 import { DesktopTitlebar } from "./components/desktop-titlebar";
@@ -26,6 +27,7 @@ export function App() {
   const t = useMemo(() => createTranslator(language), [language]);
   const {
     activityItems,
+    authChecked,
     apiState,
     assetTotal,
     currentUser,
@@ -190,6 +192,10 @@ export function App() {
     );
   }
 
+  if (!authChecked) {
+    return withDesktopFrame(<AuthShell t={t} language={language} setLanguage={setLanguage} title={t("loading")} colorTheme={colorTheme} />);
+  }
+
   if (!signedIn) {
     return withDesktopFrame(
       <AuthShell t={t} language={language} setLanguage={setLanguage} title={t("login")} colorTheme={colorTheme}>
@@ -244,6 +250,7 @@ export function App() {
       onClearMessage={() => setMessage(null)}
       onLogout={logout}
       onRefresh={refreshAll}
+      onCreateBrowserHandoff={() => token ? api.createBrowserHandoff(token).then((response) => response.code) : Promise.resolve(null)}
       onSelectSection={selectSection}
       onSetDeploymentMode={setDeploymentMode}
     >

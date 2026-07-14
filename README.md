@@ -73,10 +73,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-status.ps1
 
 ## Windows Desktop Release
 
-The desktop installer is the default deployment for a LAN host. It provides a
-Tauri management window, starts the server and bundled PostgreSQL without a
-console window, and prevents duplicate service instances on the same machine.
-The NSIS installer supports both current-user and all-users installation.
+The desktop installer is the default deployment for a LAN host. Its compact
+Tauri control center starts, stops, restarts, and diagnoses the server and
+opens the administration UI in the system browser. Closing the window hides it
+to the system tray; exiting the tray application leaves the server running.
+Stopping the server is an explicit control-center action and also shuts down
+the bundled PostgreSQL cleanly.
+
+The control center persists a local installation identity and only manages a
+server that proves it has the matching identity and control token. It does not
+take over an unrelated process on the configured port. Both the control center
+and each machine data directory are single-instance. The NSIS installer
+supports both current-user and all-users installation.
 
 ```powershell
 npm run release:windows

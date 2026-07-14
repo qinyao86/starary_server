@@ -33,12 +33,11 @@ pub struct CreateDefaultStorageRootRequest {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateLibraryRequest {
     #[serde(alias = "name")]
     pub display_name: String,
     pub icon_url: Option<String>,
-    pub storage_binding: Option<StorageBindingRequest>,
 }
 
 #[derive(Deserialize)]
@@ -52,4 +51,18 @@ pub struct UpdateLibraryEnabledRequest {
 pub struct DeleteLibraryRequest {
     #[serde(default)]
     pub delete_files: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UpdateLibraryRequest;
+
+    #[test]
+    fn update_library_request_rejects_storage_binding() {
+        let result = serde_json::from_str::<UpdateLibraryRequest>(
+            r#"{"displayName":"Design","storageBinding":{"connectionId":"00000000-0000-0000-0000-000000000000"}}"#,
+        );
+
+        assert!(result.is_err());
+    }
 }

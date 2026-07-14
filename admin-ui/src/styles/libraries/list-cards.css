@@ -30,9 +30,22 @@
 
 .library-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 390px));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 360px));
   justify-content: center;
   gap: 16px;
+}
+
+.library-list-page-frame > :not(.page-intro):not(.dialog-backdrop) {
+  width: min(100%, 1500px);
+}
+
+.library-list-page-frame {
+  min-height: 100%;
+}
+
+.library-list-page-frame > .library-page {
+  flex: 1;
+  min-height: 360px;
 }
 
 .library-card {
@@ -117,7 +130,7 @@
 
 .library-card-path-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   margin-top: 10px;
@@ -199,18 +212,17 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid transparent;
   border-radius: 7px;
   color: #475569;
-  background: rgba(255, 255, 255, 0.72);
+  background: transparent;
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
 }
 
 .library-card-storage-tool:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.34);
   color: #1d4ed8;
-  background: #ffffff;
+  background: rgba(148, 163, 184, 0.12);
 }
 
 .library-card-storage-tool:disabled {
@@ -284,10 +296,6 @@
   }
 
   .library-card-path-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .library-card-storage-kind {
-    display: none;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
   }
 }

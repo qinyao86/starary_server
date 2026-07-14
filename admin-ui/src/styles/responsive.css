@@ -43,6 +43,15 @@
 }
 
 @media (max-width: 760px) {
+  .management-empty-state {
+    min-height: 320px;
+    padding: 32px 18px 48px;
+  }
+
+  .management-empty-state img {
+    width: 210px;
+  }
+
   .content {
     padding: 18px 12px;
   }

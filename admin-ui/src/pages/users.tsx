@@ -1,12 +1,17 @@
 import { useMemo, useState } from "react";
-import { Pencil, Power, Search, UserPlus } from "lucide-react";
+import { Pencil, Plus, Power, Search, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TeamUser } from "../api";
 import { api } from "../api";
 import type { PageContext } from "../types";
 import { PageFrame, StatusDot } from "../components/common";
 import { UserDialog, UserLibraryAccessDialog } from "../components/dialogs";
+import { defaultNewUserPassword } from "../constants";
 import { canManageServerRole, formatDateTime, isUserOnline, roleLabel } from "../utils/format";
+
+function emailPrefix(value: string) {
+  return value.trim().split("@", 1)[0] ?? "";
+}
 
 export function UsersPage({ t, token, users, currentUser, libraries, refreshAll, setMessage }: PageContext) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -18,10 +23,11 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
   const [isActive, setIsActive] = useState(true);
   const [libraryRoles, setLibraryRoles] = useState<Record<string, string>>({});
   const [libraryAccessManageOpen, setLibraryAccessManageOpen] = useState(false);
+  const [libraryAccessTarget, setLibraryAccessTarget] = useState<TeamUser | null>(null);
   const [query, setQuery] = useState("");
 
   const canManageUsers = canManageServerRole(currentUser?.role ?? "");
-  const canAssignOwner = currentUser?.role === "owner";
+  const canManageAccountIdentity = currentUser?.role === "owner";
   const onlineUserCount = useMemo(() => users.filter((item) => isUserOnline(item)).length, [users]);
   const filteredUsers = useMemo(() => {
     const value = query.trim().toLocaleLowerCase();
@@ -58,20 +64,64 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
     setEmail(user.email);
     setPassword("");
     setDisplayName(user.displayName);
-    setRole(user.globalRole);
+    setRole(user.globalRole === "owner" || user.globalRole === "admin" ? user.globalRole : "viewer");
     setIsActive(user.isActive);
     setLibraryRoles(Object.fromEntries((user.libraryMemberships ?? []).map((membership) => [membership.libraryId, membership.role])));
     setDialogOpen(true);
   };
 
+  const userLibraryRoles = (user: TeamUser) =>
+    Object.fromEntries((user.libraryMemberships ?? []).map((membership) => [membership.libraryId, membership.role]));
+
+  const libraryMembershipsFromRoles = (roles: Record<string, string>) =>
+    libraries.flatMap((library) => {
+      const membershipRole = roles[library.id] ?? "";
+      return membershipRole ? [{ libraryId: library.id, role: membershipRole }] : [];
+    });
+
+  const openLibraryAccessDialog = (user: TeamUser) => {
+    setLibraryAccessTarget(user);
+    setLibraryRoles(userLibraryRoles(user));
+    setLibraryAccessManageOpen(true);
+  };
+
+  const closeLibraryAccessDialog = () => {
+    setLibraryAccessManageOpen(false);
+    setLibraryAccessTarget(null);
+  };
+
   const closeDialog = () => {
     setDialogOpen(false);
     setLibraryAccessManageOpen(false);
+    setLibraryAccessTarget(null);
+  };
+
+  const saveLibraryAccess = async (roles: Record<string, string>) => {
+    if (!libraryAccessTarget) {
+      setLibraryRoles(roles);
+      return true;
+    }
+    if (!token) {
+      setMessage(t("plannedNote"));
+      return false;
+    }
+    try {
+      await api.updateUser(token, libraryAccessTarget.id, {
+        libraryMemberships: libraryMembershipsFromRoles(roles)
+      });
+      setLibraryRoles(roles);
+      setMessage(t("saved"));
+      await refreshAll();
+      return true;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+      return false;
+    }
   };
 
   const submitUser = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!editingUser && (!email.trim() || !password.trim())) {
+    if (!editingUser && !email.trim()) {
       setMessage(t("formRequiredHint"));
       return;
     }
@@ -80,10 +130,7 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
       return;
     }
     try {
-      const libraryMemberships = libraries.flatMap((library) => {
-        const membershipRole = libraryRoles[library.id] ?? "";
-        return membershipRole ? [{ libraryId: library.id, role: membershipRole }] : [];
-      });
+      const libraryMemberships = libraryMembershipsFromRoles(libraryRoles);
       if (editingUser) {
         await api.updateUser(token, editingUser.id, {
           displayName: displayName.trim() || undefined,
@@ -95,8 +142,8 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
       } else {
         await api.createUser(token, {
           email: email.trim(),
-          password,
-          displayName: displayName.trim() || undefined,
+          password: defaultNewUserPassword,
+          displayName: displayName.trim() || emailPrefix(email),
           role,
           libraryMemberships
         });
@@ -139,6 +186,7 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
       }
     >
       <UserDialog
+        canManageAccountIdentity={canManageAccountIdentity}
         displayName={displayName}
         editingUser={editingUser}
         email={email}
@@ -147,22 +195,28 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
         libraryRoles={libraryRoles}
         open={dialogOpen}
         password={password}
+        role={role}
         t={t}
         onClose={closeDialog}
         onDisplayNameChange={setDisplayName}
         onEmailChange={setEmail}
         onIsActiveChange={setIsActive}
-        onLibraryAccessManageOpen={() => setLibraryAccessManageOpen(true)}
+        onLibraryAccessManageOpen={() => {
+          setLibraryAccessTarget(null);
+          setLibraryAccessManageOpen(true);
+        }}
         onPasswordChange={setPassword}
+        onRoleChange={setRole}
         onSubmit={submitUser}
       />
       <UserLibraryAccessDialog
         libraries={libraries}
         libraryRoles={libraryRoles}
         open={libraryAccessManageOpen}
+        subject={libraryAccessTarget?.displayName ?? editingUser?.displayName}
         t={t}
-        onClose={() => setLibraryAccessManageOpen(false)}
-        onSave={setLibraryRoles}
+        onClose={closeLibraryAccessDialog}
+        onSave={saveLibraryAccess}
       />
       <section className="management-list-card users-surface">
         <div className="users-toolbar">
@@ -178,8 +232,7 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
               <tr>
                 <th className="users-identity-column">{t("users")}</th>
                 <th className="users-libraries-column">{t("libraryAccess")}</th>
-                <th className="users-activity-column">{t("lastActive")}</th>
-                <th className="users-login-column">{t("lastLogin")}</th>
+                <th className="users-activity-column">{t("recentActivity")}</th>
                 <th className="users-status-column">{t("status")}</th>
                 <th className="users-actions-column">{t("action")}</th>
               </tr>
@@ -187,63 +240,80 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>{t("empty")}</td>
+                  <td colSpan={5}>{t("noSearchResults")}</td>
                 </tr>
-              ) : (
-                filteredUsers.map((item) => {
-                  const isOwnerUser = item.globalRole === "owner";
-                  const canEditUser = canManageUsers && (canAssignOwner || !isOwnerUser);
+              ) : filteredUsers.map((item) => {
+                  const hasGlobalLibraryAccess = item.globalRole === "owner" || item.globalRole === "admin";
+                  const canEditUser = canManageUsers && (canManageAccountIdentity || !hasGlobalLibraryAccess);
                   const online = isUserOnline(item);
+                  const activityTime = online ? item.lastSeenAt : item.lastLoginAt;
+                  const activityLabel = online ? t("lastActive") : t("lastLogin");
                   return (
                     <tr key={item.id}>
                       <td className="users-identity-column">
                         <div className="user-identity-cell">
                           <div className="user-identity-heading">
                             <strong>{item.displayName}</strong>
-                            <em>{roleLabel(t, item.globalRole)}</em>
+                            {(item.globalRole === "owner" || item.globalRole === "admin") && (
+                              <em className={`is-${item.globalRole}`}>{roleLabel(t, item.globalRole)}</em>
+                            )}
                           </div>
                           <span>{item.email}</span>
                         </div>
                       </td>
                       <td className="users-libraries-column">
-                        <div
-                          className="user-library-access"
-                          title={(item.globalRole === "owner" || item.globalRole === "admin")
-                            ? t("serverRoleGrantsAllLibraries")
-                            : (item.libraryMemberships ?? []).map((membership) => `${membership.libraryName}: ${roleLabel(t, membership.role)}`).join("\n")}
-                        >
-                          {item.globalRole === "owner" || item.globalRole === "admin" ? (
-                            <span className="user-library-chip is-global">
-                              <strong>{t("allLibraries")}</strong>
-                              <em>{roleLabel(t, item.globalRole)}</em>
-                            </span>
-                          ) : (item.libraryMemberships ?? []).length === 0 ? (
-                            <span className="user-library-empty">{t("noLibraryAccess")}</span>
-                          ) : (
-                            <>
-                              {(item.libraryMemberships ?? []).slice(0, 2).map((membership) => (
-                                <span className="user-library-chip" key={membership.libraryId}>
-                                  <strong>{membership.libraryName}</strong>
-                                  <em>{roleLabel(t, membership.role)}</em>
-                                </span>
-                              ))}
-                              {(item.libraryMemberships ?? []).length > 2 && (
-                                <span className="user-library-more">+{(item.libraryMemberships ?? []).length - 2}</span>
-                              )}
-                            </>
+                        <div className="user-library-access-cell">
+                          <div
+                            className="user-library-access"
+                            title={hasGlobalLibraryAccess
+                              ? t("serverRoleGrantsAllLibraries")
+                              : (item.libraryMemberships ?? []).map((membership) => `${membership.libraryName}: ${roleLabel(t, membership.role)}`).join("\n")}
+                          >
+                            {hasGlobalLibraryAccess ? (
+                              <span className="user-library-chip is-global">
+                                <strong>{t("allLibraries")}</strong>
+                              </span>
+                            ) : (item.libraryMemberships ?? []).length === 0 ? (
+                              null
+                            ) : (
+                              <>
+                                {(item.libraryMemberships ?? []).slice(0, 2).map((membership) => (
+                                  <span className="user-library-chip" key={membership.libraryId}>
+                                    <strong>{membership.libraryName}</strong>
+                                    <em>{roleLabel(t, membership.role)}</em>
+                                  </span>
+                                ))}
+                                {(item.libraryMemberships ?? []).length > 2 && (
+                                  <span className="user-library-more">+{(item.libraryMemberships ?? []).length - 2}</span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          {!hasGlobalLibraryAccess && (
+                            <Button
+                              className="user-library-access-button"
+                              disabled={!canEditUser || libraries.length === 0}
+                              size="icon"
+                              title={t("manageLibraryAccess")}
+                              aria-label={t("manageLibraryAccess")}
+                              type="button"
+                              variant="ghost"
+                              onClick={() => openLibraryAccessDialog(item)}
+                            >
+                              <Plus size={14} />
+                            </Button>
                           )}
                         </div>
                       </td>
                       <td className="users-activity-column">
-                        <div className="user-activity-state" title={formatDateTime(item.lastSeenAt)}>
+                        <div className="user-activity-state" title={`${activityLabel}: ${formatDateTime(activityTime)}`}>
                           <span className={`user-state${online ? " is-on" : " is-off"}`}>
                             <span aria-hidden="true" />
                             {online ? t("online") : t("offline")}
                           </span>
-                          <time>{formatDateTime(item.lastSeenAt)}</time>
+                          <time>{formatDateTime(activityTime)}</time>
                         </div>
                       </td>
-                      <td className="users-login-column">{formatDateTime(item.lastLoginAt)}</td>
                       <td className="users-status-column">
                         <span className={`user-state${item.isActive ? " is-on" : " is-off"}`}>
                           <span aria-hidden="true" />
@@ -262,8 +332,7 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
                       </td>
                     </tr>
                   );
-                })
-              )}
+                })}
             </tbody>
           </table>
         </div>

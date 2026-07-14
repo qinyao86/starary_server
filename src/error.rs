@@ -20,8 +20,6 @@ pub enum AppError {
     Conflict(String),
     #[error("storage location conflicts with another library: {0}")]
     StorageLocationConflict(String),
-    #[error("storage migration is required: {0}")]
-    StorageMigrationRequired(String),
     #[error("library is temporarily closed")]
     LibraryDisabled(String),
     #[error(transparent)]
@@ -51,9 +49,7 @@ impl IntoResponse for AppError {
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
-            AppError::StorageLocationConflict(_) | AppError::StorageMigrationRequired(_) => {
-                StatusCode::CONFLICT
-            }
+            AppError::StorageLocationConflict(_) => StatusCode::CONFLICT,
             AppError::LibraryDisabled(_) => StatusCode::LOCKED,
             AppError::Database(_)
             | AppError::Jwt(_)
@@ -64,7 +60,6 @@ impl IntoResponse for AppError {
         let code = match &self {
             AppError::LibraryDisabled(_) => Some("library_disabled"),
             AppError::StorageLocationConflict(_) => Some("storage_location_conflict"),
-            AppError::StorageMigrationRequired(_) => Some("storage_migration_required"),
             _ => None,
         };
         let library_id = match &self {

@@ -1,134 +1,306 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{
-    env,
-    fs::{self, File},
-    io::Write,
-    path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
-    sync::{Arc, Mutex},
-    thread,
-    time::{Duration, Instant},
-};
+mod managed_service;
+mod tray;
+
+use managed_service::{ManagedService, ServiceStatus};
+use std::{env, fs, path::PathBuf, sync::Arc};
 use tauri::Manager;
-use url::Url;
-use uuid::Uuid;
-
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-const DEFAULT_SERVER_PORT: u16 = 3789;
-
-#[derive(Clone)]
-struct ServerProcess {
-    child: Arc<Mutex<Option<Child>>>,
-    port: u16,
-    control_token: String,
-}
-
-impl ServerProcess {
-    fn stop(&self) {
-        request_server_shutdown(self.port, &self.control_token);
-        let deadline = Instant::now() + Duration::from_secs(12);
-        while Instant::now() < deadline {
-            let exited = self
-                .child
-                .lock()
-                .ok()
-                .and_then(|mut child| child.as_mut().and_then(|child| child.try_wait().ok()))
-                .flatten()
-                .is_some();
-            if exited {
-                return;
-            }
-            thread::sleep(Duration::from_millis(150));
-        }
-        if let Ok(mut child) = self.child.lock() {
-            if let Some(child) = child.as_mut() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-        }
-    }
-}
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 
 fn main() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            get_service_status,
+            start_service,
+            stop_service,
+            restart_service,
+            change_service_port,
+            change_log_directory,
+            select_log_directory,
+            open_admin,
+            open_data_directory,
+            open_log,
+            set_control_center_language,
+        ])
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            write_control_center_log("single-instance activation");
+            tray::show_main_window(app);
         }))
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            tray::MENU_SHOW => tray::show_main_window(app),
+            tray::MENU_OPEN_ADMIN => {
+                if let Some(service) = app.try_state::<Arc<ManagedService>>() {
+                    if service.status().state == "running" {
+                        let _ = app
+                            .opener()
+                            .open_url(service.status().admin_url, None::<&str>);
+                    } else {
+                        tray::show_main_window(app);
+                    }
+                }
+            }
+            tray::MENU_TOGGLE_SERVICE => toggle_service_from_tray(app),
+            tray::MENU_EXIT => app.exit(0),
+            _ => {}
+        })
         .setup(|app| {
             let resources = runtime_resources(app.handle())?;
             let data_home = machine_data_home()?;
             fs::create_dir_all(data_home.join("logs"))?;
-            let port = configured_server_port(&data_home).unwrap_or(DEFAULT_SERVER_PORT);
-            let control_token = Uuid::new_v4().simple().to_string();
-            let child = spawn_server(&resources, &data_home, &control_token)?;
-            let process = ServerProcess {
-                child: Arc::new(Mutex::new(Some(child))),
-                port,
-                control_token,
-            };
-            app.manage(process.clone());
-
-            let app_handle = app.handle().clone();
-            thread::spawn(move || {
-                if wait_for_server(port, &process.child, Duration::from_secs(45)) {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        if let Ok(url) = Url::parse(&format!("http://127.0.0.1:{port}/admin/")) {
-                            let _ = window.navigate(url);
+            let service =
+                Arc::new(ManagedService::new(resources, data_home).map_err(std::io::Error::other)?);
+            app.manage(service.clone());
+            write_control_center_log("control center setup completed");
+            let status = service.status();
+            tray::install(app.handle(), &status)?;
+            if service.should_start_automatically() && status.state == "stopped" {
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    if !tray::begin_service_action(&app_handle) {
+                        return;
+                    }
+                    match service.start() {
+                        Ok(status) => {
+                            write_control_center_log("automatic service start completed");
+                            tray::finish_service_action(&app_handle, &status);
+                        }
+                        Err(error) => {
+                            write_control_center_log(&format!(
+                                "automatic service start failed: {error}"
+                            ));
+                            tray::finish_service_action(&app_handle, &service.status());
                         }
                     }
-                    wait_for_process_exit(&process.child);
-                    app_handle.exit(0);
-                } else {
-                    show_startup_error(&app_handle, &data_home);
-                }
-            });
+                });
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == "main"
-                && matches!(event, tauri::WindowEvent::CloseRequested { .. })
-            {
-                if let Some(process) = window.app_handle().try_state::<ServerProcess>() {
-                    process.stop();
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    write_control_center_log("main window close requested; hiding to tray");
+                    api.prevent_close();
+                    let _ = window.hide();
                 }
             }
         })
         .run(tauri::generate_context!())
-        .expect("failed to run Mad Library Server desktop shell");
+        .expect("failed to run Mad Library Server control center");
 }
 
-fn wait_for_process_exit(child: &Arc<Mutex<Option<Child>>>) {
-    loop {
-        let exited = child
-            .lock()
-            .ok()
-            .and_then(|mut child| child.as_mut().and_then(|child| child.try_wait().ok()))
-            .flatten()
-            .is_some();
-        if exited {
-            return;
+#[tauri::command]
+fn get_service_status(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> ServiceStatus {
+    let status = service.status();
+    tray::sync_service_action(&app, &status);
+    status
+}
+
+#[tauri::command]
+async fn start_service(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<ServiceStatus, String> {
+    run_service_task(app, service.inner().clone(), |service| service.start()).await
+}
+
+#[tauri::command]
+async fn stop_service(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<ServiceStatus, String> {
+    run_service_task(app, service.inner().clone(), |service| service.stop()).await
+}
+
+#[tauri::command]
+async fn restart_service(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<ServiceStatus, String> {
+    run_service_task(app, service.inner().clone(), |service| service.restart()).await
+}
+
+#[tauri::command]
+fn change_service_port(
+    port: u16,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<ServiceStatus, String> {
+    service.update_port(port)?;
+    Ok(service.status())
+}
+
+#[tauri::command]
+fn change_log_directory(
+    directory: String,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<ServiceStatus, String> {
+    service.update_log_directory(PathBuf::from(directory))?;
+    Ok(service.status())
+}
+
+#[tauri::command]
+fn select_log_directory(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<Option<ServiceStatus>, String> {
+    if service.status().state == "running" {
+        return Err("请先停止服务，再修改日志目录。".to_string());
+    }
+    let Some(directory) = app.dialog().file().blocking_pick_folder() else {
+        return Ok(None);
+    };
+    service.update_log_directory(directory.into_path().map_err(|error| error.to_string())?)?;
+    Ok(Some(service.status()))
+}
+
+#[tauri::command]
+fn open_admin(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<(), String> {
+    let status = service.status();
+    if status.state != "running" || !status.managed {
+        return Err("服务尚未运行。".to_string());
+    }
+    app.opener()
+        .open_url(status.admin_url, None::<&str>)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn open_data_directory(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<(), String> {
+    app.opener()
+        .open_path(service.data_home().display().to_string(), None::<&str>)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn open_log(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<(), String> {
+    let target = service.log_path();
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&target)
+        .map_err(|error| error.to_string())?;
+    app.opener()
+        .open_path(target.display().to_string(), None::<&str>)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_control_center_language(
+    language: String,
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<(), String> {
+    tray::set_language(&app, &language, &service.status())
+}
+
+async fn run_service_task<F>(
+    app: tauri::AppHandle,
+    service: Arc<ManagedService>,
+    action: F,
+) -> Result<ServiceStatus, String>
+where
+    F: FnOnce(&ManagedService) -> Result<ServiceStatus, String> + Send + 'static,
+{
+    if !tray::begin_service_action(&app) {
+        return Err("服务操作正在进行中。".to_string());
+    }
+    run_reserved_service_task(app, service, action).await
+}
+
+async fn run_reserved_service_task<F>(
+    app: tauri::AppHandle,
+    service: Arc<ManagedService>,
+    action: F,
+) -> Result<ServiceStatus, String>
+where
+    F: FnOnce(&ManagedService) -> Result<ServiceStatus, String> + Send + 'static,
+{
+    let worker = service.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || action(&worker)).await;
+    match result {
+        Ok(Ok(status)) => {
+            tray::finish_service_action(&app, &status);
+            Ok(status)
         }
-        thread::sleep(Duration::from_millis(250));
+        Ok(Err(error)) => {
+            tray::finish_service_action(&app, &service.status());
+            Err(error)
+        }
+        Err(error) => {
+            tray::finish_service_action(&app, &service.status());
+            Err(error.to_string())
+        }
     }
 }
 
-fn runtime_resources(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn toggle_service_from_tray(app: &tauri::AppHandle) {
+    let Some(service) = app.try_state::<Arc<ManagedService>>() else {
+        return;
+    };
+    let status = service.status();
+    if status.state == "conflict" || !tray::begin_service_action(app) {
+        tray::sync_service_action(app, &status);
+        return;
+    }
+
+    let should_stop = status.state == "running" && status.managed;
+    let app_handle = app.clone();
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn(async move {
+        let result = run_reserved_service_task(app_handle.clone(), service, move |service| {
+            if should_stop {
+                service.stop()
+            } else {
+                service.start()
+            }
+        })
+        .await;
+        match result {
+            Ok(_) => write_control_center_log(if should_stop {
+                "tray service stop completed"
+            } else {
+                "tray service start completed"
+            }),
+            Err(error) => {
+                write_control_center_log(&format!("tray service action failed: {error}"));
+                tray::show_main_window(&app_handle);
+            }
+        }
+    });
+}
+
+fn runtime_resources(_app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Ok(override_path) = env::var("MADLIBRARY_DESKTOP_RUNTIME") {
         return Ok(normalize_windows_path(PathBuf::from(override_path)));
     }
+    #[cfg(debug_assertions)]
+    {
+        return Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("target")
+            .join("desktop-runtime"));
+    }
+    #[cfg(not(debug_assertions))]
     Ok(normalize_windows_path(
-        app.path().resource_dir()?.join("runtime"),
+        _app.path().resource_dir()?.join("runtime"),
     ))
 }
 
@@ -161,112 +333,20 @@ fn machine_data_home() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Ok(env::current_dir()?.join(".madlibrary-server"))
 }
 
-fn spawn_server(
-    resources: &Path,
-    data_home: &Path,
-    control_token: &str,
-) -> Result<Child, Box<dyn std::error::Error>> {
-    let server = resources.join("madlibrary-server.exe");
-    let postgres = resources.join("postgresql");
-    let admin_ui = resources.join("admin-ui");
-    let log_path = data_home.join("logs").join("server.log");
-    let stdout = File::options().create(true).append(true).open(&log_path)?;
-    let stderr = stdout.try_clone()?;
-
-    let mut command = Command::new(server);
-    command
-        .env("MADLIBRARY_HOME", data_home)
-        .env("MADLIBRARY_POSTGRES_HOME", postgres)
-        .env(
-            "MADLIBRARY_POSTGRES_BIN_DIR",
-            resources.join("postgresql").join("bin"),
-        )
-        .env("MADLIBRARY_ADMIN_ASSETS_DIR", admin_ui)
-        .env("MADLIBRARY_DESKTOP_CONTROL_TOKEN", control_token)
-        .stdin(Stdio::null())
-        .stdout(Stdio::from(stdout))
-        .stderr(Stdio::from(stderr));
-    #[cfg(windows)]
-    command.creation_flags(CREATE_NO_WINDOW);
-    Ok(command.spawn()?)
-}
-
-fn configured_server_port(data_home: &Path) -> Option<u16> {
-    let bytes = fs::read(data_home.join("data").join("config").join("runtime.json")).ok()?;
-    let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    value
-        .get("serverPort")?
-        .as_u64()
-        .and_then(|port| u16::try_from(port).ok())
-}
-
-fn wait_for_server(port: u16, child: &Arc<Mutex<Option<Child>>>, timeout: Duration) -> bool {
-    let deadline = Instant::now() + timeout;
-    while Instant::now() < deadline {
-        if http_request(port, "GET", "/health", &[]).is_ok() {
-            return true;
-        }
-        if child
-            .lock()
-            .ok()
-            .and_then(|mut child| child.as_mut().and_then(|child| child.try_wait().ok()))
-            .flatten()
-            .is_some()
-        {
-            return false;
-        }
-        thread::sleep(Duration::from_millis(250));
-    }
-    false
-}
-
-fn request_server_shutdown(port: u16, token: &str) {
-    let header = format!("X-MadLibrary-Control-Token: {token}");
-    let _ = http_request(port, "POST", "/api/v1/server/desktop/shutdown", &[header]);
-}
-
-fn http_request(port: u16, method: &str, path: &str, headers: &[String]) -> std::io::Result<()> {
-    use std::io::Read;
-    use std::net::TcpStream;
-    let mut stream = TcpStream::connect_timeout(
-        &format!("127.0.0.1:{port}")
-            .parse()
-            .expect("valid local address"),
-        Duration::from_millis(500),
-    )?;
-    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
-    let mut request = format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\nContent-Length: 0\r\n");
-    for header in headers {
-        request.push_str(header);
-        request.push_str("\r\n");
-    }
-    request.push_str("\r\n");
-    stream.write_all(request.as_bytes())?;
-    let mut response = String::new();
-    stream.read_to_string(&mut response)?;
-    if response.starts_with("HTTP/1.1 2") || response.starts_with("HTTP/1.0 2") {
-        Ok(())
-    } else {
-        Err(std::io::Error::other("server returned an error"))
-    }
-}
-
-fn show_startup_error(app: &tauri::AppHandle, data_home: &Path) {
-    if let Some(window) = app.get_webview_window("main") {
-        let log = data_home.join("logs").join("server.log");
-        let escaped = log
-            .display()
-            .to_string()
-            .replace('\\', "\\\\")
-            .replace('`', "\\`");
-        /*
-            "document.querySelector('h1').textContent='服务启动失败';document.querySelector('p').textContent=`请检查日志：{escaped}`;document.querySelector('.progress').style.display='none';"
-        );
-        */
-        let script = format!(
-            "document.querySelector('h1').textContent='\u{670d}\u{52a1}\u{542f}\u{52a8}\u{5931}\u{8d25}';document.querySelector('p').textContent=`\u{8bf7}\u{68c0}\u{67e5}\u{65e5}\u{5fd7}\u{ff1a}{escaped}`;document.querySelector('.progress').style.display='none';"
-        );
-        let _ = window.eval(&script);
+fn write_control_center_log(message: &str) {
+    let Ok(data_home) = machine_data_home() else {
+        return;
+    };
+    let logs = managed_service::configured_log_directory(&data_home);
+    let _ = fs::create_dir_all(&logs);
+    let path = logs.join("control-center.log");
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| value.as_secs())
+        .unwrap_or_default();
+    use std::io::Write;
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{timestamp} {message}");
     }
 }
 
@@ -275,7 +355,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn normalizes_extended_drive_path_for_postgres() {
+    fn normalizes_extended_drive_path() {
         assert_eq!(
             normalize_windows_path(PathBuf::from(
                 r"\\?\C:\Program Files\Mad Library Server\runtime"

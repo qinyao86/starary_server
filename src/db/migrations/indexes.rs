@@ -49,6 +49,10 @@ pub(super) async fn create_indexes(tx: &mut MigrationTx<'_>) -> anyhow::Result<(
         .await?;
     tx.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_storage_connections_name ON storage_connections(lower(name));")
         .await?;
+    tx.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_storage_connections_single_default ON storage_connections(is_default) WHERE is_default;",
+    )
+    .await?;
     tx.execute("CREATE INDEX IF NOT EXISTS idx_storage_roots_connection_id ON storage_roots(storage_connection_id);")
         .await?;
     tx.execute(

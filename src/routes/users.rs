@@ -116,7 +116,7 @@ pub async fn create_user(
     }
 
     let role = request.role.unwrap_or(Role::Viewer);
-    if role == Role::Owner && actor.role != Role::Owner {
+    if role.can_manage_server() && actor.role != Role::Owner {
         return Err(AppError::Forbidden);
     }
 
@@ -214,7 +214,7 @@ pub async fn update_user(
         .map_err(|_| AppError::Internal(anyhow::anyhow!("stored user role is invalid")))?;
 
     if actor.role != Role::Owner
-        && (current_role == Role::Owner || request.role == Some(Role::Owner))
+        && (current_role.can_manage_server() || request.role.is_some_and(Role::can_manage_server))
     {
         return Err(AppError::Forbidden);
     }

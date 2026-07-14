@@ -62,11 +62,7 @@
 }
 
 .users-table .users-activity-column {
-  width: 180px;
-}
-
-.users-table .users-login-column {
-  width: 150px;
+  width: 210px;
 }
 
 .users-table .users-status-column {
@@ -93,18 +89,59 @@
 
 .user-identity-heading em {
   flex: 0 0 auto;
-  color: #526071;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 0 6px;
   font-size: 11px;
   font-style: normal;
   font-weight: 650;
+  line-height: 1;
+}
+
+.user-identity-heading em.is-owner {
+  border-color: #e9d29c;
+  color: #8a5a08;
+  background: #fff7df;
+}
+
+.user-identity-heading em.is-admin {
+  border-color: #c8d9f5;
+  color: #245aa5;
+  background: #edf4ff;
+}
+
+.user-library-access-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
 }
 
 .user-library-access {
   display: flex;
   align-items: center;
+  flex: 0 1 auto;
   min-width: 0;
   gap: 6px;
   overflow: hidden;
+}
+
+.user-library-access-button {
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  color: #697586;
+  background: #efefed;
+  box-shadow: none;
+}
+
+.user-library-access-button:hover {
+  color: #1f2937;
+  background: #e5e5e2;
 }
 
 .user-library-chip {
@@ -380,9 +417,20 @@
 }
 
 .theme-dark .users-search input::placeholder,
-.theme-dark .user-identity-heading em,
 .theme-dark .user-library-inherited {
   color: #a1a1aa;
+}
+
+.theme-dark .user-identity-heading em.is-owner {
+  border-color: rgba(245, 190, 76, 0.28);
+  color: #f2ca72;
+  background: rgba(245, 190, 76, 0.12);
+}
+
+.theme-dark .user-identity-heading em.is-admin {
+  border-color: rgba(96, 165, 250, 0.28);
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.14);
 }
 
 .theme-dark .user-activity-state time,
@@ -564,7 +612,7 @@
   }
 
   .users-table .users-activity-column {
-    width: 180px;
+    width: 190px;
   }
 
   .users-table .users-status-column {
@@ -575,9 +623,16 @@
     width: 84px;
   }
 
-  .users-table .users-login-column {
-    display: none;
-  }
+}
+
+.theme-dark .user-library-access-button {
+  color: #a1a1aa;
+  background: #2f2f33;
+}
+
+.theme-dark .user-library-access-button:hover {
+  color: #fafafa;
+  background: #3f3f46;
 }
 
 @media (max-width: 760px) {

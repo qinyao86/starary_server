@@ -101,7 +101,11 @@ export type StorageConnection = {
   macosSmbUrl?: string | null;
   macosMountAliases: string[];
   enabled: boolean;
+  isDefault: boolean;
   libraryCount: number;
+  libraryNames: string[];
+  assetCount: number;
+  totalSizeBytes: number;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -115,6 +119,15 @@ export type StorageConnectionInput = {
   windowsMappedDriveAliases?: string[];
   macosSmbUrl?: string;
   macosMountAliases?: string[];
+};
+
+export type StorageMigrationResult = {
+  connection: StorageConnection;
+  migratedLibraryCount: number;
+  migratedAssetCount: number;
+  estimatedSizeBytes: number;
+  previousLocation: string;
+  currentLocation: string;
 };
 
 export type TeamUser = {

@@ -33,6 +33,41 @@
   border-bottom: 0;
 }
 
+.management-empty-page-frame {
+  min-height: 100%;
+}
+
+.management-empty-state {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: clamp(340px, calc(100vh - 210px), 620px);
+  padding: 48px 24px 72px;
+  opacity: 0.6;
+  text-align: center;
+}
+
+.management-empty-state img {
+  display: block;
+  width: clamp(210px, 20vw, 270px);
+  max-width: 72vw;
+  height: auto;
+}
+
+.management-empty-state strong {
+  color: #526071;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 20px;
+}
+
+.theme-dark .management-empty-state strong {
+  color: #a1a1aa;
+}
+
 .theme-dark .management-list-card {
   border-color: var(--admin-card-border);
   background: var(--admin-card-background);

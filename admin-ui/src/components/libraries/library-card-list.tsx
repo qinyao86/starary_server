@@ -1,9 +1,11 @@
 import { Copy, HardDrive, Images, UserRound, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import emptyLibraryIllustration from "../../assets/empty-library.svg";
 import type { TeamLibrary } from "../../api";
 import type { TranslatorContext } from "../../types";
 import { formatBytes, formatCount, formatMemberNames, storageKindLabel } from "../../utils/format";
+import { EmptyState } from "../common";
 
 function libraryStorageMeta(library: TeamLibrary, t: TranslatorContext["t"]) {
   const storagePath = preferredStoragePath(library);
@@ -102,7 +104,7 @@ export function LibraryCardList({
   onToggleEnabled: (library: TeamLibrary, enabled: boolean) => void;
 }) {
   if (libraries.length === 0) {
-    return <div className="placeholder-box">{t("noLibraries")}</div>;
+    return <EmptyState illustration={emptyLibraryIllustration} label={t("noLibraries")} />;
   }
 
   return (
@@ -135,6 +137,10 @@ export function LibraryCardList({
                 </div>
                 <div className="library-card-path-row">
                   <HardDrive aria-hidden="true" size={14} />
+                  <span className="library-card-storage-kind">
+                    {storageMeta.kind}
+                    {storageMeta.extraCount > 0 ? ` +${storageMeta.extraCount}` : ""}
+                  </span>
                   <strong
                     className="library-card-storage-path"
                     title={storageMeta.path}
@@ -143,10 +149,6 @@ export function LibraryCardList({
                   >
                     {storageMeta.path}
                   </strong>
-                  <span className="library-card-storage-kind">
-                    {storageMeta.kind}
-                    {storageMeta.extraCount > 0 ? ` +${storageMeta.extraCount}` : ""}
-                  </span>
                   <button
                     aria-label={t("copyMode")}
                     className="library-card-storage-tool"

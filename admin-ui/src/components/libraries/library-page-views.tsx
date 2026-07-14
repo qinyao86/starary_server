@@ -16,9 +16,12 @@ export function LibraryDetailPageView({
   memberDialogOpen,
   memberRole,
   memberUserId,
+  assignStorageDialogOpen,
   canDeleteLibrary,
   canManageLibrary,
   storageRoots,
+  storageConnectionId,
+  storageConnections,
   t,
   onBack,
   onDelete,
@@ -29,7 +32,12 @@ export function LibraryDetailPageView({
   onMemberSubmit,
   onMemberUserChange,
   onMemberRoleUpdate,
-  onRemoveMember
+  onRemoveMember,
+  onAssignStorage,
+  onAssignStorageDialogClose,
+  onAssignStorageDialogOpen,
+  onStorageConnectionChange,
+  onOpenStorageCreate
 }: TranslatorContext & {
   activeLibrary: TeamLibrary;
   availableUsers: TeamUser[];
@@ -38,9 +46,12 @@ export function LibraryDetailPageView({
   memberDialogOpen: boolean;
   memberRole: string;
   memberUserId: string;
+  assignStorageDialogOpen: boolean;
   canDeleteLibrary: boolean;
   canManageLibrary: boolean;
   storageRoots: StorageRoot[];
+  storageConnectionId: string;
+  storageConnections: StorageConnection[];
   onBack: () => void;
   onDelete: () => void;
   onEdit: () => void;
@@ -51,6 +62,11 @@ export function LibraryDetailPageView({
   onMemberUserChange: (value: string) => void;
   onMemberRoleUpdate: (member: LibraryMember, role: string) => void;
   onRemoveMember: (member: LibraryMember) => void;
+  onAssignStorage: (event: FormEvent) => void | Promise<void>;
+  onAssignStorageDialogClose: () => void;
+  onAssignStorageDialogOpen: () => void;
+  onStorageConnectionChange: (value: string) => void;
+  onOpenStorageCreate: () => void;
 }) {
   return (
     <PageFrame
@@ -83,6 +99,10 @@ export function LibraryDetailPageView({
         memberDialogOpen={memberDialogOpen}
         memberRole={memberRole}
         memberUserId={memberUserId}
+        assignStorageDialogOpen={assignStorageDialogOpen}
+        canAssignStorage={canManageLibrary && storageRoots.length === 0 && (activeLibrary.storageRootCount ?? 0) === 0}
+        storageConnectionId={storageConnectionId}
+        storageConnections={storageConnections}
         storageRoots={storageRoots}
         t={t}
         onMemberDialogClose={onMemberDialogClose}
@@ -92,6 +112,11 @@ export function LibraryDetailPageView({
         onMemberUserChange={onMemberUserChange}
         onMemberRoleUpdate={onMemberRoleUpdate}
         onRemoveMember={onRemoveMember}
+        onAssignStorage={onAssignStorage}
+        onAssignStorageDialogClose={onAssignStorageDialogClose}
+        onAssignStorageDialogOpen={onAssignStorageDialogOpen}
+        onStorageConnectionChange={onStorageConnectionChange}
+        onOpenStorageCreate={onOpenStorageCreate}
       />
     </PageFrame>
   );
@@ -101,7 +126,6 @@ export function LibraryListPageView({
   createName,
   editName,
   editingLibraryId,
-  editingStorageLocked,
   libraries,
   canCreateLibrary,
   canManageLibrary,
@@ -124,7 +148,6 @@ export function LibraryListPageView({
   createName: string;
   editName: string;
   editingLibraryId: string | null;
-  editingStorageLocked: boolean;
   libraries: TeamLibrary[];
   canCreateLibrary: boolean;
   canManageLibrary: (library: TeamLibrary) => boolean;
@@ -145,6 +168,7 @@ export function LibraryListPageView({
 }) {
   return (
     <PageFrame
+      className="library-list-page-frame"
       title={t("libraries")}
       description={t("libraryPageHint")}
       action={canCreateLibrary ? (
@@ -178,14 +202,8 @@ export function LibraryListPageView({
           name={editName}
           submitLabel={t("submit")}
           t={t}
-          showStorage
-          storageLocked={editingStorageLocked}
-          storageConnectionId={storageConnectionId}
-          storageConnections={storageConnections}
           onClose={onCancelEdit}
           onNameChange={onEditNameChange}
-          onStorageConnectionChange={onStorageConnectionChange}
-          onCreateStorage={onOpenStorageCreate}
           onSubmit={onUpdate}
         />
         <LibraryCardList

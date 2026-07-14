@@ -38,7 +38,9 @@ export function TextField({
   type = "text",
   placeholder,
   required = false,
-  autoFocus = false
+  autoFocus = false,
+  autoComplete,
+  name
 }: {
   label: string;
   value: string;
@@ -47,12 +49,16 @@ export function TextField({
   placeholder?: string;
   required?: boolean;
   autoFocus?: boolean;
+  autoComplete?: string;
+  name?: string;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
       <input
+        autoComplete={autoComplete}
         autoFocus={autoFocus}
+        name={name}
         required={required}
         type={type}
         value={value}

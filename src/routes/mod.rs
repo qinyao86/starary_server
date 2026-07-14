@@ -42,6 +42,10 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/server/shutdown", post(runtime::shutdown))
         .route(
+            "/api/v1/server/desktop/identity",
+            get(runtime::desktop_identity),
+        )
+        .route(
             "/api/v1/server/desktop/shutdown",
             post(runtime::desktop_shutdown),
         )
@@ -62,6 +66,14 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/setup/status", get(setup::setup_status))
         .route("/api/v1/setup/owner", post(setup::create_owner))
         .route("/api/v1/auth/login", post(auth_routes::login))
+        .route(
+            "/api/v1/auth/browser-handoff",
+            post(auth_routes::create_browser_handoff),
+        )
+        .route(
+            "/api/v1/auth/browser-handoff/redeem",
+            post(auth_routes::redeem_browser_handoff),
+        )
         .route(
             "/api/v1/me",
             get(auth_routes::me).patch(auth_routes::update_me),
@@ -95,6 +107,10 @@ pub fn router(state: AppState) -> Router {
             patch(libraries::update_library_enabled),
         )
         .route(
+            "/api/v1/libraries/:library_id/storage-binding",
+            post(libraries::assign_library_storage),
+        )
+        .route(
             "/api/v1/libraries/:library_id/members",
             get(members::list_members),
         )
@@ -105,7 +121,56 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/libraries/:library_id/assets",
             get(assets::list_assets)
-                .post(assets::import_assets.layer(DefaultBodyLimit::max(384 * 1024 * 1024))),
+                .post(assets::import_assets.layer(DefaultBodyLimit::max(384 * 1024 * 1024)))
+                .delete(assets::delete_assets_permanently),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/rating",
+            patch(assets::update_assets_rating),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/starred",
+            patch(assets::update_assets_starred),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/viewer",
+            patch(assets::update_assets_viewer),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/folders",
+            patch(assets::set_asset_folders),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/tags",
+            patch(assets::set_asset_tags),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/trash",
+            post(assets::trash_assets),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/restore",
+            post(assets::restore_assets),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/duplicates/merge",
+            post(assets::merge_duplicate_assets),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/:asset_id/derived",
+            patch(assets::update_asset_derived_files),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/:asset_id/text",
+            get(assets::read_asset_text).patch(assets::update_asset_text),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/:asset_id/sequence/frame-numbers",
+            patch(assets::update_image_sequence_frame_numbers),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/:asset_id",
+            patch(assets::update_asset),
         )
         .route(
             "/api/v1/libraries/:library_id/storage-roots/:storage_root_id/files/*relative_path",
@@ -175,6 +240,14 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/storage-connections/:id",
             patch(storage_connections::update_storage_connection)
                 .delete(storage_connections::delete_storage_connection),
+        )
+        .route(
+            "/api/v1/storage-connections/:id/default",
+            patch(storage_connections::set_default_storage_connection),
+        )
+        .route(
+            "/api/v1/storage-connections/:id/migrate",
+            post(storage_connections::migrate_storage_connection),
         )
         .route(
             "/api/v1/storage-roots",

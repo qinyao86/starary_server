@@ -103,6 +103,10 @@
   display: none;
 }
 
+.theme-dark .library-detail-storage-path {
+  color: #f4f4f5;
+}
+
 .member-role-control {
   position: relative;
   display: inline-flex;

@@ -42,6 +42,9 @@ pub struct ServerConfig {
     #[arg(long, env = "MADLIBRARY_DESKTOP_CONTROL_TOKEN")]
     pub desktop_control_token: Option<String>,
 
+    #[arg(long, env = "MADLIBRARY_DESKTOP_INSTANCE_ID")]
+    pub desktop_instance_id: Option<String>,
+
     #[arg(long, env = "MADLIBRARY_TOKEN_TTL_HOURS", default_value_t = 168)]
     pub token_ttl_hours: i64,
 }

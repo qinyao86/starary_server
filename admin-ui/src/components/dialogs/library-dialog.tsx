@@ -12,8 +12,8 @@ export function LibraryDialog({
   hint,
   name,
   open,
+  showName = true,
   showStorage = false,
-  storageLocked = false,
   storageConnectionId = "",
   storageConnections = [],
   submitLabel,
@@ -28,8 +28,8 @@ export function LibraryDialog({
   hint: string;
   name: string;
   open: boolean;
+  showName?: boolean;
   showStorage?: boolean;
-  storageLocked?: boolean;
   storageConnectionId?: string;
   storageConnections?: StorageConnection[];
   submitLabel: string;
@@ -48,11 +48,10 @@ export function LibraryDialog({
     <DialogShell className="library-dialog" closeLabel={t("cancel")} open={open} subtitle={hint} title={title} titleId="library-dialog-title" onClose={onClose}>
       <form className="dialog-form" onSubmit={onSubmit}>
         <div className="dialog-body">
-          <TextField autoFocus required label={t("name")} value={name} onChange={onNameChange} />
+          {showName && <TextField autoFocus required label={t("name")} value={name} onChange={onNameChange} />}
           {showStorage && onStorageConnectionChange && (
             availableStorageConnections.length > 0 ? (
               <SelectField
-                disabled={storageLocked}
                 required
                 label={t("libraryStorageLocation")}
                 value={storageConnectionId || availableStorageConnections[0].id}
@@ -79,7 +78,6 @@ export function LibraryDialog({
               </label>
             )
           )}
-          {showStorage && storageLocked && <p className="dialog-hint">{t("libraryStorageMigrationRequired")}</p>}
         </div>
         <div className="dialog-footer">
           <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>

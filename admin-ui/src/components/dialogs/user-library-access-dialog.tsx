@@ -9,6 +9,7 @@ export function UserLibraryAccessDialog({
   libraries,
   libraryRoles,
   open,
+  subject,
   t,
   onClose,
   onSave
@@ -16,13 +17,18 @@ export function UserLibraryAccessDialog({
   libraries: TeamLibrary[];
   libraryRoles: Record<string, string>;
   open: boolean;
+  subject?: string;
   onClose: () => void;
-  onSave: (roles: Record<string, string>) => void;
+  onSave: (roles: Record<string, string>) => boolean | void | Promise<boolean | void>;
 }) {
   const [draftRoles, setDraftRoles] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setDraftRoles(libraryRoles);
+    if (open) {
+      setDraftRoles(libraryRoles);
+      setSaving(false);
+    }
   }, [libraryRoles, open]);
 
   const setLibraryEnabled = (libraryId: string, enabled: boolean) => {
@@ -38,9 +44,14 @@ export function UserLibraryAccessDialog({
     setDraftRoles((current) => ({ ...current, [libraryId]: role }));
   };
 
-  const save = () => {
-    onSave(draftRoles);
-    onClose();
+  const save = async () => {
+    setSaving(true);
+    try {
+      const shouldClose = await onSave(draftRoles);
+      if (shouldClose !== false) onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -48,7 +59,7 @@ export function UserLibraryAccessDialog({
       className="user-library-access-dialog"
       closeLabel={t("cancel")}
       open={open}
-      subtitle={t("manageLibraryAccessHint")}
+      subtitle={subject ? `${subject} · ${t("manageLibraryAccessHint")}` : t("manageLibraryAccessHint")}
       title={t("manageLibraryAccess")}
       titleId="user-library-access-dialog-title"
       onClose={onClose}
@@ -93,8 +104,8 @@ export function UserLibraryAccessDialog({
         )}
       </div>
       <div className="dialog-footer">
-        <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>
-        <Button type="button" onClick={save}>{t("save")}</Button>
+        <Button disabled={saving} type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>
+        <Button disabled={saving} type="button" onClick={() => void save()}>{t("save")}</Button>
       </div>
     </DialogShell>
   );

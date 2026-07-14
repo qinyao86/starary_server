@@ -6,16 +6,18 @@ export function PageFrame({
   description,
   titleSlot,
   action,
+  className = "",
   children
 }: {
   title: string;
   description: string;
   titleSlot?: ReactNode;
   action?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <div className="page-frame">
+    <div className={`page-frame ${className}`.trim()}>
       <div className="page-intro">
         <div className="page-intro-copy">
           {titleSlot ?? <h2>{title}</h2>}

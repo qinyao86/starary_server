@@ -37,12 +37,12 @@
 }
 
 .sidebar-runtime-heading {
-  gap: 7px;
+  gap: 8px;
 }
 
 .sidebar-runtime-indicator {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: #94a3b8;
@@ -56,26 +56,21 @@
 
 .sidebar-runtime-heading strong {
   color: #253244;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-}
-
-.sidebar-runtime-heading > span:last-child {
-  margin-left: auto;
-  color: #7a8697;
-  font-size: 11px;
 }
 
 .sidebar-runtime-address {
   gap: 6px;
   width: 100%;
-  margin-top: 7px;
-  padding: 3px 5px;
+  margin-top: 8px;
+  padding: 4px 5px;
   border: 0;
   border-radius: 6px;
   color: #7a8697;
   background: transparent;
   cursor: pointer;
+  text-decoration: none;
   text-align: left;
 }
 
@@ -93,7 +88,7 @@
   flex: 1;
   overflow: hidden;
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

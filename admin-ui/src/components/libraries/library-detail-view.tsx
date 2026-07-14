@@ -3,11 +3,11 @@ import type { FormEvent } from "react";
 import { Badge as UiBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ActivityItem, LibraryMember, StorageRoot, TeamLibrary, TeamUser } from "../../api";
+import type { ActivityItem, LibraryMember, StorageConnection, StorageRoot, TeamLibrary, TeamUser } from "../../api";
 import type { TranslatorContext } from "../../types";
 import { formatBytes, formatCount, formatMemberNames, isLibraryManagerRole, roleLabel, storageKindLabel } from "../../utils/format";
 import { ActivityList, Badge, LibraryDetailStat, Panel } from "../common";
-import { MemberDialog } from "../dialogs";
+import { LibraryDialog, MemberDialog } from "../dialogs";
 
 export function LibraryDetailView({
   activeLibrary,
@@ -17,6 +17,10 @@ export function LibraryDetailView({
   memberDialogOpen,
   memberRole,
   memberUserId,
+  assignStorageDialogOpen,
+  canAssignStorage,
+  storageConnectionId,
+  storageConnections,
   storageRoots,
   t,
   onMemberDialogClose,
@@ -25,7 +29,12 @@ export function LibraryDetailView({
   onMemberSubmit,
   onMemberUserChange,
   onMemberRoleUpdate,
-  onRemoveMember
+  onRemoveMember,
+  onAssignStorage,
+  onAssignStorageDialogClose,
+  onAssignStorageDialogOpen,
+  onStorageConnectionChange,
+  onOpenStorageCreate
 }: TranslatorContext & {
   activeLibrary: TeamLibrary;
   availableUsers: TeamUser[];
@@ -34,6 +43,10 @@ export function LibraryDetailView({
   memberDialogOpen: boolean;
   memberRole: string;
   memberUserId: string;
+  assignStorageDialogOpen: boolean;
+  canAssignStorage: boolean;
+  storageConnectionId: string;
+  storageConnections: StorageConnection[];
   storageRoots: StorageRoot[];
   onMemberDialogClose: () => void;
   onMemberDialogOpen: () => void;
@@ -42,6 +55,11 @@ export function LibraryDetailView({
   onMemberUserChange: (value: string) => void;
   onMemberRoleUpdate: (member: LibraryMember, role: string) => void;
   onRemoveMember: (member: LibraryMember) => void;
+  onAssignStorage: (event: FormEvent) => void | Promise<void>;
+  onAssignStorageDialogClose: () => void;
+  onAssignStorageDialogOpen: () => void;
+  onStorageConnectionChange: (value: string) => void;
+  onOpenStorageCreate: () => void;
 }) {
   const libraryManagerCount = libraryMembers.filter((member) => isLibraryManagerRole(member.role)).length;
   const visibleMemberCount = Math.max(libraryMembers.length, activeLibrary.memberNames?.length ?? 0);
@@ -58,6 +76,24 @@ export function LibraryDetailView({
         onRoleChange={onMemberRoleChange}
         onSubmit={onMemberSubmit}
         onUserChange={onMemberUserChange}
+      />
+
+      <LibraryDialog
+        hint={t("assignLibraryStorageHint")}
+        name=""
+        open={canAssignStorage && assignStorageDialogOpen}
+        showName={false}
+        showStorage
+        storageConnectionId={storageConnectionId}
+        storageConnections={storageConnections}
+        submitLabel={t("assignStorage")}
+        t={t}
+        title={t("assignStorage")}
+        onClose={onAssignStorageDialogClose}
+        onCreateStorage={onOpenStorageCreate}
+        onNameChange={() => undefined}
+        onStorageConnectionChange={onStorageConnectionChange}
+        onSubmit={onAssignStorage}
       />
 
       <Card className="library-detail-hero">
@@ -100,7 +136,17 @@ export function LibraryDetailView({
           />
         </Panel>
 
-        <Panel title={t("storage")} icon={Network} className="span-6" action={<Badge>{storageRoots.length ? t("realData") : t("empty")}</Badge>}>
+        <Panel
+          title={t("storage")}
+          icon={Network}
+          className="span-6"
+          action={canAssignStorage ? (
+            <Button size="sm" type="button" onClick={onAssignStorageDialogOpen}>
+              <Network size={15} />
+              <span>{t("assignStorage")}</span>
+            </Button>
+          ) : <Badge>{storageRoots.length ? t("realData") : t("empty")}</Badge>}
+        >
           <LibraryStorageList storageRoots={storageRoots} t={t} />
         </Panel>
         <Panel title={t("libraryActivity")} icon={ListChecks} className="span-6" action={<Badge>{libraryActivityItems.length ? t("realData") : t("empty")}</Badge>}>

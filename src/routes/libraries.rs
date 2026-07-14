@@ -244,14 +244,22 @@ pub async fn create_library(
         ensure_storage_location_exists(default_storage_root.kind, &root_location)?;
         let connection_id = Uuid::new_v4();
         let connection_name = unique_connection_name(&mut tx, display_name).await?;
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+            .execute(&mut *tx)
+            .await?;
+        let should_be_default: bool = sqlx::query_scalar(
+            "SELECT NOT EXISTS(SELECT 1 FROM storage_connections WHERE is_default AND enabled)",
+        )
+        .fetch_one(&mut *tx)
+        .await?;
         sqlx::query(
             r#"
             INSERT INTO storage_connections (
                 id, name, kind, canonical_uri, windows_unc_path,
                 windows_mapped_drive_aliases, macos_smb_url, macos_mount_aliases,
-                created_by_user_id
+                is_default, created_by_user_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9)
+            VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9, $10)
             "#,
         )
         .bind(connection_id)
@@ -266,6 +274,7 @@ pub async fn create_library(
         .bind(serde_json::to_value(
             default_storage_root.macos_mount_aliases,
         )?)
+        .bind(should_be_default)
         .bind(user.id)
         .execute(&mut *tx)
         .await?;
@@ -283,6 +292,27 @@ pub async fn create_library(
         .await?;
     } else if let Some(binding) = request.storage_binding {
         bind_library_storage(&state, &mut tx, &library_id, user.id, binding, display_name).await?;
+    } else {
+        let connection_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM storage_connections WHERE is_default AND enabled LIMIT 1",
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        let connection_id = connection_id.ok_or_else(|| {
+            AppError::BadRequest("default storage connection is not configured".to_string())
+        })?;
+        bind_library_storage(
+            &state,
+            &mut tx,
+            &library_id,
+            user.id,
+            StorageBindingRequest {
+                connection_id,
+                namespace: None,
+            },
+            display_name,
+        )
+        .await?;
     }
 
     sqlx::query(
@@ -333,66 +363,6 @@ pub async fn update_library(
     .await?
     .ok_or_else(|| AppError::NotFound("library not found".to_string()))?;
 
-    if let Some(binding) = request.storage_binding {
-        let existing_root: Option<(Uuid, Uuid, String)> = sqlx::query_as(
-            "SELECT id, storage_connection_id, namespace FROM storage_roots WHERE library_id = $1 ORDER BY created_at ASC LIMIT 1",
-        )
-        .bind(&library_id)
-        .fetch_optional(&mut *tx)
-        .await?;
-        let namespace = match (binding.namespace.as_deref(), existing_root.as_ref()) {
-            (Some(value), _) => normalize_existing_storage_namespace(value)?,
-            (None, Some((_, _, current_namespace))) => current_namespace.clone(),
-            (None, None) => normalize_storage_namespace(None, &library_id)?,
-        };
-        let changed = existing_root
-            .as_ref()
-            .map(|(_, connection_id, current_namespace)| {
-                *connection_id != binding.connection_id || current_namespace != &namespace
-            })
-            .unwrap_or(true);
-        if changed {
-            let storage_locked: bool = sqlx::query_scalar(
-                r#"
-                SELECT storage_locked_at IS NOT NULL
-                    OR EXISTS(
-                        SELECT 1 FROM assets
-                        WHERE library_id = $1 AND storage_root_id IS NOT NULL
-                    )
-                FROM libraries
-                WHERE id = $1
-                "#,
-            )
-            .bind(&library_id)
-            .fetch_one(&mut *tx)
-            .await?;
-            if storage_locked {
-                return Err(AppError::StorageMigrationRequired(
-                    "this library has used its current storage; move it with the storage migration workflow"
-                        .to_string(),
-                ));
-            }
-            if let Some((root_id, _, _)) = existing_root {
-                sqlx::query("DELETE FROM storage_roots WHERE id = $1")
-                    .bind(root_id)
-                    .execute(&mut *tx)
-                    .await?;
-            }
-            bind_library_storage(
-                &state,
-                &mut tx,
-                &library_id,
-                user.id,
-                StorageBindingRequest {
-                    connection_id: binding.connection_id,
-                    namespace: Some(namespace),
-                },
-                display_name,
-            )
-            .await?;
-        }
-    }
-
     sqlx::query(
         r#"
         INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id)
@@ -408,6 +378,65 @@ pub async fn update_library(
     tx.commit().await?;
 
     Ok(Json(library))
+}
+
+pub async fn assign_library_storage(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+    Json(binding): Json<StorageBindingRequest>,
+) -> AppResult<StatusCode> {
+    ensure_library_manager(&state, &user, &library_id).await?;
+
+    let mut tx = state.pool.begin().await?;
+    let display_name: String = sqlx::query_scalar(
+        r#"
+        SELECT display_name
+        FROM libraries
+        WHERE id = $1 AND deleted_at IS NULL
+        FOR UPDATE
+        "#,
+    )
+    .bind(&library_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("library not found".to_string()))?;
+
+    let has_storage: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM storage_roots WHERE library_id = $1)")
+            .bind(&library_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    if has_storage {
+        return Err(AppError::Conflict(
+            "library storage is already assigned; use the storage migration workflow".to_string(),
+        ));
+    }
+
+    bind_library_storage(
+        &state,
+        &mut tx,
+        &library_id,
+        user.id,
+        binding,
+        &display_name,
+    )
+    .await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id)
+        VALUES ($1, $2, $3, 'library.storage_assigned', 'library', $2)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(&library_id)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn bind_library_storage(
@@ -608,47 +637,42 @@ pub async fn delete_library(
     let request = request.map(|Json(request)| request).unwrap_or_default();
 
     let mut tx = state.pool.begin().await?;
-    let exists: Option<String> = sqlx::query_scalar(
-        "SELECT id FROM libraries WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+    let display_name: Option<String> = sqlx::query_scalar(
+        "SELECT display_name FROM libraries WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
     )
     .bind(&library_id)
     .fetch_optional(&mut *tx)
     .await?;
-    if exists.is_none() {
-        return Err(AppError::NotFound("library not found".to_string()));
-    }
+    let display_name =
+        display_name.ok_or_else(|| AppError::NotFound("library not found".to_string()))?;
 
     if request.delete_files {
         delete_library_storage_files(&state, &mut tx, &library_id).await?;
     }
 
-    let deleted = sqlx::query(
-        r#"
-        UPDATE libraries
-        SET deleted_at = NOW(), updated_at = NOW()
-        WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(&library_id)
-    .execute(&mut *tx)
-    .await?;
-
-    if deleted.rows_affected() == 0 {
-        return Err(AppError::NotFound("library not found".to_string()));
-    }
-
     sqlx::query(
         r#"
-        INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id, details)
-        VALUES ($1, $2, $3, 'library.deleted', 'library', $2, $4::jsonb)
+        INSERT INTO activity_log (id, actor_user_id, action, target_type, target_id, details)
+        VALUES ($1, $2, 'library.deleted', 'library', $3, $4::jsonb)
         "#,
     )
     .bind(Uuid::new_v4())
-    .bind(&library_id)
     .bind(user.id)
-    .bind(serde_json::json!({ "deleteFiles": request.delete_files }))
+    .bind(&library_id)
+    .bind(serde_json::json!({
+        "deleteFiles": request.delete_files,
+        "name": display_name,
+    }))
     .execute(&mut *tx)
     .await?;
+
+    let deleted = sqlx::query("DELETE FROM libraries WHERE id = $1 AND deleted_at IS NULL")
+        .bind(&library_id)
+        .execute(&mut *tx)
+        .await?;
+    if deleted.rows_affected() == 0 {
+        return Err(AppError::NotFound("library not found".to_string()));
+    }
 
     tx.commit().await?;
 

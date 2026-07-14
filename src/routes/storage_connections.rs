@@ -14,7 +14,12 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
+use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
+
+mod migration;
+
+pub use migration::migrate_storage_connection;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,14 +84,23 @@ pub async fn create_storage_connection(
         Some(value) => validate_name(&state, value, None).await?,
         None => format!("storage-{id}"),
     };
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+        .execute(&mut *tx)
+        .await?;
+    let should_be_default: bool = sqlx::query_scalar(
+        "SELECT NOT EXISTS(SELECT 1 FROM storage_connections WHERE is_default AND enabled)",
+    )
+    .fetch_one(&mut *tx)
+    .await?;
     sqlx::query(
         r#"
         INSERT INTO storage_connections (
             id, name, kind, canonical_uri, windows_unc_path,
             windows_mapped_drive_aliases, macos_smb_url, macos_mount_aliases,
-            created_by_user_id
+            is_default, created_by_user_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9, $10)
         "#,
     )
     .bind(id)
@@ -97,9 +111,11 @@ pub async fn create_storage_connection(
     .bind(serde_json::to_value(request.windows_mapped_drive_aliases)?)
     .bind(location.macos_smb_url)
     .bind(serde_json::to_value(request.macos_mount_aliases)?)
+    .bind(should_be_default)
     .bind(user.id)
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?;
+    tx.commit().await?;
 
     Ok(Json(get_connection(&state, id).await?))
 }
@@ -137,13 +153,16 @@ pub async fn update_storage_connection(
         || existing.windows_mapped_drive_aliases != windows_aliases
         || existing.macos_smb_url != location.macos_smb_url
         || existing.macos_mount_aliases != macos_aliases;
-    if existing.library_count > 0 && location_changed {
+    if location_changed {
         return Err(AppError::Conflict(
-            "storage connection is used by libraries; detach them before changing its location"
-                .to_string(),
+            "storage location can only be changed with the migration workflow".to_string(),
         ));
     }
 
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+        .execute(&mut *tx)
+        .await?;
     sqlx::query(
         r#"
         UPDATE storage_connections
@@ -155,6 +174,7 @@ pub async fn update_storage_connection(
             macos_smb_url = $7,
             macos_mount_aliases = $8::jsonb,
             enabled = $9,
+            is_default = CASE WHEN $9 THEN is_default ELSE FALSE END,
             updated_at = NOW()
         WHERE id = $1
         "#,
@@ -168,9 +188,55 @@ pub async fn update_storage_connection(
     .bind(location.macos_smb_url)
     .bind(macos_aliases)
     .bind(request.enabled)
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?;
+    if existing.is_default && !request.enabled {
+        select_fallback_default(&mut tx, Some(id)).await?;
+    }
+    tx.commit().await?;
 
+    Ok(Json(get_connection(&state, id).await?))
+}
+
+pub async fn set_default_storage_connection(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<StorageConnectionRecord>> {
+    require_server_manager(&user)?;
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+        .execute(&mut *tx)
+        .await?;
+    let enabled: Option<bool> =
+        sqlx::query_scalar("SELECT enabled FROM storage_connections WHERE id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    match enabled {
+        None => {
+            return Err(AppError::NotFound(
+                "storage connection not found".to_string(),
+            ));
+        }
+        Some(false) => {
+            return Err(AppError::BadRequest(
+                "disabled storage connection cannot be the default".to_string(),
+            ));
+        }
+        Some(true) => {}
+    }
+    sqlx::query("UPDATE storage_connections SET is_default = FALSE WHERE is_default AND id <> $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "UPDATE storage_connections SET is_default = TRUE, updated_at = NOW() WHERE id = $1",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
     Ok(Json(get_connection(&state, id).await?))
 }
 
@@ -186,10 +252,18 @@ pub async fn delete_storage_connection(
             "storage connection is used by libraries; detach them before deleting it".to_string(),
         ));
     }
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM storage_connections WHERE id = $1")
         .bind(id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await?;
+    if existing.is_default {
+        select_fallback_default(&mut tx, Some(id)).await?;
+    }
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -204,15 +278,68 @@ SELECT
     sc.macos_smb_url,
     sc.macos_mount_aliases,
     sc.enabled,
-    COUNT(sr.id)::BIGINT AS library_count,
+    sc.is_default,
+    COALESCE(root_stats.library_count, 0)::BIGINT AS library_count,
+    COALESCE(root_stats.library_names, ARRAY[]::TEXT[]) AS library_names,
+    COALESCE(asset_stats.asset_count, 0)::BIGINT AS asset_count,
+    COALESCE(asset_stats.total_size_bytes, 0)::BIGINT AS total_size_bytes,
     sc.created_by_user_id,
     sc.created_at,
     sc.updated_at
 FROM storage_connections sc
-LEFT JOIN storage_roots sr ON sr.storage_connection_id = sc.id
-GROUP BY sc.id
-ORDER BY sc.canonical_uri ASC
+LEFT JOIN LATERAL (
+    SELECT
+        COUNT(sr.id)::BIGINT AS library_count,
+        ARRAY_AGG(l.display_name ORDER BY l.display_name) AS library_names
+    FROM storage_roots sr
+    INNER JOIN libraries l ON l.id = sr.library_id AND l.deleted_at IS NULL
+    WHERE sr.storage_connection_id = sc.id
+) root_stats ON TRUE
+LEFT JOIN LATERAL (
+    SELECT
+        COUNT(a.id) FILTER (WHERE a.deleted_at IS NULL)::BIGINT AS asset_count,
+        COALESCE(SUM(
+            CASE
+                WHEN a.deleted_at IS NULL AND (a.metadata->>'sizeBytes') ~ '^[0-9]+$' THEN (a.metadata->>'sizeBytes')::BIGINT
+                WHEN a.deleted_at IS NULL AND (a.metadata->>'fileSize') ~ '^[0-9]+$' THEN (a.metadata->>'fileSize')::BIGINT
+                WHEN a.deleted_at IS NULL AND (a.metadata->>'size') ~ '^[0-9]+$' THEN (a.metadata->>'size')::BIGINT
+                ELSE 0
+            END
+        ), 0)::BIGINT AS total_size_bytes
+    FROM assets a
+    INNER JOIN storage_roots sr ON sr.id = a.storage_root_id
+    WHERE sr.storage_connection_id = sc.id
+) asset_stats ON TRUE
+ORDER BY sc.is_default DESC, sc.canonical_uri ASC
 "#;
+
+async fn select_fallback_default(
+    tx: &mut Transaction<'_, Postgres>,
+    excluded_id: Option<Uuid>,
+) -> AppResult<()> {
+    sqlx::query(
+        r#"
+        UPDATE storage_connections
+        SET is_default = TRUE, updated_at = NOW()
+        WHERE id = (
+            SELECT id
+            FROM storage_connections
+            WHERE enabled AND ($1::uuid IS NULL OR id <> $1)
+            ORDER BY created_at, id
+            LIMIT 1
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM storage_connections
+            WHERE is_default AND enabled AND ($1::uuid IS NULL OR id <> $1)
+        )
+        "#,
+    )
+    .bind(excluded_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
 
 async fn get_connection(state: &AppState, id: Uuid) -> AppResult<StorageConnectionRecord> {
     let sql = format!("SELECT * FROM ({STORAGE_CONNECTION_SELECT}) connections WHERE id = $1");

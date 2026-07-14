@@ -105,6 +105,7 @@ pub(super) async fn create_base_schema(tx: &mut MigrationTx<'_>) -> anyhow::Resu
             macos_smb_url TEXT,
             macos_mount_aliases JSONB NOT NULL DEFAULT '[]'::jsonb,
             enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            is_default BOOLEAN NOT NULL DEFAULT FALSE,
             created_by_user_id UUID NOT NULL REFERENCES users(id),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

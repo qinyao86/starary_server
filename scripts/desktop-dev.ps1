@@ -14,7 +14,9 @@ powershell -ExecutionPolicy Bypass -File (Join-Path $root "scripts\prepare-deskt
 
 Push-Location (Join-Path $root "desktop")
 try {
-  npm ci
+  if (-not (Test-Path (Join-Path (Get-Location) "node_modules\@tauri-apps\cli\tauri.js"))) {
+    npm ci
+  }
   npm run tauri -- dev
 } finally {
   Pop-Location

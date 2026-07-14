@@ -23,6 +23,21 @@ use std::{
 };
 use uuid::Uuid;
 
+mod duplicates;
+mod file_metadata;
+mod mutations;
+mod sequence;
+mod text;
+
+pub use duplicates::merge_duplicate_assets;
+pub use mutations::{
+    delete_assets_permanently, restore_assets, set_asset_folders, set_asset_tags, trash_assets,
+    update_asset, update_asset_derived_files, update_assets_rating, update_assets_starred,
+    update_assets_viewer,
+};
+pub use sequence::update_image_sequence_frame_numbers;
+pub use text::{read_asset_text, update_asset_text};
+
 const MAX_DERIVED_FILE_BYTES: usize = 25 * 1024 * 1024;
 const MAX_SOURCE_FILE_BYTES: usize = 256 * 1024 * 1024;
 
@@ -35,6 +50,8 @@ pub struct ListAssetsQuery {
     offset: i64,
     #[serde(default)]
     include_deleted: bool,
+    #[serde(default)]
+    deleted_only: bool,
 }
 
 #[derive(Serialize)]
@@ -69,7 +86,7 @@ pub struct ImportAssetRequest {
     derived_files: Vec<ImportAssetDerivedFileRequest>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportAssetFileRequest {
     relative_path: String,
@@ -78,7 +95,7 @@ pub struct ImportAssetFileRequest {
     size_bytes: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportAssetDerivedFileRequest {
     kind: String,
@@ -92,6 +109,7 @@ pub struct AssetFileUrls {
     source: Option<String>,
     thumbnail: Option<String>,
     preview_image: Option<String>,
+    preview_video: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -153,9 +171,22 @@ pub async fn list_assets(
 
     let limit = query.limit.clamp(1, 500);
     let offset = query.offset.max(0);
-    let total = count_assets(&state, &library_id, query.include_deleted).await?;
-    let records =
-        query_assets_page(&state, &library_id, query.include_deleted, limit, offset).await?;
+    let total = count_assets(
+        &state,
+        &library_id,
+        query.include_deleted,
+        query.deleted_only,
+    )
+    .await?;
+    let records = query_assets_page(
+        &state,
+        &library_id,
+        query.include_deleted,
+        query.deleted_only,
+        limit,
+        offset,
+    )
+    .await?;
     let items = build_asset_responses(&state, &library_id, records).await?;
 
     Ok(Json(AssetListResponse {
@@ -334,7 +365,7 @@ pub async fn import_assets(
 
     let records = query_assets_by_ids(&state, &library_id, &imported_asset_ids).await?;
     let items = build_asset_responses(&state, &library_id, records).await?;
-    let total = count_assets(&state, &library_id, false).await?;
+    let total = count_assets(&state, &library_id, false, false).await?;
 
     Ok(Json(ImportAssetsResponse {
         imported_count: items.len(),
@@ -379,6 +410,7 @@ async fn query_assets_page(
     state: &AppState,
     library_id: &str,
     include_deleted: bool,
+    deleted_only: bool,
     limit: i64,
     offset: i64,
 ) -> AppResult<Vec<AssetRecord>> {
@@ -405,20 +437,22 @@ async fn query_assets_page(
             deleted_at,
             restored_at
         FROM assets
-        WHERE library_id = $1 AND ($2 OR deleted_at IS NULL)
+        WHERE library_id = $1
+          AND (($3 AND deleted_at IS NOT NULL) OR (NOT $3 AND ($2 OR deleted_at IS NULL)))
         ORDER BY created_at DESC, id DESC
-        LIMIT $3 OFFSET $4
+        LIMIT $4 OFFSET $5
         "#,
     )
     .bind(library_id)
     .bind(include_deleted)
+    .bind(deleted_only)
     .bind(limit)
     .bind(offset)
     .fetch_all(&state.pool)
     .await?)
 }
 
-async fn build_asset_responses(
+pub(super) async fn build_asset_responses(
     state: &AppState,
     library_id: &str,
     records: Vec<AssetRecord>,
@@ -648,6 +682,7 @@ fn build_asset_file_urls(asset: &AssetRecord) -> AssetFileUrls {
             source: None,
             thumbnail: None,
             preview_image: None,
+            preview_video: None,
         };
     };
 
@@ -659,6 +694,8 @@ fn build_asset_file_urls(asset: &AssetRecord) -> AssetFileUrls {
         thumbnail: metadata_string(&asset.metadata, "thumbnailPath")
             .and_then(|path| build_asset_file_url(&asset.library_id, storage_root_id, &path)),
         preview_image: metadata_string(&asset.metadata, "previewImagePath")
+            .and_then(|path| build_asset_file_url(&asset.library_id, storage_root_id, &path)),
+        preview_video: metadata_string(&asset.metadata, "previewVideoPath")
             .and_then(|path| build_asset_file_url(&asset.library_id, storage_root_id, &path)),
     }
 }
@@ -743,21 +780,28 @@ fn json_string_array(value: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-async fn count_assets(state: &AppState, library_id: &str, include_deleted: bool) -> AppResult<i64> {
+async fn count_assets(
+    state: &AppState,
+    library_id: &str,
+    include_deleted: bool,
+    deleted_only: bool,
+) -> AppResult<i64> {
     Ok(sqlx::query_scalar(
         r#"
         SELECT COUNT(*)
         FROM assets
-        WHERE library_id = $1 AND ($2 OR deleted_at IS NULL)
+        WHERE library_id = $1
+          AND (($3 AND deleted_at IS NOT NULL) OR (NOT $3 AND ($2 OR deleted_at IS NULL)))
         "#,
     )
     .bind(library_id)
     .bind(include_deleted)
+    .bind(deleted_only)
     .fetch_one(&state.pool)
     .await?)
 }
 
-async fn query_assets_by_ids(
+pub(super) async fn query_assets_by_ids(
     state: &AppState,
     library_id: &str,
     asset_ids: &[String],
@@ -874,7 +918,7 @@ async fn write_asset_source_file(
     write_file_atomic(&target_path, &decoded)
 }
 
-async fn write_asset_derived_files(
+pub(super) async fn write_asset_derived_files(
     state: &AppState,
     root_id: Uuid,
     files: &[ImportAssetDerivedFileRequest],
@@ -890,7 +934,7 @@ async fn write_asset_derived_files(
     Ok(())
 }
 
-async fn storage_root_write_base_path(
+pub(super) async fn storage_root_write_base_path(
     state: &AppState,
     root_id: Uuid,
     library_id: Option<&str>,
@@ -988,7 +1032,7 @@ fn normalize_source_file_relative_path(value: &str, asset_id: &str) -> AppResult
     Ok(normalized)
 }
 
-fn normalize_derived_file_relative_path(value: &str) -> AppResult<String> {
+pub(super) fn normalize_derived_file_relative_path(value: &str) -> AppResult<String> {
     let normalized = normalize_safe_relative_path(value)?;
     if !normalized.starts_with(".madlibrary/thumbs/")
         && !normalized.starts_with(".madlibrary/previews/")
@@ -1002,7 +1046,7 @@ fn normalize_derived_file_relative_path(value: &str) -> AppResult<String> {
     Ok(normalized)
 }
 
-fn normalize_readable_storage_file_relative_path(value: &str) -> AppResult<String> {
+pub(super) fn normalize_readable_storage_file_relative_path(value: &str) -> AppResult<String> {
     let normalized = normalize_safe_relative_path(value)?;
     if normalized.starts_with("assets/")
         || normalized.starts_with(".madlibrary/thumbs/")
@@ -1039,7 +1083,7 @@ fn normalize_safe_relative_path(value: &str) -> AppResult<String> {
     Ok(normalized)
 }
 
-fn join_safe_relative_path(base_path: &StdPath, relative_path: &str) -> PathBuf {
+pub(super) fn join_safe_relative_path(base_path: &StdPath, relative_path: &str) -> PathBuf {
     relative_path
         .split('/')
         .fold(base_path.to_path_buf(), |path, segment| path.join(segment))
@@ -1080,6 +1124,7 @@ fn content_type_for_path(path: &str) -> &'static str {
         "gif" => "image/gif",
         "jpg" | "jpeg" => "image/jpeg",
         "json" => "application/json",
+        "mp4" => "video/mp4",
         "png" => "image/png",
         "svg" => "image/svg+xml",
         "webp" => "image/webp",

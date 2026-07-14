@@ -4,11 +4,12 @@ use crate::{
     state::AppState,
 };
 use axum::{
-    extract::State,
+    extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
 #[derive(Serialize)]
@@ -23,6 +24,15 @@ pub struct RuntimeSettingsResponse {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateRuntimeSettingsRequest {
+    port: u16,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopIdentityResponse {
+    product: &'static str,
+    instance_id: String,
+    process_id: u32,
     port: u16,
 }
 
@@ -68,23 +78,33 @@ pub async fn shutdown(State(state): State<AppState>, user: AuthUser) -> AppResul
 
 pub async fn desktop_shutdown(
     State(state): State<AppState>,
+    ConnectInfo(remote): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
 ) -> AppResult<StatusCode> {
-    let expected = state
-        .config
-        .desktop_control_token
-        .as_deref()
-        .ok_or_else(|| AppError::NotFound("desktop control is unavailable".to_string()))?;
-    let provided = headers
-        .get("x-madlibrary-control-token")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or_default();
-    if provided != expected {
-        return Err(AppError::Forbidden);
-    }
+    ensure_local_desktop_control(&state, &headers, remote)?;
 
     state.service_control.request_shutdown()?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn desktop_identity(
+    State(state): State<AppState>,
+    ConnectInfo(remote): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> AppResult<Json<DesktopIdentityResponse>> {
+    ensure_local_desktop_control(&state, &headers, remote)?;
+    let instance_id = state
+        .config
+        .desktop_instance_id
+        .clone()
+        .ok_or_else(|| AppError::NotFound("desktop control is unavailable".to_string()))?;
+
+    Ok(Json(DesktopIdentityResponse {
+        product: "Mad Library Team Server",
+        instance_id,
+        process_id: std::process::id(),
+        port: state.config.port,
+    }))
 }
 
 fn response(state: &AppState) -> RuntimeSettingsResponse {
@@ -113,4 +133,28 @@ fn ensure_controls_available(state: &AppState) -> AppResult<()> {
             "service controls are managed by the deployment environment".to_string(),
         ))
     }
+}
+
+fn ensure_local_desktop_control(
+    state: &AppState,
+    headers: &HeaderMap,
+    remote: SocketAddr,
+) -> AppResult<()> {
+    if !remote.ip().is_loopback() {
+        return Err(AppError::Forbidden);
+    }
+
+    let expected = state
+        .config
+        .desktop_control_token
+        .as_deref()
+        .ok_or_else(|| AppError::NotFound("desktop control is unavailable".to_string()))?;
+    let provided = headers
+        .get("x-madlibrary-control-token")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    if provided != expected {
+        return Err(AppError::Forbidden);
+    }
+    Ok(())
 }

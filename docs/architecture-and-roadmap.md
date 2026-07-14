@@ -10,12 +10,32 @@ database directly to clients.
 
 ### Windows LAN appliance
 
-- One Windows x64 portable package.
+- One Windows x64 installer with a small local control center.
 - `madlibrary-server.exe` serves the API and built React administration UI.
 - A minimal PostgreSQL 16 runtime is bundled and managed by the server process.
 - Local disks and SMB shares are available as filesystem storage roots.
 - Persistent data is isolated under `data/` so application upgrades do not
   replace database or asset data.
+
+The Tauri application is a local service control center, not an embedded copy
+of the administration UI. It starts, stops, restarts, and diagnoses the managed
+server, while all library, storage, user, backup, and settings workflows remain
+in the browser administration UI. Closing its window hides it to the system
+tray. Exiting from the tray closes only the control center and leaves the
+server running; stopping the server is always a separate explicit action.
+
+The control center and managed server use a persisted installation instance ID
+and local control token under the machine data directory. A control center may
+only manage a server that returns the matching identity over a loopback-only
+control endpoint. It never claims or stops a process merely because it uses the
+configured port or has a matching executable name. The control center itself
+is single-instance, and the server keeps its existing per-data-directory
+instance lock.
+
+The first release still launches the managed server as a detached background
+process. Installing the same server core as a Windows Service is the next
+hardening step for startup before user sign-in, service recovery policies, and
+multi-user hosts; it does not change the browser administration architecture.
 
 ### Internet or cloud server
 
@@ -43,8 +63,8 @@ random database password and JWT secret on first startup and stores them under
 `data/config/`. Application schema migrations remain automatic and idempotent.
 
 The HTTP service listens on `0.0.0.0` by default and exposes both the client API
-and browser administration UI on the configured server port. The desktop shell
-is a local launcher and owner console, not the only administration surface.
+and browser administration UI on the configured server port. The desktop
+control center opens that UI in the system browser rather than embedding it.
 Initial Owner creation is restricted to loopback connections; subsequent
 administration is available over authenticated LAN browser sessions. Production
 internet deployments must terminate TLS at a reverse proxy and should not

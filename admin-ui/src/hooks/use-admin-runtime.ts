@@ -18,13 +18,17 @@ import type { ApiState, DeploymentMode } from "../types";
 import { canManageServerRole, isLibraryManagerRole } from "../utils/format";
 
 export function useAdminRuntime() {
+  const [initialAuth] = useState(readInitialAuth);
   const [deploymentMode, setDeploymentMode] = useState<DeploymentMode>("local");
   const [serviceRunning, setServiceRunning] = useState(true);
   const [apiState, setApiState] = useState<ApiState>("loading");
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [needsOwner, setNeedsOwner] = useState<boolean | null>(null);
   const [ownerSetupAllowed, setOwnerSetupAllowed] = useState(false);
-  const [token, setToken] = useState<string | null>(() => getStoredToken());
+  const [token, setToken] = useState<string | null>(initialAuth.token);
+  const [authChecked, setAuthChecked] = useState(() => !initialAuth.token && !initialAuth.browserHandoffCode);
+  const [browserHandoffCode] = useState(initialAuth.browserHandoffCode);
+  const [browserHandoffPending, setBrowserHandoffPending] = useState(() => Boolean(initialAuth.browserHandoffCode));
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [libraries, setLibraries] = useState<TeamLibrary[]>([]);
   const [users, setUsers] = useState<TeamUser[]>([]);
@@ -82,16 +86,20 @@ export function useAdminRuntime() {
 
   const loadPrivateState = useCallback(
     async (nextToken = token) => {
-      if (!nextToken) return;
+      if (!nextToken) {
+        setAuthChecked(true);
+        return;
+      }
       try {
         const me = await api.me(nextToken);
+        setCurrentUser(me);
+        setAuthChecked(true);
         const [nextLibraries, nextUsers, nextActivity, nextStorageConnections] = await Promise.all([
           api.listLibraries(nextToken),
           canManageServerRole(me.role) ? api.listUsers(nextToken) : Promise.resolve([]),
           api.listServerActivity(nextToken),
           api.listStorageConnections(nextToken)
         ]);
-        setCurrentUser(me);
         setLibraries(nextLibraries);
         setUsers(nextUsers);
         setActivityItems(nextActivity.items);
@@ -115,6 +123,7 @@ export function useAdminRuntime() {
           setActivityItems([]);
           setLibraryActivityItems([]);
         }
+        setAuthChecked(true);
         setMessage(error instanceof Error ? error.message : String(error));
       }
     },
@@ -126,10 +135,37 @@ export function useAdminRuntime() {
   }, [loadPublicState]);
 
   useEffect(() => {
+    if (browserHandoffPending) return;
     if (token) {
       void loadPrivateState(token);
+    } else {
+      setAuthChecked(true);
     }
-  }, [loadPrivateState, token]);
+  }, [browserHandoffPending, loadPrivateState, token]);
+
+  useEffect(() => {
+    if (!browserHandoffCode) return;
+    let active = true;
+    void api.redeemBrowserHandoff(browserHandoffCode)
+      .then((response) => {
+        if (!active) return;
+        storeToken(response.accessToken);
+        setToken(response.accessToken);
+        setCurrentUser(response.user);
+        setNeedsOwner(false);
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setMessage(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (!active) return;
+        setAuthChecked(true);
+        setBrowserHandoffPending(false);
+      });
+    return () => { active = false; };
+  }, [browserHandoffCode]);
 
   useEffect(() => {
     if (!token || !currentUser) {
@@ -187,6 +223,7 @@ export function useAdminRuntime() {
     setToken(response.accessToken);
     setCurrentUser(response.user);
     setNeedsOwner(false);
+    setAuthChecked(true);
     setMessage(null);
   };
 
@@ -200,6 +237,7 @@ export function useAdminRuntime() {
     setStorageConnections([]);
     setActivityItems([]);
     setLibraryActivityItems([]);
+    setAuthChecked(true);
   };
 
   const resetAfterInitialization = async () => {
@@ -211,6 +249,7 @@ export function useAdminRuntime() {
 
   return {
     activityItems,
+    authChecked,
     apiState,
     assetTotal,
     currentUser,
@@ -238,4 +277,14 @@ export function useAdminRuntime() {
     token,
     users
   };
+}
+
+function readInitialAuth() {
+  const token = getStoredToken();
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const code = hash.get("handoff")?.trim();
+  if (code) {
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+  }
+  return { token, browserHandoffCode: code || null };
 }

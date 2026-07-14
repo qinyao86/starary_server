@@ -14,12 +14,14 @@
         "label": "main",
         "title": "Mad Library Server",
         "url": "index.html",
-        "width": 1280,
-        "height": 820,
-        "minWidth": 680,
+        "width": 800,
+        "height": 520,
+        "minWidth": 800,
         "minHeight": 520,
+        "maxWidth": 800,
+        "maxHeight": 520,
         "center": true,
-        "resizable": true,
+        "resizable": false,
         "decorations": false,
         "backgroundColor": "#f5f6f8"
       }

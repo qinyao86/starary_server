@@ -1,6 +1,8 @@
 use crate::{backup::BackupService, config::ServerConfig};
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::{
+    collections::HashMap,
     path::PathBuf,
     sync::{
         atomic::{AtomicU16, Ordering},
@@ -8,6 +10,36 @@ use std::{
     },
 };
 use tokio::sync::watch;
+use uuid::Uuid;
+
+#[derive(Clone, Default)]
+pub struct BrowserHandoffStore {
+    codes: Arc<std::sync::Mutex<HashMap<String, BrowserHandoff>>>,
+}
+
+#[derive(Clone)]
+pub struct BrowserHandoff {
+    pub user_id: Uuid,
+    pub expires_at: DateTime<Utc>,
+}
+
+impl BrowserHandoffStore {
+    pub fn issue(&self, code: String, handoff: BrowserHandoff) {
+        if let Ok(mut codes) = self.codes.lock() {
+            let now = Utc::now();
+            codes.retain(|_, value| value.expires_at > now);
+            codes.insert(code, handoff);
+        }
+    }
+
+    pub fn redeem(&self, code: &str) -> Option<BrowserHandoff> {
+        let mut codes = self.codes.lock().ok()?;
+        let now = Utc::now();
+        codes.retain(|_, value| value.expires_at > now);
+        let handoff = codes.remove(code)?;
+        (handoff.expires_at > now).then_some(handoff)
+    }
+}
 
 #[derive(Clone)]
 pub struct ServiceControl {
@@ -62,6 +94,7 @@ pub struct AppState {
     pub pool: PgPool,
     pub service_control: ServiceControl,
     pub backup_service: BackupService,
+    pub browser_handoffs: BrowserHandoffStore,
 }
 
 impl AppState {
@@ -76,6 +109,7 @@ impl AppState {
             pool,
             service_control,
             backup_service,
+            browser_handoffs: BrowserHandoffStore::default(),
         }
     }
 }

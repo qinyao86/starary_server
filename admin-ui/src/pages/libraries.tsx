@@ -17,6 +17,7 @@ export function LibrariesPage({
   const [name, setName] = useState("");
   const [storageConnectionId, setStorageConnectionId] = useState("");
   const [storageDialogOpen, setStorageDialogOpen] = useState(false);
+  const [assignStorageDialogOpen, setAssignStorageDialogOpen] = useState(false);
   const [storageKind, setStorageKind] = useState("server_filesystem");
   const [storageLocation, setStorageLocation] = useState("");
   const [editName, setEditName] = useState("");
@@ -37,16 +38,17 @@ export function LibrariesPage({
     if (error instanceof ApiError && error.code === "storage_location_conflict") {
       return t("storageLocationConflict");
     }
-    if (error instanceof ApiError && error.code === "storage_migration_required") {
-      return t("libraryStorageMigrationRequired");
-    }
     return error instanceof Error ? error.message : String(error);
   };
 
   const openCreateLibraryDialog = () => {
     cancelEditLibrary();
     setName("");
-    setStorageConnectionId(storageConnections.find((connection) => connection.enabled)?.id ?? "");
+    setStorageConnectionId(
+      storageConnections.find((connection) => connection.isDefault && connection.enabled)?.id ??
+      storageConnections.find((connection) => connection.enabled)?.id ??
+      ""
+    );
     setShowCreate(true);
   };
 
@@ -57,6 +59,7 @@ export function LibrariesPage({
   };
 
   const openLibrary = (libraryId: string) => {
+    setAssignStorageDialogOpen(false);
     setViewLibraryId(libraryId);
     setSelectedLibraryId(libraryId);
   };
@@ -65,19 +68,31 @@ export function LibrariesPage({
     setShowCreate(false);
     setEditingLibraryId(library.id);
     setEditName(library.displayName);
-    setStorageConnectionId(library.primaryStorageConnectionId ?? storageConnections.find((connection) => connection.enabled)?.id ?? "");
   };
 
   const cancelEditLibrary = () => {
     setEditingLibraryId(null);
     setEditName("");
-    setStorageConnectionId("");
   };
 
   const openStorageDialog = () => {
     setStorageKind("server_filesystem");
     setStorageLocation("");
     setStorageDialogOpen(true);
+  };
+
+  const openAssignStorageDialog = () => {
+    setStorageConnectionId(
+      storageConnections.find((connection) => connection.isDefault && connection.enabled)?.id ??
+      storageConnections.find((connection) => connection.enabled)?.id ??
+      ""
+    );
+    setAssignStorageDialogOpen(true);
+  };
+
+  const closeAssignStorageDialog = () => {
+    setAssignStorageDialogOpen(false);
+    setStorageConnectionId("");
   };
 
   const createStorageConnection = async (event: FormEvent) => {
@@ -133,7 +148,7 @@ export function LibrariesPage({
 
   const updateLibrary = async (event: FormEvent) => {
     event.preventDefault();
-    if (!editingLibraryId || !editName.trim() || !storageConnectionId) {
+    if (!editingLibraryId || !editName.trim()) {
       setMessage(t("formRequiredHint"));
       return;
     }
@@ -143,11 +158,30 @@ export function LibrariesPage({
     }
     try {
       await api.updateLibrary(token, editingLibraryId, {
-        displayName: editName.trim(),
-        storageBinding: { connectionId: storageConnectionId }
+        displayName: editName.trim()
       });
       cancelEditLibrary();
       setMessage(t("saved"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(storageErrorMessage(error));
+    }
+  };
+
+  const assignLibraryStorage = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!activeLibrary || !storageConnectionId) {
+      setMessage(t("formRequiredHint"));
+      return;
+    }
+    if (!token) {
+      setMessage(t("plannedNote"));
+      return;
+    }
+    try {
+      await api.assignLibraryStorage(token, activeLibrary.id, { connectionId: storageConnectionId });
+      closeAssignStorageDialog();
+      setMessage(t("storageAssigned"));
       await refreshAll();
     } catch (error) {
       setMessage(storageErrorMessage(error));
@@ -266,14 +300,8 @@ export function LibrariesPage({
           name={editName}
           submitLabel={t("submit")}
           t={t}
-          showStorage
-          storageLocked={Boolean(activeLibrary.storageLockedAt)}
-          storageConnectionId={storageConnectionId}
-          storageConnections={storageConnections}
           onClose={cancelEditLibrary}
           onNameChange={setEditName}
-          onStorageConnectionChange={setStorageConnectionId}
-          onCreateStorage={openStorageDialog}
           onSubmit={updateLibrary}
         />
         <LibraryDetailPageView
@@ -286,9 +314,15 @@ export function LibrariesPage({
           memberUserId={memberUserId}
           canDeleteLibrary={canCreateLibrary}
           canManageLibrary={canManageLibrary(activeLibrary)}
+          assignStorageDialogOpen={assignStorageDialogOpen && !storageDialogOpen}
+          storageConnectionId={storageConnectionId}
+          storageConnections={storageConnections}
           storageRoots={storageRoots}
           t={t}
-          onBack={() => setViewLibraryId(null)}
+          onBack={() => {
+            closeAssignStorageDialog();
+            setViewLibraryId(null);
+          }}
           onDelete={() => setLibraryPendingDeletion(activeLibrary)}
           onEdit={() => startEditLibrary(activeLibrary)}
           onMemberDialogClose={() => setMemberDialogOpen(false)}
@@ -298,6 +332,11 @@ export function LibrariesPage({
           onMemberUserChange={setMemberUserId}
           onMemberRoleUpdate={(member, role) => void updateMemberRole(member, role)}
           onRemoveMember={(member) => void removeMember(member)}
+          onAssignStorage={assignLibraryStorage}
+          onAssignStorageDialogClose={closeAssignStorageDialog}
+          onAssignStorageDialogOpen={openAssignStorageDialog}
+          onStorageConnectionChange={setStorageConnectionId}
+          onOpenStorageCreate={openStorageDialog}
         />
       </>
     );
@@ -322,7 +361,6 @@ export function LibrariesPage({
       createName={name}
       editName={editName}
       editingLibraryId={storageDialogOpen ? null : editingLibraryId}
-      editingStorageLocked={Boolean(libraries.find((library) => library.id === editingLibraryId)?.storageLockedAt)}
       libraries={libraries}
       canCreateLibrary={canCreateLibrary}
       canManageLibrary={canManageLibrary}

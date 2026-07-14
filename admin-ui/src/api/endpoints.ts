@@ -15,6 +15,7 @@ import type {
   SetupStatus,
   StorageConnection,
   StorageConnectionInput,
+  StorageMigrationResult,
   StorageRoot,
   TeamLibrary,
   TeamUser
@@ -64,6 +65,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
+  createBrowserHandoff: (token: string) =>
+    request<{ code: string }>("/api/v1/auth/browser-handoff", { method: "POST", token }),
+  redeemBrowserHandoff: (code: string) =>
+    request<LoginResponse>("/api/v1/auth/browser-handoff/redeem", {
+      method: "POST",
+      body: JSON.stringify({ code })
+    }),
   me: (token: string) => request<CurrentUser>("/api/v1/me", { token }),
   updatePresence: (token: string, payload: { libraryId?: string | null } = {}) =>
     request<void>("/api/v1/me/presence", {
@@ -91,7 +99,7 @@ export const api = {
       token,
       body: JSON.stringify(payload)
     }),
-  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; storageBinding?: { connectionId: string; namespace?: string } }) =>
+  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; iconUrl?: string | null }) =>
     request<TeamLibrary>(`/api/v1/libraries/${libraryId}`, {
       method: "PATCH",
       token,
@@ -100,6 +108,12 @@ export const api = {
   updateLibraryEnabled: (token: string, libraryId: string, payload: { enabled: boolean }) =>
     request<TeamLibrary>(`/api/v1/libraries/${libraryId}/enabled`, {
       method: "PATCH",
+      token,
+      body: JSON.stringify(payload)
+    }),
+  assignLibraryStorage: (token: string, libraryId: string, payload: { connectionId: string; namespace?: string }) =>
+    request<void>(`/api/v1/libraries/${libraryId}/storage-binding`, {
+      method: "POST",
       token,
       body: JSON.stringify(payload)
     }),
@@ -134,6 +148,17 @@ export const api = {
       method: "PATCH",
       token,
       body: JSON.stringify(payload)
+    }),
+  migrateStorageConnection: (token: string, connectionId: string, payload: StorageConnectionInput) =>
+    request<StorageMigrationResult>(`/api/v1/storage-connections/${connectionId}/migrate`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload)
+    }),
+  setDefaultStorageConnection: (token: string, connectionId: string) =>
+    request<StorageConnection>(`/api/v1/storage-connections/${connectionId}/default`, {
+      method: "PATCH",
+      token
     }),
   deleteStorageConnection: (token: string, connectionId: string) =>
     request<void>(`/api/v1/storage-connections/${connectionId}`, {

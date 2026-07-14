@@ -4,12 +4,16 @@ import { TextField } from "../common";
 export function StorageLocationFields({
   kind,
   location,
+  allowedKinds,
+  locationLabel,
   t,
   onKindChange,
   onLocationChange
 }: TranslatorContext & {
   kind: string;
   location: string;
+  allowedKinds?: string[];
+  locationLabel?: string;
   onKindChange: (kind: string) => void;
   onLocationChange: (location: string) => void;
 }) {
@@ -17,7 +21,7 @@ export function StorageLocationFields({
     { value: "server_filesystem", label: t("storageKindServerFilesystem") },
     { value: "smb", label: t("storageKindSmb") },
     { value: "s3", label: t("storageKindS3") }
-  ];
+  ].filter((option) => !allowedKinds || allowedKinds.includes(option.value));
   const placeholder =
     kind === "s3"
       ? t("objectStorageLocationPlaceholder")
@@ -30,7 +34,7 @@ export function StorageLocationFields({
       <TextField
         autoFocus
         required
-        label={t("libraryStorageLocation")}
+        label={locationLabel ?? t("libraryStorageLocation")}
         placeholder={placeholder}
         value={location}
         onChange={onLocationChange}

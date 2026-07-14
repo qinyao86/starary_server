@@ -36,6 +36,41 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
         .await?;
     tx.execute("ALTER TABLE library_memberships ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();")
         .await?;
+    tx.execute(
+        "ALTER TABLE storage_connections ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT FALSE;",
+    )
+    .await?;
+    tx.execute(
+        "UPDATE storage_connections SET is_default = FALSE WHERE is_default AND NOT enabled;",
+    )
+    .await?;
+    tx.execute(
+        r#"
+        WITH ranked AS (
+            SELECT id, ROW_NUMBER() OVER (ORDER BY created_at, id) AS position
+            FROM storage_connections
+            WHERE is_default AND enabled
+        )
+        UPDATE storage_connections sc
+        SET is_default = FALSE
+        FROM ranked
+        WHERE sc.id = ranked.id AND ranked.position > 1;
+
+        UPDATE storage_connections
+        SET is_default = TRUE
+        WHERE id = (
+            SELECT id
+            FROM storage_connections
+            WHERE enabled
+            ORDER BY created_at, id
+            LIMIT 1
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM storage_connections WHERE is_default AND enabled
+        );
+        "#,
+    )
+    .await?;
     tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS windows_mapped_drive_aliases JSONB NOT NULL DEFAULT '[]'::jsonb;")
         .await?;
     tx.execute("ALTER TABLE storage_roots ADD COLUMN IF NOT EXISTS macos_mount_aliases JSONB NOT NULL DEFAULT '[]'::jsonb;")
@@ -234,6 +269,11 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
     tx.execute("ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS target_id TEXT;")
         .await?;
     tx.execute("ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS details JSONB NOT NULL DEFAULT '{}'::jsonb;")
+        .await?;
+
+    // Library deletion has no restore workflow. Remove legacy soft-deleted rows so
+    // their cascading records no longer reserve storage connections.
+    tx.execute("DELETE FROM libraries WHERE deleted_at IS NOT NULL;")
         .await?;
 
     Ok(())

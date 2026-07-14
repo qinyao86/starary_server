@@ -1,11 +1,12 @@
 use crate::{
-    auth::{hash_password, issue_token, verify_password, AuthUser},
+    auth::{hash_password, issue_token, issue_token_for_user, verify_password, AuthUser},
     error::{AppError, AppResult},
-    models::UserWithPassword,
+    models::{UserRecord, UserWithPassword},
     routes::users::guards::ensure_unique_display_name,
-    state::AppState,
+    state::{AppState, BrowserHandoff},
 };
 use axum::{extract::State, http::StatusCode, Json};
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -43,6 +44,18 @@ pub struct LoginResponse {
     access_token: String,
     token_type: &'static str,
     user: CurrentUserResponse,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserHandoffResponse {
+    code: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedeemBrowserHandoffRequest {
+    code: String,
 }
 
 #[derive(Serialize)]
@@ -87,6 +100,62 @@ pub async fn login(
     .bind(user.id)
     .execute(&state.pool)
     .await?;
+
+    Ok(Json(LoginResponse {
+        access_token: token,
+        token_type: "Bearer",
+        user: CurrentUserResponse {
+            id: user.id.to_string(),
+            email: user.email,
+            display_name: user.display_name,
+            role: user.global_role,
+        },
+    }))
+}
+
+pub async fn create_browser_handoff(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> Json<BrowserHandoffResponse> {
+    let code = Uuid::new_v4().simple().to_string();
+    state.browser_handoffs.issue(
+        code.clone(),
+        BrowserHandoff {
+            user_id: user.id,
+            expires_at: Utc::now() + Duration::seconds(60),
+        },
+    );
+    Json(BrowserHandoffResponse { code })
+}
+
+pub async fn redeem_browser_handoff(
+    State(state): State<AppState>,
+    Json(request): Json<RedeemBrowserHandoffRequest>,
+) -> AppResult<Json<LoginResponse>> {
+    let handoff = state
+        .browser_handoffs
+        .redeem(request.code.trim())
+        .ok_or(AppError::Unauthorized)?;
+    let user = sqlx::query_as::<_, UserRecord>(
+        r#"
+        SELECT id, email, display_name, global_role, is_active, created_at, updated_at
+        FROM users
+        WHERE id = $1
+        "#,
+    )
+    .bind(handoff.user_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::Unauthorized)?;
+    if !user.is_active {
+        return Err(AppError::Unauthorized);
+    }
+
+    let token = issue_token_for_user(&state, user.id, &user.global_role)?;
+    sqlx::query("UPDATE users SET last_seen_at = NOW() WHERE id = $1")
+        .bind(user.id)
+        .execute(&state.pool)
+        .await?;
 
     Ok(Json(LoginResponse {
         access_token: token,

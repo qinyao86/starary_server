@@ -78,6 +78,8 @@ export function activityActionLabel(t: ReturnType<typeof createTranslator>, acti
       return t("libraryCreated");
     case "library.updated":
       return t("libraryUpdated");
+    case "library.storage_assigned":
+      return t("libraryStorageAssigned");
     case "library.deleted":
       return t("libraryDeleted");
     case "library.enabled":
@@ -100,6 +102,8 @@ export function activityActionLabel(t: ReturnType<typeof createTranslator>, acti
       return t("storageRootUpdated");
     case "storage_root.deleted":
       return t("storageRootDeleted");
+    case "storage_connection.migrated":
+      return t("storageConnectionMigrated");
     default:
       return action;
   }

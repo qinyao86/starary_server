@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TeamLibrary, TeamUser } from "../../api";
+import { defaultNewUserPassword } from "../../constants";
 import type { TranslatorContext } from "../../types";
 import { SelectField, TextField } from "../common";
 import { roleLabel } from "../../utils/format";
@@ -12,11 +13,13 @@ export function UserDialog({
   displayName,
   editingUser,
   email,
+  canManageAccountIdentity,
   isActive,
   libraries,
   libraryRoles,
   open,
   password,
+  role,
   t,
   onClose,
   onDisplayNameChange,
@@ -24,8 +27,10 @@ export function UserDialog({
   onIsActiveChange,
   onLibraryAccessManageOpen,
   onPasswordChange,
+  onRoleChange,
   onSubmit
 }: TranslatorContext & {
+  canManageAccountIdentity: boolean;
   displayName: string;
   editingUser: TeamUser | null;
   email: string;
@@ -34,15 +39,23 @@ export function UserDialog({
   libraryRoles: Record<string, string>;
   open: boolean;
   password: string;
+  role: string;
   onClose: () => void;
   onDisplayNameChange: (value: string) => void;
   onEmailChange: (value: string) => void;
   onIsActiveChange: (value: boolean) => void;
   onLibraryAccessManageOpen: () => void;
   onPasswordChange: (value: string) => void;
+  onRoleChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void | Promise<void>;
 }) {
   const title = editingUser ? t("editUser") : t("createUser");
+  const hasGlobalLibraryAccess = role === "owner" || role === "admin";
+  const accountIdentityLabel = role === "owner"
+    ? t("owner")
+    : role === "admin"
+      ? t("adminRole")
+      : t("standardUser");
   const assignedLibraries = useMemo(
     () => libraries.filter((library) => Boolean(libraryRoles[library.id])),
     [libraries, libraryRoles]
@@ -52,12 +65,14 @@ export function UserDialog({
       className="user-dialog"
       closeLabel={t("cancel")}
       open={open}
-      subtitle={t("userDialogHint")}
+      subtitle={editingUser
+        ? t("userDialogHint")
+        : t("createUserDialogHint").replace("{password}", defaultNewUserPassword)}
       title={title}
       titleId="user-dialog-title"
       onClose={onClose}
     >
-      <form className="dialog-form" onSubmit={onSubmit}>
+      <form autoComplete="off" className="dialog-form" onSubmit={onSubmit}>
         <div className="dialog-body">
           <div className="user-account-fields">
             {editingUser ? (
@@ -66,17 +81,45 @@ export function UserDialog({
                 <strong>{email}</strong>
               </div>
             ) : (
-              <TextField autoFocus required label={t("email")} value={email} onChange={onEmailChange} />
+              <TextField
+                autoComplete="off"
+                autoFocus
+                required
+                label={t("email")}
+                name="new-user-email"
+                value={email}
+                onChange={onEmailChange}
+              />
             )}
-            <TextField label={t("displayName")} value={displayName} onChange={onDisplayNameChange} />
             <TextField
-              label={editingUser ? t("newPassword") : t("password")}
-              value={password}
-              onChange={onPasswordChange}
-              type="password"
-              required={!editingUser}
-              placeholder={editingUser ? t("passwordOptional") : undefined}
+              autoComplete="off"
+              label={t("displayName")}
+              name={editingUser ? "user-display-name" : "new-user-display-name"}
+              value={displayName}
+              onChange={onDisplayNameChange}
             />
+            {canManageAccountIdentity && role !== "owner" ? (
+              <SelectField label={t("accountIdentity")} value={role} onChange={onRoleChange}>
+                <option value="viewer">{t("standardUser")}</option>
+                <option value="admin">{t("adminRole")}</option>
+              </SelectField>
+            ) : (
+              <div className="readonly-field">
+                <span>{t("accountIdentity")}</span>
+                <strong>{accountIdentityLabel}</strong>
+              </div>
+            )}
+            {editingUser && (
+              <TextField
+                autoComplete="new-password"
+                label={t("newPassword")}
+                name="user-new-password"
+                value={password}
+                onChange={onPasswordChange}
+                type="password"
+                placeholder={t("passwordOptional")}
+              />
+            )}
             {editingUser && (
               <SelectField
                 label={t("status")}
@@ -93,20 +136,24 @@ export function UserDialog({
               <div className="user-library-editor-heading">
                 <strong>{t("libraryAccess")}</strong>
               </div>
-              <Button
-                className="user-library-manage-button"
-                disabled={libraries.length === 0}
-                size="icon"
-                title={t("manageLibraryAccess")}
-                aria-label={t("manageLibraryAccess")}
-                type="button"
-                variant="outline"
-                onClick={onLibraryAccessManageOpen}
-              >
-                <Plus size={15} />
-              </Button>
+              {!hasGlobalLibraryAccess && (
+                <Button
+                  className="user-library-manage-button"
+                  disabled={libraries.length === 0}
+                  size="icon"
+                  title={t("manageLibraryAccess")}
+                  aria-label={t("manageLibraryAccess")}
+                  type="button"
+                  variant="outline"
+                  onClick={onLibraryAccessManageOpen}
+                >
+                  <Plus size={15} />
+                </Button>
+              )}
             </div>
-            {libraries.length === 0 ? (
+            {hasGlobalLibraryAccess ? (
+              <div className="user-library-inherited">{t("serverRoleGrantsAllLibraries")}</div>
+            ) : libraries.length === 0 ? (
               <div className="user-library-inherited">{t("noLibraries")}</div>
             ) : (
               <div className="user-library-tags-editor">
