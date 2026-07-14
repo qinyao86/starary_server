@@ -177,6 +177,7 @@ elements["copy-url"].addEventListener("click", async () => {
 });
 elements["open-log"].addEventListener("click", () => invoke("open_log").catch(showError));
 elements["open-data"].addEventListener("click", () => invoke("open_data_directory").catch(showError));
+elements["check-updates"].addEventListener("click", () => showToast(t("updateCheckPlaceholderToast")));
 elements["device-management"].addEventListener("click", () => showToast(t("deviceManagementPlanned")));
 document.querySelectorAll("[data-panel-target]").forEach((button) => {
   button.addEventListener("click", () => setActivePanel(button.dataset.panelTarget));

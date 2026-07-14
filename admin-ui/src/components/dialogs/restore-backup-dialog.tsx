@@ -8,6 +8,7 @@ export function RestoreBackupDialog({
   backup,
   busy,
   open,
+  sourceName,
   t,
   onClose,
   onConfirm
@@ -15,6 +16,7 @@ export function RestoreBackupDialog({
   backup: BackupRecord | null;
   busy: boolean;
   open: boolean;
+  sourceName?: string;
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
 }) {
@@ -31,7 +33,7 @@ export function RestoreBackupDialog({
       <div className="restore-backup-body">
         <RotateCcw aria-hidden="true" size={20} />
         <div>
-          <strong>{backup?.id ?? ""}</strong>
+          <strong>{sourceName ?? backup?.id ?? ""}</strong>
           <p>{t("restoreBackupSafetyHint")}</p>
         </div>
       </div>

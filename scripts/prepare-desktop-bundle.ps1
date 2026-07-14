@@ -20,10 +20,19 @@ if ($Development) {
 }
 
 if (Test-Path -LiteralPath $runtime) {
-  Get-ChildItem -LiteralPath $runtime -Force | Where-Object { $_.Name -ne ".gitkeep" } | Remove-Item -Recurse -Force
+  Get-ChildItem -LiteralPath $runtime -Force | Where-Object { $_.Name -ne ".gitkeep" } | ForEach-Object {
+    try {
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+    } catch {
+      Write-Warning "Skipping locked runtime item: $($_.FullName)"
+    }
+  }
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $runtime "admin-ui") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $runtime "postgresql") | Out-Null
 Copy-Item -LiteralPath $serverExe -Destination (Join-Path $runtime "madlibrary-server.exe")
 Copy-Item -Path (Join-Path $root "admin-ui\dist\*") -Destination (Join-Path $runtime "admin-ui") -Recurse
-Copy-Item -Path (Join-Path $root "binaries\windows-x64\postgresql\*") -Destination (Join-Path $runtime "postgresql") -Recurse
+$postgresSource = Join-Path $root "binaries\windows-x64\postgresql"
+$postgresTarget = Join-Path $runtime "postgresql"
+& robocopy $postgresSource $postgresTarget /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NP | Out-Null
+if ($LASTEXITCODE -gt 7) { throw "Failed to copy PostgreSQL runtime. Robocopy exit code: $LASTEXITCODE" }

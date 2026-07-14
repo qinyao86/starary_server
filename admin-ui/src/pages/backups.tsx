@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Archive, Clock3, Download, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Archive, Clock3, Download, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, clearStoredToken, type BackupRecord, type BackupStatus } from "../api";
 import { PageFrame, Panel } from "../components/common";
@@ -16,9 +16,12 @@ export function BackupsPage({ t, token, currentUser, setMessage, resetAfterIniti
   const [busy, setBusy] = useState(false);
   const [restoreBackup, setRestoreBackup] = useState<BackupRecord | null>(null);
   const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreFileBusy, setRestoreFileBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BackupRecord | null>(null);
   const [initializeOpen, setInitializeOpen] = useState(false);
   const [initializeBusy, setInitializeBusy] = useState(false);
+  const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     const overview = await api.backupOverview(token);
@@ -112,6 +115,30 @@ export function BackupsPage({ t, token, currentUser, setMessage, resetAfterIniti
     }
   };
 
+  const selectRestoreFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".dump")) {
+      setMessage(t("invalidBackupFile"));
+      return;
+    }
+    setRestoreFile(file);
+  };
+
+  const confirmRestoreFile = async () => {
+    if (!restoreFile) return;
+    setRestoreFileBusy(true);
+    try {
+      await api.restoreBackupFile(token, restoreFile);
+      setMessage(t("restoreQueued"));
+      setRestoreFile(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+      setRestoreFileBusy(false);
+    }
+  };
+
   const initializeServer = async () => {
     setInitializeBusy(true);
     try {
@@ -131,10 +158,23 @@ export function BackupsPage({ t, token, currentUser, setMessage, resetAfterIniti
       title={t("data")}
       description={t("dataPageHint")}
       action={
-        <Button disabled={busy || !status?.available} type="button" onClick={() => void createBackup()}>
-          <Archive size={16} />
-          {busy ? t("backupWorking") : t("backupNow")}
-        </Button>
+        <>
+          <input
+            ref={restoreFileInputRef}
+            accept=".dump"
+            style={{ display: "none" }}
+            type="file"
+            onChange={selectRestoreFile}
+          />
+          <Button disabled={busy || restoreBusy || restoreFileBusy || !status?.available} type="button" variant="outline" onClick={() => restoreFileInputRef.current?.click()}>
+            <Upload size={16} />
+            {t("restoreFromFile")}
+          </Button>
+          <Button disabled={busy || !status?.available} type="button" onClick={() => void createBackup()}>
+            <Archive size={16} />
+            {busy ? t("backupWorking") : t("backupNow")}
+          </Button>
+        </>
       }
     >
       <RestoreBackupDialog
@@ -144,6 +184,15 @@ export function BackupsPage({ t, token, currentUser, setMessage, resetAfterIniti
         t={t}
         onClose={() => !restoreBusy && setRestoreBackup(null)}
         onConfirm={confirmRestore}
+      />
+      <RestoreBackupDialog
+        backup={null}
+        busy={restoreFileBusy}
+        open={Boolean(restoreFile)}
+        sourceName={restoreFile?.name}
+        t={t}
+        onClose={() => !restoreFileBusy && setRestoreFile(null)}
+        onConfirm={confirmRestoreFile}
       />
       <DeleteBackupDialog
         backup={deleteTarget}

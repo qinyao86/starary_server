@@ -53,6 +53,15 @@ export const api = {
       token,
       body: JSON.stringify({ backupId })
     }),
+  restoreBackupFile: (token: string, file: File) => {
+    const form = new FormData();
+    form.set("file", file);
+    return request<void>("/api/v1/backups/restore-file", {
+      method: "POST",
+      token,
+      body: form
+    });
+  },
   initializeServer: (token: string) =>
     request<void>("/api/v1/server/initialize", { method: "POST", token }),
   createOwner: (payload: { email: string; password: string; displayName?: string }) =>

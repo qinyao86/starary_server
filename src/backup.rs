@@ -65,7 +65,10 @@ pub enum BackupKind {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PendingRestore {
-    backup_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    backup_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_path: Option<PathBuf>,
     requested_at: DateTime<Utc>,
 }
 
@@ -180,7 +183,32 @@ impl BackupService {
         write_json_atomic(
             &self.inner.pending_restore_path,
             &PendingRestore {
-                backup_id: backup_id.to_string(),
+                backup_id: Some(backup_id.to_string()),
+                source_path: None,
+                requested_at: Utc::now(),
+            },
+        )
+    }
+
+    pub fn uploaded_restore_paths(&self) -> anyhow::Result<(PathBuf, PathBuf)> {
+        fs::create_dir_all(&self.inner.backup_dir)?;
+        let id = format!(
+            "madlibrary-upload-restore-{}.dump",
+            Local::now().format("%Y%m%d-%H%M%S-%3f")
+        );
+        let destination = self.inner.backup_dir.join(id);
+        let partial = destination.with_extension("dump.partial");
+        Ok((partial, destination))
+    }
+
+    pub async fn queue_uploaded_restore(&self, source_path: &Path) -> anyhow::Result<()> {
+        let _guard = self.inner.operation_lock.lock().await;
+        validate_uploaded_restore_source(source_path, &self.inner.backup_dir)?;
+        write_json_atomic(
+            &self.inner.pending_restore_path,
+            &PendingRestore {
+                backup_id: None,
+                source_path: Some(source_path.to_path_buf()),
                 requested_at: Utc::now(),
             },
         )
@@ -211,7 +239,7 @@ impl BackupService {
         }
         let pending: PendingRestore =
             serde_json::from_slice(&fs::read(&self.inner.pending_restore_path)?)?;
-        let source = self.backup_path(&pending.backup_id)?;
+        let (source, cleanup_source) = self.pending_restore_source(&pending)?;
         let recovery_id = format!(
             "madlibrary-pre-restore-{}.dump",
             Local::now().format("%Y%m%d-%H%M%S-%3f")
@@ -220,15 +248,21 @@ impl BackupService {
 
         self.dump_sync(&recovery)
             .context("failed to create the pre-restore safety backup")?;
-        tracing::info!(backup = %pending.backup_id, "Applying pending database restore");
+        tracing::info!(source = %source.display(), "Applying pending database restore");
         if let Err(error) = self.restore_sync(&source) {
             tracing::error!(%error, "Database restore failed; rolling back to pre-restore backup");
             self.restore_sync(&recovery)
                 .context("database restore and automatic rollback both failed")?;
             fs::remove_file(&self.inner.pending_restore_path)?;
+            if cleanup_source {
+                let _ = fs::remove_file(&source);
+            }
             return Err(error.context("database restore failed and was rolled back"));
         }
         fs::remove_file(&self.inner.pending_restore_path)?;
+        if cleanup_source {
+            let _ = fs::remove_file(&source);
+        }
         Ok(true)
     }
 
@@ -382,6 +416,17 @@ impl BackupService {
         }
         Ok(())
     }
+
+    fn pending_restore_source(&self, pending: &PendingRestore) -> anyhow::Result<(PathBuf, bool)> {
+        if let Some(backup_id) = pending.backup_id.as_deref() {
+            return Ok((self.backup_path(backup_id)?, false));
+        }
+        if let Some(source_path) = pending.source_path.as_deref() {
+            validate_uploaded_restore_source(source_path, &self.inner.backup_dir)?;
+            return Ok((source_path.to_path_buf(), true));
+        }
+        bail!("pending restore source is missing")
+    }
 }
 
 impl BackupSettings {
@@ -480,6 +525,21 @@ fn validate_backup_id(value: &str) -> anyhow::Result<()> {
         || Path::new(value).file_name().and_then(|name| name.to_str()) != Some(value)
     {
         bail!("invalid backup id")
+    }
+    Ok(())
+}
+
+fn validate_uploaded_restore_source(path: &Path, backup_dir: &Path) -> anyhow::Result<()> {
+    if path.extension().and_then(|value| value.to_str()) != Some("dump") {
+        bail!("restore source must be a .dump file")
+    }
+    if !path.is_file() {
+        bail!("restore source was not found")
+    }
+    let backup_dir = backup_dir.canonicalize()?;
+    let source = path.canonicalize()?;
+    if !source.starts_with(&backup_dir) {
+        bail!("restore source must be in the backup directory")
     }
     Ok(())
 }

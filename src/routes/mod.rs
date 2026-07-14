@@ -56,6 +56,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/backups/settings", patch(backups::update_settings))
         .route("/api/v1/backups/restore", post(backups::restore))
         .route(
+            "/api/v1/backups/restore-file",
+            post(backups::restore_file).layer(DefaultBodyLimit::max(2usize * 1024 * 1024 * 1024)),
+        )
+        .route(
             "/api/v1/server/initialize",
             post(initialization::initialize),
         )
