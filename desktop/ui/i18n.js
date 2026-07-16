@@ -64,6 +64,8 @@ export const translations = {
     servicePortHint: "\u5148\u7ec8\u6b62\u670d\u52a1\u624d\u53ef\u4fee\u6539",
     logDirectory: "日志目录",
     logDirectoryHint: "先停止服务才可修改",
+    launchAtLogin: "开机启动",
+    launchAtLoginHint: "登录 Windows 时打开桌面端",
     save: "保存",
     openDirectory: "打开",
     selectDirectory: "选择文件夹",
@@ -83,6 +85,8 @@ export const translations = {
     serviceRestartedToast: "服务已重新启动",
     portSavedToast: "端口已保存",
     logDirectorySavedToast: "日志目录已保存",
+    launchAtLoginEnabledToast: "已开启开机启动",
+    launchAtLoginDisabledToast: "已关闭开机启动",
     addressCopiedToast: "地址已复制"
   },
   en: {
@@ -148,6 +152,8 @@ export const translations = {
     servicePortHint: "Stop the service first",
     logDirectory: "Log directory",
     logDirectoryHint: "Stop the service first",
+    launchAtLogin: "Launch at startup",
+    launchAtLoginHint: "Open the desktop app when you sign in to Windows",
     save: "Save",
     openDirectory: "Open",
     selectDirectory: "Choose folder",
@@ -167,6 +173,8 @@ export const translations = {
     serviceRestartedToast: "Service restarted",
     portSavedToast: "Port saved",
     logDirectorySavedToast: "Log directory saved",
+    launchAtLoginEnabledToast: "Launch at startup enabled",
+    launchAtLoginDisabledToast: "Launch at startup disabled",
     addressCopiedToast: "Address copied"
   }
 };
@@ -182,6 +190,8 @@ const englishBackendMessages = new Map([
   ["请先停止服务，再修改端口。", "Stop the service before changing the port."],
   ["请先停止服务，再修改日志目录。", "Stop the service before changing the log directory."],
   ["日志目录不能为空。", "The log directory cannot be empty."],
+  ["无法写入开机启动项。", "Could not update launch at startup."],
+  ["当前系统暂不支持开机启动设置。", "Launch at startup is not supported on this system."],
   ["服务尚未运行。", "The service is not running."],
   ["服务操作正在进行中。", "A service operation is already in progress."]
 ]);

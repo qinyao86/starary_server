@@ -32,6 +32,7 @@ pub async fn list_members(
             m.user_id,
             u.email,
             u.display_name,
+            u.avatar_key,
             m.role,
             m.created_at,
             m.updated_at
@@ -115,6 +116,7 @@ pub async fn upsert_member(
             m.user_id,
             u.email,
             u.display_name,
+            u.avatar_key,
             m.role,
             m.created_at,
             m.updated_at

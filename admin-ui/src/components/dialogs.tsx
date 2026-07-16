@@ -9,3 +9,5 @@ export { RestoreBackupDialog } from "./dialogs/restore-backup-dialog";
 export { InitializeServerDialog } from "./dialogs/initialize-server-dialog";
 export { UserDialog } from "./dialogs/user-dialog";
 export { UserLibraryAccessDialog } from "./dialogs/user-library-access-dialog";
+export { AvatarDialog } from "./dialogs/avatar-dialog";
+export { DeleteUserDialog } from "./dialogs/delete-user-dialog";

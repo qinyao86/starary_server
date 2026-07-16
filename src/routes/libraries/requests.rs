@@ -1,4 +1,4 @@
-use crate::models::StorageRootKind;
+use crate::models::{LibraryAccessMode, StorageRootKind};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -7,6 +7,8 @@ pub struct CreateLibraryRequest {
     #[serde(alias = "name")]
     pub display_name: String,
     pub icon_url: Option<String>,
+    #[serde(default)]
+    pub access_mode: Option<LibraryAccessMode>,
     pub default_storage_root: Option<CreateDefaultStorageRootRequest>,
     pub storage_binding: Option<StorageBindingRequest>,
 }
@@ -38,6 +40,8 @@ pub struct UpdateLibraryRequest {
     #[serde(alias = "name")]
     pub display_name: String,
     pub icon_url: Option<String>,
+    #[serde(default)]
+    pub access_mode: Option<LibraryAccessMode>,
 }
 
 #[derive(Deserialize)]
@@ -55,7 +59,8 @@ pub struct DeleteLibraryRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::UpdateLibraryRequest;
+    use super::{CreateLibraryRequest, UpdateLibraryRequest};
+    use crate::models::LibraryAccessMode;
 
     #[test]
     fn update_library_request_rejects_storage_binding() {
@@ -64,5 +69,18 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn create_library_request_accepts_access_mode() {
+        let result = serde_json::from_str::<CreateLibraryRequest>(
+            r#"{"displayName":"Design","accessMode":"public"}"#,
+        )
+        .expect("request should deserialize");
+
+        assert!(matches!(
+            result.access_mode,
+            Some(LibraryAccessMode::Public)
+        ));
     }
 }

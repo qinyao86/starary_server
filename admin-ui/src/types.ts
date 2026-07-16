@@ -12,7 +12,7 @@ export type Section =
   | "settings";
 
 export type DeploymentMode = "local" | "cloud";
-export type ColorTheme = "light" | "dark";
+export type ColorTheme = "system" | "light" | "dark";
 export type ApiState = "loading" | "connected" | "unavailable";
 
 export type NavItem = { id: Section; icon: LucideIcon; label: TranslationKey };
@@ -46,7 +46,8 @@ export type PageContext = TranslatorContext & {
   refreshAll: () => Promise<void>;
   resetAfterInitialization: () => Promise<void>;
   navigateToSection: (section: Section) => void;
-  libraryListViewVersion: number;
+  libraryRouteId: string | null;
+  navigateToLibrary: (libraryId: string | null, options?: { replace?: boolean }) => void;
   setMessage: (message: string | null) => void;
   previewMode: boolean;
 };

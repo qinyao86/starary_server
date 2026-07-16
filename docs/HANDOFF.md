@@ -1,6 +1,6 @@
 # Mad Library Server 交接文档
 
-最后更新：2026-07-12
+最后更新：2026-07-15
 
 ## 1. 项目定位
 
@@ -62,6 +62,15 @@ npm run desktop:dev
 ```
 
 该命令会构建管理后台、准备 `target/desktop-runtime/`，然后启动 Tauri。不要同时再运行一份 `cargo run`，否则会争用端口或实例锁。
+
+智能体注意：如果只在 `admin-ui/` 下执行 `npm run build`，Vite 只会更新 `admin-ui/dist/`。桌面开发运行时和 `http://127.0.0.1:3789/admin/` 实际读取的是 `target/desktop-runtime/admin-ui/` 的复制品。每次希望桌面端或 3789 后台看到最新前端时，构建后必须同步一次：
+
+```powershell
+robocopy admin-ui\dist target\desktop-runtime\admin-ui /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NP
+if ($LASTEXITCODE -gt 7) { exit $LASTEXITCODE }
+```
+
+也可以直接运行 `npm run desktop:dev`，该脚本会构建并准备 `target/desktop-runtime/`。若同步后页面仍旧，强刷浏览器或重启桌面窗口，让它重新加载新的 Vite hash 资源。
 
 只开发管理后台时，可先启动服务端，再运行 Vite：
 

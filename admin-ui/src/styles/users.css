@@ -70,7 +70,7 @@
 }
 
 .users-table .users-actions-column {
-  width: 92px;
+  width: 124px;
   padding-right: 14px;
   text-align: right;
 }
@@ -78,6 +78,20 @@
 .users-table th:first-child,
 .users-table td:first-child {
   padding-left: 14px;
+}
+
+.users-table .user-identity-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-identity-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .user-identity-heading {
@@ -249,6 +263,55 @@
 .users-action-button:hover {
   color: #1f2937;
   background: #efefed;
+}
+
+.users-action-button.is-destructive {
+  color: #b42318;
+}
+
+.users-action-button.is-destructive:hover {
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.delete-user-body {
+  display: grid;
+  gap: 16px;
+  padding: 20px 22px 8px;
+}
+
+.delete-user-dialog {
+  width: min(480px, 100%);
+}
+
+.delete-user-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.delete-user-identity > div:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.delete-user-identity strong,
+.delete-user-identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-user-identity span,
+.delete-user-body p {
+  color: #667085;
+  font-size: 13px;
+}
+
+.delete-user-body p {
+  margin: 0;
+  line-height: 1.65;
 }
 
 .user-dialog {
@@ -467,6 +530,20 @@
   background: #27272a;
 }
 
+.theme-dark .users-action-button.is-destructive,
+.theme-dark .users-action-button.is-destructive:hover {
+  color: #fda29b;
+}
+
+.theme-dark .users-action-button.is-destructive:hover {
+  background: rgba(180, 35, 24, 0.18);
+}
+
+.theme-dark .delete-user-identity span,
+.theme-dark .delete-user-body p {
+  color: #a1a1aa;
+}
+
 .theme-dark .user-library-editor,
 .theme-dark .user-library-tag-label {
   border-color: #2f2f33;
@@ -620,7 +697,7 @@
   }
 
   .users-table .users-actions-column {
-    width: 84px;
+    width: 116px;
   }
 
 }

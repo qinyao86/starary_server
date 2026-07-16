@@ -1,34 +1,42 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Cloud, LogOut, RefreshCw, Server } from "lucide-react";
-import type { ReactNode } from "react";
+import { Cloud, LogOut, MoreHorizontal, RefreshCw, Server } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import logoImage from "../assets/logo.png";
-import type { ServerInfo } from "../api";
-import { navItems } from "../navigation";
+import { api, type CurrentUser, type ServerInfo, type SystemAvatar } from "../api";
+import { visibleNavItems } from "../navigation";
 import type { ColorTheme, DeploymentMode, Section, TranslatorContext } from "../types";
-import { deploymentModeLabel } from "../utils/format";
-import { Segmented } from "./common";
+import { defaultSystemAvatars } from "../utils/avatars";
+import { deploymentModeLabel, roleLabel } from "../utils/format";
+import { Segmented, UserAvatar } from "./common";
+import { AvatarDialog } from "./dialogs";
 
 export function AdminShell({
   children,
   colorTheme,
+  currentUser,
   deploymentMode,
   message,
   previewMode,
+  currentUserRole,
   section,
   sidebarCollapsed,
   serverInfo,
   serviceRunning,
   t,
   title,
+  token,
   onClearMessage,
   onCreateBrowserHandoff,
   onLogout,
   onRefresh,
   onSelectSection,
+  onSetMessage,
   onSetDeploymentMode
 }: TranslatorContext & {
   children: ReactNode;
   colorTheme: ColorTheme;
+  currentUser: CurrentUser | null;
+  currentUserRole: string | null;
   deploymentMode: DeploymentMode;
   message: string | null;
   previewMode: boolean;
@@ -37,20 +45,28 @@ export function AdminShell({
   serverInfo: ServerInfo | null;
   serviceRunning: boolean;
   title: string;
+  token: string;
   onClearMessage: () => void;
   onCreateBrowserHandoff: () => Promise<string | null>;
   onLogout: () => void;
   onRefresh: () => Promise<void>;
   onSelectSection: (section: Section) => void;
+  onSetMessage: (message: string | null) => void;
   onSetDeploymentMode: (mode: DeploymentMode) => void;
 }) {
+  useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(onClearMessage, 2200);
+    return () => window.clearTimeout(timer);
+  }, [message, onClearMessage]);
+
   return (
     <div className={`admin-shell${sidebarCollapsed ? " is-sidebar-collapsed" : ""} ${colorTheme === "dark" ? "dark theme-dark" : "theme-light"}`}>
       <aside className="sidebar">
         <SidebarBrand t={t} />
         <SidebarStatus serverInfo={serverInfo} serviceRunning={serviceRunning} t={t} onCreateBrowserHandoff={onCreateBrowserHandoff} />
-        <SidebarNav section={section} t={t} onSelectSection={onSelectSection} />
-        <SidebarFooter t={t} onLogout={onLogout} />
+        <SidebarNav currentUserRole={currentUserRole} section={section} t={t} onSelectSection={onSelectSection} />
+        <SidebarFooter currentUser={currentUser} t={t} token={token} onLogout={onLogout} onRefresh={onRefresh} onSetMessage={onSetMessage} />
       </aside>
 
       <main className="main">
@@ -77,16 +93,11 @@ export function AdminShell({
           </div>
         </header>
 
-        {message && (
-          <div className="message-bar" role="status" aria-live="polite">
-            <span>{message}</span>
-            <button type="button" onClick={onClearMessage}>
-              x
-            </button>
-          </div>
-        )}
+        {message && <div className="toast is-visible" role="status" aria-live="polite">{message}</div>}
 
-        <section className="content">{children}</section>
+        <section className="content">
+          <div className="content-inner">{children}</div>
+        </section>
       </main>
     </div>
   );
@@ -154,13 +165,14 @@ function SidebarStatus({ serverInfo, serviceRunning, t, onCreateBrowserHandoff }
   );
 }
 
-function SidebarNav({ section, t, onSelectSection }: TranslatorContext & {
+function SidebarNav({ currentUserRole, section, t, onSelectSection }: TranslatorContext & {
+  currentUserRole: string | null;
   section: Section;
   onSelectSection: (section: Section) => void;
 }) {
   return (
     <nav className="nav-list" aria-label="Server admin navigation">
-      {navItems.map((item) => {
+      {visibleNavItems(currentUserRole).map((item) => {
         const Icon = item.icon;
         const active = item.id === section;
         return (
@@ -180,15 +192,99 @@ function SidebarNav({ section, t, onSelectSection }: TranslatorContext & {
   );
 }
 
-function SidebarFooter({ t, onLogout }: TranslatorContext & {
+function SidebarFooter({ currentUser, t, token, onLogout, onRefresh, onSetMessage }: TranslatorContext & {
+  currentUser: CurrentUser | null;
+  token: string;
   onLogout: () => void;
+  onRefresh: () => Promise<void>;
+  onSetMessage: (message: string | null) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatars, setAvatars] = useState<SystemAvatar[]>(defaultSystemAvatars);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const displayName = currentUser?.displayName?.trim() || currentUser?.email || t("standardUser");
+  const email = currentUser?.email ?? "";
+  const title = email ? `${displayName} - ${email}` : displayName;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [menuOpen]);
+
+  const openAvatarDialog = async () => {
+    if (!currentUser || !token) return;
+    setAvatarOpen(true);
+    try {
+      setAvatars(await api.listSystemAvatars(token));
+    } catch {
+      setAvatars(defaultSystemAvatars);
+    }
+  };
+
+  const updateAvatar = async (avatarKey: string) => {
+    if (!currentUser || !token) return;
+    setAvatarBusy(true);
+    try {
+      await api.updateUserAvatar(token, currentUser.id, avatarKey);
+      setAvatarOpen(false);
+      onSetMessage(t("avatarUpdated"));
+      await onRefresh();
+    } catch (error) {
+      onSetMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   return (
-    <div className="sidebar-footer">
-      <button className="sidebar-logout-button" type="button" onClick={onLogout} title={t("logout")}>
-        <LogOut size={15} />
-        <span>{t("logout")}</span>
-      </button>
+    <div className="sidebar-footer" ref={menuRef}>
+      <AvatarDialog
+        avatars={avatars}
+        busy={avatarBusy}
+        currentAvatarKey={currentUser?.avatarKey}
+        open={avatarOpen}
+        t={t}
+        targetName={displayName}
+        onClose={() => !avatarBusy && setAvatarOpen(false)}
+        onSelect={(avatarKey) => { void updateAvatar(avatarKey); }}
+      />
+      <div className="sidebar-account" title={title}>
+        <UserAvatar avatarKey={currentUser?.avatarKey} label={displayName} size="lg" onClick={() => { void openAvatarDialog(); }} />
+        <div className="sidebar-account-main">
+          <div className="sidebar-account-name">{displayName}</div>
+          {currentUser?.role && <div className="sidebar-account-role">{roleLabel(t, currentUser.role)}</div>}
+        </div>
+        <button
+          aria-expanded={menuOpen}
+          aria-label={t("accountIdentity")}
+          className="sidebar-account-menu-button"
+          type="button"
+          title={t("accountIdentity")}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      </div>
+      {menuOpen && (
+        <div className="sidebar-account-menu" role="menu">
+          <div className="sidebar-account-menu-header">
+            <strong>{displayName}</strong>
+            {email && <span>{email}</span>}
+            {currentUser?.role && <span>{roleLabel(t, currentUser.role)}</span>}
+          </div>
+          <button className="sidebar-logout-button" type="button" role="menuitem" onClick={onLogout}>
+            <LogOut size={15} />
+            <span>{t("logout")}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

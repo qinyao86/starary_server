@@ -1,0 +1,135 @@
+.user-avatar {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #e6e7e9;
+  color: #1f2937;
+  font-weight: 750;
+  vertical-align: middle;
+}
+
+.user-avatar-sm {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.user-avatar-md {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+
+.user-avatar-lg {
+  width: 40px;
+  height: 40px;
+  font-size: 15px;
+}
+
+.user-avatar img {
+  display: block;
+  width: 80%;
+  height: 80%;
+  object-fit: cover;
+}
+
+.user-avatar.is-clickable {
+  cursor: pointer;
+}
+
+.user-avatar.is-clickable:hover {
+  box-shadow: 0 0 0 3px rgba(82, 96, 113, 0.14);
+}
+
+.avatar-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 16px 20px 10px;
+}
+
+.avatar-picker-option {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  justify-self: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.avatar-picker-option:hover {
+  background: transparent;
+}
+
+.avatar-picker-option.is-selected {
+  background: transparent;
+}
+
+.avatar-picker-option .user-avatar {
+  width: 42px;
+  height: 42px;
+  box-sizing: border-box;
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+
+.avatar-picker-option:hover .user-avatar {
+  background: #f1f1ef;
+  box-shadow: 0 0 0 2px rgba(200, 200, 195, 0.55), 0 0 0 6px rgba(200, 200, 195, 0.18);
+}
+
+.avatar-picker-option.is-selected .user-avatar {
+  background: #eef4ff;
+  box-shadow: 0 0 0 2px #2563eb, 0 0 0 6px rgba(37, 99, 235, 0.16);
+}
+
+.avatar-picker-option .user-avatar img {
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+}
+
+.avatar-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding: 12px 20px 18px;
+}
+
+.avatar-dialog .dialog-actions button {
+  min-width: 66px;
+}
+
+.theme-dark .user-avatar {
+  background: #5b5f67;
+  color: #fafafa;
+}
+
+.theme-dark .user-avatar.is-clickable:hover {
+  box-shadow: 0 0 0 3px rgba(212, 212, 216, 0.14);
+}
+
+.theme-dark .avatar-picker-option:hover {
+  background: transparent;
+}
+
+.theme-dark .avatar-picker-option.is-selected {
+  background: transparent;
+}
+
+.theme-dark .avatar-picker-option:hover .user-avatar {
+  background: #646972;
+  box-shadow: 0 0 0 2px rgba(82, 82, 91, 0.75), 0 0 0 6px rgba(82, 82, 91, 0.2);
+}
+
+.theme-dark .avatar-picker-option.is-selected .user-avatar {
+  background: #6b7280;
+  box-shadow: 0 0 0 2px #60a5fa, 0 0 0 6px rgba(96, 165, 250, 0.16);
+}

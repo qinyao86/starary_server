@@ -88,6 +88,8 @@ export function activityActionLabel(t: ReturnType<typeof createTranslator>, acti
       return t("libraryDisabled");
     case "library.member_upserted":
       return t("memberUpdated");
+    case "library.member_joined":
+      return t("memberJoined");
     case "library.member_removed":
       return t("memberRemoved");
     case "user.created":

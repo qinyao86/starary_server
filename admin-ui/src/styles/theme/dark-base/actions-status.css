@@ -12,6 +12,18 @@
   background: #27272a;
 }
 
+.theme-dark .library-card-access-badge.is-public {
+  border-color: rgba(74, 222, 128, 0.34);
+  color: #86efac;
+  background: rgba(22, 101, 52, 0.2);
+}
+
+.theme-dark .library-card-access-badge.is-invite {
+  border-color: rgba(251, 146, 60, 0.36);
+  color: #fdba74;
+  background: rgba(154, 52, 18, 0.22);
+}
+
 .theme-dark .control-badge,
 .theme-dark .member-role-badge {
   border-color: rgba(244, 244, 245, 0.08);

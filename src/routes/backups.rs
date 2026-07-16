@@ -33,7 +33,7 @@ pub async fn overview(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<BackupOverviewResponse>> {
-    ensure_server_manager(&user)?;
+    ensure_owner(&user)?;
     Ok(Json(BackupOverviewResponse {
         status: state.backup_service.status()?,
         backups: state.backup_service.list()?,
@@ -45,7 +45,7 @@ pub async fn update_settings(
     user: AuthUser,
     Json(settings): Json<BackupSettings>,
 ) -> AppResult<Json<BackupStatus>> {
-    ensure_server_manager(&user)?;
+    ensure_owner(&user)?;
     Ok(Json(state.backup_service.update_settings(settings).await?))
 }
 
@@ -53,7 +53,7 @@ pub async fn create(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<(StatusCode, Json<BackupRecord>)> {
-    ensure_server_manager(&user)?;
+    ensure_owner(&user)?;
     let record = state.backup_service.create_manual().await?;
     Ok((StatusCode::CREATED, Json(record)))
 }
@@ -63,7 +63,7 @@ pub async fn download(
     user: AuthUser,
     Path(backup_id): Path<String>,
 ) -> AppResult<Response> {
-    ensure_server_manager(&user)?;
+    ensure_owner(&user)?;
     let path = state.backup_service.backup_path(&backup_id)?;
     let file = File::open(&path)
         .await
@@ -88,7 +88,7 @@ pub async fn delete(
     user: AuthUser,
     Path(backup_id): Path<String>,
 ) -> AppResult<StatusCode> {
-    ensure_server_manager(&user)?;
+    ensure_owner(&user)?;
     state.backup_service.delete(&backup_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -98,7 +98,7 @@ pub async fn restore(
     user: AuthUser,
     Json(request): Json<RestoreBackupRequest>,
 ) -> AppResult<StatusCode> {
-    ensure_server_manager(&user)?;
+    ensure_owner(&user)?;
     if !state.service_control.available() {
         return Err(AppError::BadRequest(
             "database restore requires the bundled service runtime".to_string(),
@@ -117,7 +117,7 @@ pub async fn restore_file(
     user: AuthUser,
     mut multipart: Multipart,
 ) -> AppResult<StatusCode> {
-    ensure_server_manager(&user)?;
+    ensure_owner(&user)?;
     if !state.service_control.available() {
         return Err(AppError::BadRequest(
             "database restore requires the bundled service runtime".to_string(),
@@ -183,8 +183,8 @@ pub async fn restore_file(
     Err(AppError::BadRequest("restore file is required".to_string()))
 }
 
-fn ensure_server_manager(user: &AuthUser) -> AppResult<()> {
-    if user.role.can_manage_server() {
+fn ensure_owner(user: &AuthUser) -> AppResult<()> {
+    if user.role == crate::models::Role::Owner {
         Ok(())
     } else {
         Err(AppError::Forbidden)

@@ -52,8 +52,10 @@ pub struct UpdateStorageConnectionRequest {
 
 pub async fn list_storage_connections(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
 ) -> AppResult<Json<Vec<StorageConnectionRecord>>> {
+    require_server_manager(&user)?;
+
     Ok(Json(
         sqlx::query_as::<_, StorageConnectionRecord>(STORAGE_CONNECTION_SELECT)
             .fetch_all(&state.pool)

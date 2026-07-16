@@ -103,6 +103,135 @@
   width: min(460px, 100%);
 }
 
+.member-dialog {
+  width: min(640px, 100%);
+}
+
+.member-dialog .dialog-body {
+  padding-bottom: 2px;
+}
+
+.member-dialog .dialog-footer {
+  align-items: center;
+}
+
+.member-picker-search {
+  display: grid;
+  gap: 6px;
+}
+
+.member-picker-search span {
+  color: #526071;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.member-picker-search input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #d7d7d4;
+  border-radius: 8px;
+  padding: 0 11px;
+  color: #1f2937;
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.member-picker-search input:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.member-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(420px, calc(100vh - 240px));
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.member-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 10px 11px;
+  background: #ffffff;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.member-picker-row.is-selected {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+
+.member-picker-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.member-picker-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+.member-picker-check span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.member-picker-check strong,
+.member-picker-check small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-picker-check strong {
+  color: #273244;
+  font-size: 13px;
+}
+
+.member-picker-check small {
+  color: #7a8697;
+  font-size: 12px;
+}
+
+.member-picker-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  margin-right: auto;
+  color: #526071;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.member-picker-select-all input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+.member-picker-select-all:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .delete-library-body {
   display: grid;
   gap: 14px;
@@ -213,7 +342,7 @@
 
 .member-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   min-height: 54px;

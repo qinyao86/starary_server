@@ -644,7 +644,7 @@ async fn change_deleted_state(
     ensure_library_write_access(state, user, library_id).await?;
     let asset_ids = normalize_ids(asset_ids, "assets")?;
     let mut tx = state.pool.begin().await?;
-    ensure_assets_in_library(&mut tx, library_id, &asset_ids, deleted).await?;
+    ensure_assets_in_library(&mut tx, library_id, &asset_ids, !deleted).await?;
     let action = if deleted {
         "assets.trashed"
     } else {

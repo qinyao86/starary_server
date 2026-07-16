@@ -1,7 +1,7 @@
 use crate::{
     auth::{hash_password, issue_token, issue_token_for_user, verify_password, AuthUser},
     error::{AppError, AppResult},
-    models::{UserRecord, UserWithPassword},
+    models::{Role, UserRecord, UserWithPassword},
     routes::users::guards::ensure_unique_display_name,
     state::{AppState, BrowserHandoff},
 };
@@ -64,6 +64,7 @@ pub struct CurrentUserResponse {
     id: String,
     email: String,
     display_name: String,
+    avatar_key: Option<String>,
     role: String,
 }
 
@@ -74,7 +75,7 @@ pub async fn login(
     let email = request.email.trim().to_ascii_lowercase();
     let user = sqlx::query_as::<_, UserWithPassword>(
         r#"
-        SELECT id, email, display_name, password_hash, global_role, is_active
+        SELECT id, email, display_name, avatar_key, password_hash, global_role, is_active
         FROM users
         WHERE email = $1
         "#,
@@ -84,9 +85,16 @@ pub async fn login(
     .await?
     .ok_or(AppError::Unauthorized)?;
 
-    if !user.is_active || !verify_password(&request.password, &user.password_hash) {
+    if !user.is_active {
         return Err(AppError::Unauthorized);
     }
+
+    if !verify_password(&request.password, &user.password_hash) {
+        return Err(AppError::Unauthorized);
+    }
+
+    let role = parse_console_role(&user.global_role)?;
+    ensure_console_access(&state, user.id, role).await?;
 
     let token = issue_token(&state, &user)?;
 
@@ -108,6 +116,7 @@ pub async fn login(
             id: user.id.to_string(),
             email: user.email,
             display_name: user.display_name,
+            avatar_key: user.avatar_key,
             role: user.global_role,
         },
     }))
@@ -116,7 +125,9 @@ pub async fn login(
 pub async fn create_browser_handoff(
     State(state): State<AppState>,
     user: AuthUser,
-) -> Json<BrowserHandoffResponse> {
+) -> AppResult<Json<BrowserHandoffResponse>> {
+    ensure_console_access(&state, user.id, user.role).await?;
+
     let code = Uuid::new_v4().simple().to_string();
     state.browser_handoffs.issue(
         code.clone(),
@@ -125,7 +136,7 @@ pub async fn create_browser_handoff(
             expires_at: Utc::now() + Duration::seconds(60),
         },
     );
-    Json(BrowserHandoffResponse { code })
+    Ok(Json(BrowserHandoffResponse { code }))
 }
 
 pub async fn redeem_browser_handoff(
@@ -138,7 +149,7 @@ pub async fn redeem_browser_handoff(
         .ok_or(AppError::Unauthorized)?;
     let user = sqlx::query_as::<_, UserRecord>(
         r#"
-        SELECT id, email, display_name, global_role, is_active, created_at, updated_at
+        SELECT id, email, display_name, avatar_key, global_role, is_active, created_at, updated_at
         FROM users
         WHERE id = $1
         "#,
@@ -150,6 +161,9 @@ pub async fn redeem_browser_handoff(
     if !user.is_active {
         return Err(AppError::Unauthorized);
     }
+
+    let role = parse_console_role(&user.global_role)?;
+    ensure_console_access(&state, user.id, role).await?;
 
     let token = issue_token_for_user(&state, user.id, &user.global_role)?;
     sqlx::query("UPDATE users SET last_seen_at = NOW() WHERE id = $1")
@@ -164,18 +178,25 @@ pub async fn redeem_browser_handoff(
             id: user.id.to_string(),
             email: user.email,
             display_name: user.display_name,
+            avatar_key: user.avatar_key,
             role: user.global_role,
         },
     }))
 }
 
-pub async fn me(user: AuthUser) -> Json<CurrentUserResponse> {
-    Json(CurrentUserResponse {
+pub async fn me(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<CurrentUserResponse>> {
+    ensure_console_access(&state, user.id, user.role).await?;
+
+    Ok(Json(CurrentUserResponse {
         id: user.id.to_string(),
         email: user.email,
         display_name: user.display_name,
+        avatar_key: user.avatar_key,
         role: user.role.to_string(),
-    })
+    }))
 }
 
 pub async fn update_me(
@@ -207,6 +228,7 @@ pub async fn update_me(
         id: user.id.to_string(),
         email: user.email,
         display_name,
+        avatar_key: user.avatar_key,
         role: user.role.to_string(),
     }))
 }
@@ -283,4 +305,34 @@ pub async fn update_presence(
     .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+fn parse_console_role(role: &str) -> AppResult<Role> {
+    role.parse::<Role>().map_err(|_| AppError::Unauthorized)
+}
+
+async fn ensure_console_access(state: &AppState, user_id: Uuid, role: Role) -> AppResult<()> {
+    if role.can_manage_server() || has_library_manager_membership(state, user_id).await? {
+        Ok(())
+    } else {
+        Err(AppError::ConsoleLoginForbidden)
+    }
+}
+
+async fn has_library_manager_membership(state: &AppState, user_id: Uuid) -> AppResult<bool> {
+    let count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM library_memberships m
+        INNER JOIN libraries l ON l.id = m.library_id
+        WHERE m.user_id = $1
+          AND m.role IN ('owner', 'admin', 'library_manager')
+          AND l.deleted_at IS NULL
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(count > 0)
 }

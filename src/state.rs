@@ -39,6 +39,12 @@ impl BrowserHandoffStore {
         let handoff = codes.remove(code)?;
         (handoff.expires_at > now).then_some(handoff)
     }
+
+    pub fn revoke_user(&self, user_id: Uuid) {
+        if let Ok(mut codes) = self.codes.lock() {
+            codes.retain(|_, value| value.user_id != user_id);
+        }
+    }
 }
 
 #[derive(Clone)]

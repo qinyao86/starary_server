@@ -33,22 +33,44 @@
   background: #27272a;
 }
 
+.theme-dark .member-picker-row {
+  border-color: #2f2f33;
+  background: #18181b;
+}
+
+.theme-dark .member-picker-search span,
+.theme-dark .member-picker-select-all {
+  color: #d4d4d8;
+}
+
+.theme-dark .member-picker-search input {
+  border-color: #3f3f46;
+  color: #fafafa;
+  background: #18181b;
+}
+
+.theme-dark .member-picker-search input::placeholder {
+  color: #71717a;
+}
+
+.theme-dark .member-picker-row.is-selected {
+  border-color: rgba(96, 165, 250, 0.46);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.theme-dark .member-picker-check strong {
+  color: #fafafa;
+}
+
+.theme-dark .member-picker-check small {
+  color: #a1a1aa;
+}
+
 .theme-dark .gauge-ring {
   border-color: #27272a;
   border-right-color: #3b82f6;
   border-bottom-color: #3b82f6;
   color: #fafafa;
-}
-
-.theme-dark .message-bar {
-  border-color: #7c5b16;
-  color: #fde68a;
-  background: #2d2413;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
-}
-
-.theme-dark .message-bar button:hover {
-  background: rgba(253, 230, 138, 0.1);
 }
 
 .theme-dark .delete-library-target strong {

@@ -12,6 +12,22 @@ export const navItems: NavItem[] = [
   { id: "settings", icon: Settings, label: "settings" }
 ];
 
+export function canAccessSection(section: Section, role: string | null | undefined): boolean {
+  const isOwner = role === "owner";
+  const canManageServer = role === "owner" || role === "admin";
+  if (section === "backups") {
+    return isOwner;
+  }
+  if (canManageServer) {
+    return true;
+  }
+  return section === "libraries" || section === "settings";
+}
+
+export function visibleNavItems(role: string | null | undefined): NavItem[] {
+  return navItems.filter((item) => canAccessSection(item.id, role));
+}
+
 export function readStoredSection(): Section {
   const pathSection = sectionFromPath(window.location.pathname);
   if (pathSection) return pathSection;
@@ -27,4 +43,22 @@ export function sectionFromPath(pathname: string): Section | null {
 
 export function sectionPath(section: Section): string {
   return `/admin/${section}`;
+}
+
+export function libraryIdFromPath(pathname: string): string | null {
+  const segments = pathname.replace(/^\/admin\/?/, "").split("/").filter(Boolean);
+  if (segments[0] !== "libraries" || !segments[1]) {
+    return null;
+  }
+  try {
+    return decodeURIComponent(segments[1]).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export function libraryPath(libraryId: string | null = null): string {
+  return libraryId
+    ? `/admin/libraries/${encodeURIComponent(libraryId)}`
+    : sectionPath("libraries");
 }

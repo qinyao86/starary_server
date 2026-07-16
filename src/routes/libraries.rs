@@ -2,7 +2,10 @@ use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
     ids::generate_id,
-    models::{LibraryRecord, LibraryStatusRecord, LibraryWithRole, Role, StorageRootKind},
+    models::{
+        LibraryAccessMode, LibraryRecord, LibraryStatusRecord, LibraryWithRole, Role,
+        StorageRootKind,
+    },
     path_resolver::{
         ensure_storage_location_exists, ensure_storage_namespace_exists,
         normalize_existing_storage_namespace, normalize_storage_namespace,
@@ -26,8 +29,9 @@ mod queries;
 mod requests;
 
 use queries::{
-    list_libraries_for_member, list_libraries_for_server_manager, list_library_statuses_for_member,
-    list_library_statuses_for_server_manager,
+    list_libraries_for_library_manager, list_libraries_for_member,
+    list_libraries_for_server_manager, list_library_statuses_for_library_manager,
+    list_library_statuses_for_member, list_library_statuses_for_server_manager,
 };
 use requests::{
     CreateDefaultStorageRootRequest, CreateLibraryRequest, DeleteLibraryRequest,
@@ -131,7 +135,7 @@ pub async fn list_libraries(
     let libraries = if user.role.can_manage_server() {
         list_libraries_for_server_manager(&state, user.id, user.role.as_str()).await?
     } else {
-        list_libraries_for_member(&state, user.id).await?
+        list_libraries_for_library_manager(&state, user.id).await?
     };
 
     Ok(Json(libraries))
@@ -157,7 +161,7 @@ pub async fn list_library_statuses(
     let libraries = if user.role.can_manage_server() {
         list_library_statuses_for_server_manager(&state).await?
     } else {
-        list_library_statuses_for_member(&state, user.id).await?
+        list_library_statuses_for_library_manager(&state, user.id).await?
     };
 
     Ok(Json(LibraryStatusResponse { libraries }))
@@ -186,6 +190,7 @@ pub async fn create_library(
     }
     ensure_unique_library_display_name(&state, display_name, None).await?;
     let icon_url = normalize_optional_text(request.icon_url);
+    let access_mode = request.access_mode.unwrap_or(LibraryAccessMode::Invite);
     if request.default_storage_root.is_some() && request.storage_binding.is_some() {
         return Err(AppError::BadRequest(
             "choose either a new storage location or an existing storage connection".to_string(),
@@ -208,14 +213,15 @@ pub async fn create_library(
 
     let library = sqlx::query_as::<_, LibraryRecord>(
         r#"
-        INSERT INTO libraries (id, display_name, icon_url, created_by_user_id)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, display_name, icon_url, enabled, created_by_user_id, created_at, updated_at
+        INSERT INTO libraries (id, display_name, icon_url, enabled, access_mode, created_by_user_id)
+        VALUES ($1, $2, $3, TRUE, $4, $5)
+        RETURNING id, display_name, icon_url, enabled, access_mode, created_by_user_id, created_at, updated_at
         "#,
     )
     .bind(&library_id)
     .bind(display_name)
     .bind(icon_url)
+    .bind(access_mode.as_str())
     .bind(user.id)
     .fetch_one(&mut *tx)
     .await?;
@@ -346,19 +352,21 @@ pub async fn update_library(
     }
     ensure_unique_library_display_name(&state, display_name, Some(&library_id)).await?;
     let icon_url = normalize_optional_text(request.icon_url);
+    let access_mode = request.access_mode.map(|mode| mode.as_str().to_string());
 
     let mut tx = state.pool.begin().await?;
     let library = sqlx::query_as::<_, LibraryRecord>(
         r#"
         UPDATE libraries
-        SET display_name = $2, icon_url = $3, updated_at = NOW()
+        SET display_name = $2, icon_url = $3, access_mode = COALESCE($4, access_mode), updated_at = NOW()
         WHERE id = $1 AND deleted_at IS NULL
-        RETURNING id, display_name, icon_url, enabled, created_by_user_id, created_at, updated_at
+        RETURNING id, display_name, icon_url, enabled, access_mode, created_by_user_id, created_at, updated_at
         "#,
     )
     .bind(&library_id)
     .bind(display_name)
     .bind(icon_url)
+    .bind(access_mode.as_deref())
     .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(|| AppError::NotFound("library not found".to_string()))?;
@@ -593,7 +601,7 @@ pub async fn update_library_enabled(
         UPDATE libraries
         SET enabled = $2, updated_at = NOW()
         WHERE id = $1 AND deleted_at IS NULL
-        RETURNING id, display_name, icon_url, enabled, created_by_user_id, created_at, updated_at
+        RETURNING id, display_name, icon_url, enabled, access_mode, created_by_user_id, created_at, updated_at
         "#,
     )
     .bind(&library_id)
@@ -623,6 +631,67 @@ pub async fn update_library_enabled(
     tx.commit().await?;
 
     Ok(Json(library))
+}
+
+pub async fn join_library(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+) -> AppResult<StatusCode> {
+    let mut tx = state.pool.begin().await?;
+    let library: Option<(String, bool)> = sqlx::query_as(
+        r#"
+        SELECT access_mode, enabled
+        FROM libraries
+        WHERE id = $1 AND deleted_at IS NULL
+        FOR UPDATE
+        "#,
+    )
+    .bind(&library_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some((access_mode, enabled)) = library else {
+        return Err(AppError::NotFound("library not found".to_string()));
+    };
+    if access_mode != LibraryAccessMode::Public.as_str() {
+        return Err(AppError::BadRequest("library is invite only".to_string()));
+    }
+    if !enabled {
+        return Err(AppError::LibraryDisabled(library_id));
+    }
+
+    let inserted = sqlx::query(
+        r#"
+        INSERT INTO library_memberships (library_id, user_id, role)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (library_id, user_id) DO NOTHING
+        "#,
+    )
+    .bind(&library_id)
+    .bind(user.id)
+    .bind(Role::Viewer.as_str())
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+
+    if inserted > 0 {
+        sqlx::query(
+            r#"
+            INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id, details)
+            VALUES ($1, $2, $3, 'library.member_joined', 'user', $3, $4::jsonb)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(&library_id)
+        .bind(user.id)
+        .bind(serde_json::json!({ "role": Role::Viewer.as_str() }))
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn delete_library(

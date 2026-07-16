@@ -1,6 +1,6 @@
 export { api } from "./api/endpoints";
 export { ApiError } from "./api/request";
-export { clearStoredToken, getStoredToken, storeToken } from "./api/token";
+export { clearStoredToken, getStoredToken, storeToken, storeTokenForSession } from "./api/token";
 export type {
   ActivityItem,
   ActivityListResponse,
@@ -11,6 +11,8 @@ export type {
   BackupStatus,
   CurrentUser,
   LibraryMember,
+  LibraryStatus,
+  LibraryStatusResponse,
   LoginResponse,
   RuntimeSettings,
   ServerInfo,
@@ -18,6 +20,7 @@ export type {
   StorageConnection,
   StorageConnectionInput,
   StorageRoot,
+  SystemAvatar,
   TeamLibrary,
   TeamUser
 } from "./api/types";

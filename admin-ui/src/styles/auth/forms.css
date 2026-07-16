@@ -35,6 +35,47 @@
   min-width: 112px;
 }
 
+.auth-trust-device {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  color: #526071;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.auth-trust-device input {
+  width: 15px;
+  height: 15px;
+  margin: 2px 0 0;
+}
+
+.auth-trust-device span {
+  display: grid;
+  gap: 2px;
+}
+
+.auth-trust-device b {
+  color: #253244;
+  font-size: 13px;
+}
+
+.auth-trust-device small {
+  color: #697586;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.theme-dark .auth-trust-device,
+.theme-dark .auth-trust-device small {
+  color: #a1a1aa;
+}
+
+.theme-dark .auth-trust-device b {
+  color: #fafafa;
+}
+
 .form-error {
   border: 1px solid #f2b8b5;
   border-radius: 8px;

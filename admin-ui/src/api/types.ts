@@ -25,7 +25,14 @@ export type CurrentUser = {
   id: string;
   email: string;
   displayName: string;
+  avatarKey?: string | null;
   role: string;
+};
+
+export type SystemAvatar = {
+  key: string;
+  gender: "male" | "female";
+  url: string;
 };
 
 export type LoginResponse = {
@@ -37,10 +44,13 @@ export type LoginResponse = {
 export type TeamLibrary = {
   id: string;
   displayName: string;
-  currentUserRole?: string;
+  currentUserRole?: string | null;
   enabled: boolean;
+  accessMode?: "public" | "invite";
+  isMember?: boolean;
   storageLockedAt?: string | null;
   libraryManagerNames?: string[];
+  libraryManagerAvatarKeys?: Array<string | null>;
   memberNames?: string[];
   assetCount?: number;
   folderCount?: number;
@@ -58,6 +68,16 @@ export type TeamLibrary = {
   createdByUserId?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type LibraryStatus = {
+  id: string;
+  enabled: boolean;
+  updatedAt: string;
+};
+
+export type LibraryStatusResponse = {
+  libraries: LibraryStatus[];
 };
 
 export type RuntimeSettings = {
@@ -134,6 +154,7 @@ export type TeamUser = {
   id: string;
   email: string;
   displayName: string;
+  avatarKey?: string | null;
   globalRole: string;
   isActive: boolean;
   lastLoginAt?: string | null;
@@ -185,6 +206,7 @@ export type LibraryMember = {
   userId: string;
   email: string;
   displayName: string;
+  avatarKey?: string | null;
   role: string;
   createdAt: string;
   updatedAt: string;
@@ -203,6 +225,7 @@ export type ActivityItem = {
   actorUserId?: string | null;
   actorDisplayName?: string | null;
   actorEmail?: string | null;
+  actorAvatarKey?: string | null;
   action: string;
   targetType: string;
   targetId?: string | null;

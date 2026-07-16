@@ -14,7 +14,10 @@ use std::{
     fs::{self, File},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -39,16 +42,18 @@ pub struct ServiceStatus {
     pub storage_status: String,
     pub message: Option<String>,
     pub log_directory: String,
-    pub data_directory: String,
+    pub launch_at_login: bool,
 }
 
 pub struct ManagedService {
     resources: PathBuf,
     data_home: PathBuf,
     identity: ControlIdentity,
+    desired_running: AtomicBool,
     settings: Mutex<DesktopSettings>,
     child: Mutex<Option<Child>>,
     cached_server_info: Mutex<Option<(u32, ServerInfoResponse)>>,
+    automatic_start_retry_after: Mutex<Option<Instant>>,
 }
 
 impl ManagedService {
@@ -58,15 +63,13 @@ impl ManagedService {
         Ok(Self {
             resources,
             data_home,
+            desired_running: AtomicBool::new(identity.desired_running),
             identity,
             settings: Mutex::new(settings),
             child: Mutex::new(None),
             cached_server_info: Mutex::new(None),
+            automatic_start_retry_after: Mutex::new(None),
         })
-    }
-
-    pub fn data_home(&self) -> &Path {
-        &self.data_home
     }
 
     pub fn log_directory(&self) -> PathBuf {
@@ -80,12 +83,34 @@ impl ManagedService {
         self.log_directory().join("server.log")
     }
 
+    pub fn launch_at_login(&self) -> bool {
+        self.settings
+            .lock()
+            .map(|settings| settings.launch_at_login)
+            .unwrap_or(false)
+    }
+
     pub fn configured_port(&self) -> u16 {
         configured_server_port(&self.data_home).unwrap_or(DEFAULT_SERVER_PORT)
     }
 
     pub fn should_start_automatically(&self) -> bool {
-        self.identity.desired_running
+        self.desired_running.load(Ordering::Relaxed)
+    }
+
+    pub fn reserve_automatic_start(&self) -> bool {
+        if !self.should_start_automatically() {
+            return false;
+        }
+        let Ok(mut retry_after) = self.automatic_start_retry_after.lock() else {
+            return false;
+        };
+        let now = Instant::now();
+        if retry_after.is_some_and(|deadline| deadline > now) {
+            return false;
+        }
+        *retry_after = Some(now + Duration::from_secs(30));
+        true
     }
 
     pub fn status(&self) -> ServiceStatus {
@@ -94,7 +119,8 @@ impl ManagedService {
         match self.probe_identity(port) {
             Ok(identity) => {
                 let server_info = self.server_info(&identity);
-                let (log_directory, data_directory) = self.status_paths();
+                let log_directory = self.log_directory().display().to_string();
+                let launch_at_login = self.launch_at_login();
                 ServiceStatus {
                     state: "running",
                     managed: true,
@@ -115,7 +141,7 @@ impl ManagedService {
                         .to_string(),
                     message: None,
                     log_directory,
-                    data_directory,
+                    launch_at_login,
                 }
             }
             Err(ProbeError::Unavailable) if is_port_available(port) => self.stopped_status(port),
@@ -133,6 +159,7 @@ impl ManagedService {
         self.set_desired_running(true)?;
         let status = self.status();
         if status.state == "running" {
+            self.clear_automatic_start_retry();
             return Ok(status);
         }
         if status.state == "conflict" {
@@ -147,6 +174,7 @@ impl ManagedService {
                 if let Ok(mut slot) = self.child.lock() {
                     *slot = Some(child);
                 }
+                self.clear_automatic_start_retry();
                 return Ok(self.status());
             }
             if child
@@ -228,6 +256,13 @@ impl ManagedService {
             .update_log_directory(&self.data_home, directory)
     }
 
+    pub fn update_launch_at_login(&self, enabled: bool) -> Result<(), String> {
+        self.settings
+            .lock()
+            .map_err(|error| error.to_string())?
+            .update_launch_at_login(&self.data_home, enabled)
+    }
+
     fn spawn_server(&self) -> Result<Child, String> {
         let server = self.resources.join("madlibrary-server.exe");
         if !server.is_file() {
@@ -283,7 +318,8 @@ impl ManagedService {
     }
 
     fn stopped_status(&self, port: u16) -> ServiceStatus {
-        let (log_directory, data_directory) = self.status_paths();
+        let log_directory = self.log_directory().display().to_string();
+        let launch_at_login = self.launch_at_login();
         ServiceStatus {
             state: "stopped",
             managed: true,
@@ -296,12 +332,13 @@ impl ManagedService {
             storage_status: "unknown".to_string(),
             message: None,
             log_directory,
-            data_directory,
+            launch_at_login,
         }
     }
 
     fn foreign_status(&self, port: u16, message: &str) -> ServiceStatus {
-        let (log_directory, data_directory) = self.status_paths();
+        let log_directory = self.log_directory().display().to_string();
+        let launch_at_login = self.launch_at_login();
         ServiceStatus {
             state: "conflict",
             managed: false,
@@ -314,15 +351,8 @@ impl ManagedService {
             storage_status: "unknown".to_string(),
             message: Some(message.to_string()),
             log_directory,
-            data_directory,
+            launch_at_login,
         }
-    }
-
-    fn status_paths(&self) -> (String, String) {
-        (
-            self.log_directory().display().to_string(),
-            self.data_home.display().to_string(),
-        )
     }
 
     fn reap_child(&self) {
@@ -377,7 +407,16 @@ impl ManagedService {
 
     fn set_desired_running(&self, desired_running: bool) -> Result<(), String> {
         self.identity
-            .persist_desired_running(&self.data_home, desired_running)
+            .persist_desired_running(&self.data_home, desired_running)?;
+        self.desired_running
+            .store(desired_running, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn clear_automatic_start_retry(&self) {
+        if let Ok(mut retry_after) = self.automatic_start_retry_after.lock() {
+            *retry_after = None;
+        }
     }
 }
 

@@ -9,6 +9,7 @@ import type {
   CurrentUser,
   DefaultStorageRootInput,
   LibraryMember,
+  LibraryStatusResponse,
   LoginResponse,
   RuntimeSettings,
   ServerInfo,
@@ -17,6 +18,7 @@ import type {
   StorageConnectionInput,
   StorageMigrationResult,
   StorageRoot,
+  SystemAvatar,
   TeamLibrary,
   TeamUser
 } from "./types";
@@ -82,6 +84,15 @@ export const api = {
       body: JSON.stringify({ code })
     }),
   me: (token: string) => request<CurrentUser>("/api/v1/me", { token }),
+  listSystemAvatars: (token: string) => request<SystemAvatar[]>("/api/v1/avatars/system", { token }),
+  updateUserAvatar: (token: string, userId: string, avatarKey: string) =>
+    request<TeamUser>(`/api/v1/users/${userId}/avatar`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ avatarKey })
+    }),
+  listMyLibraries: (token: string) => request<TeamLibrary[]>("/api/v1/me/libraries", { token }),
+  listMyLibraryStatuses: (token: string) => request<LibraryStatusResponse>("/api/v1/me/library-status", { token }),
   updatePresence: (token: string, payload: { libraryId?: string | null } = {}) =>
     request<void>("/api/v1/me/presence", {
       method: "PATCH",
@@ -101,18 +112,28 @@ export const api = {
       token,
       body: JSON.stringify(payload)
     }),
+  deleteUser: (token: string, userId: string) =>
+    request<void>(`/api/v1/users/${userId}`, {
+      method: "DELETE",
+      token
+    }),
   listLibraries: (token: string) => request<TeamLibrary[]>("/api/v1/libraries", { token }),
-  createLibrary: (token: string, payload: { displayName: string; defaultStorageRoot?: DefaultStorageRootInput; storageBinding?: { connectionId: string; namespace?: string } }) =>
+  createLibrary: (token: string, payload: { displayName: string; defaultStorageRoot?: DefaultStorageRootInput; storageBinding?: { connectionId: string; namespace?: string }; accessMode?: "public" | "invite" }) =>
     request<TeamLibrary>("/api/v1/libraries", {
       method: "POST",
       token,
       body: JSON.stringify(payload)
     }),
-  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; iconUrl?: string | null }) =>
+  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; iconUrl?: string | null; accessMode?: "public" | "invite" }) =>
     request<TeamLibrary>(`/api/v1/libraries/${libraryId}`, {
       method: "PATCH",
       token,
       body: JSON.stringify(payload)
+    }),
+  joinLibrary: (token: string, libraryId: string) =>
+    request<void>(`/api/v1/libraries/${libraryId}/join`, {
+      method: "POST",
+      token
     }),
   updateLibraryEnabled: (token: string, libraryId: string, payload: { enabled: boolean }) =>
     request<TeamLibrary>(`/api/v1/libraries/${libraryId}/enabled`, {

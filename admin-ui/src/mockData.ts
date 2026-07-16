@@ -60,16 +60,24 @@ export const activity = [
   { actor: "system", action: "completedBackup", target: "Nightly", time: "yesterday" }
 ] as const;
 
-export const permissions = [
-  { action: "manageServer", owner: true, admin: true, manager: false, editor: false, viewer: false },
-  { action: "manageUsers", owner: true, admin: true, manager: true, editor: false, viewer: false },
-  { action: "manageLibrary", owner: true, admin: true, manager: true, editor: false, viewer: false },
-  { action: "importAssets", owner: true, admin: true, manager: true, editor: true, viewer: false },
-  { action: "editOwnAssets", owner: true, admin: true, manager: true, editor: true, viewer: false },
-  { action: "editAllAssets", owner: true, admin: true, manager: true, editor: false, viewer: false },
-  { action: "deleteAssets", owner: true, admin: true, manager: true, editor: false, viewer: false },
-  { action: "manageTags", owner: true, admin: true, manager: true, editor: false, viewer: false },
-  { action: "downloadAssets", owner: true, admin: true, manager: true, editor: true, viewer: true }
+export const serverPermissions = [
+  { action: "loginConsole", owner: true, admin: true, user: false },
+  { action: "createLibrary", owner: true, admin: true, user: false },
+  { action: "manageAllLibraries", owner: true, admin: true, user: false },
+  { action: "manageStorage", owner: true, admin: true, user: false },
+  { action: "manageUsers", owner: true, admin: true, user: false },
+  { action: "manageBackups", owner: true, admin: false, user: false },
+  { action: "manageRuntime", owner: true, admin: true, user: false }
+] as const;
+
+export const libraryPermissions = [
+  { action: "manageLibrary", manager: true, editor: false, viewer: false },
+  { action: "importAssets", manager: true, editor: true, viewer: false },
+  { action: "editOwnAssets", manager: true, editor: true, viewer: false },
+  { action: "editAllAssets", manager: true, editor: false, viewer: false },
+  { action: "deleteAssets", manager: true, editor: false, viewer: false },
+  { action: "manageTags", manager: true, editor: false, viewer: false },
+  { action: "downloadAssets", manager: true, editor: true, viewer: true }
 ] as const;
 
 export const assetBreakdown = [

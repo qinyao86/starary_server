@@ -2,6 +2,7 @@ mod access;
 mod activity;
 mod assets;
 mod auth_routes;
+mod avatars;
 mod backups;
 mod health;
 mod initialization;
@@ -89,11 +90,20 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/me/library-status",
             get(libraries::list_my_library_statuses),
         )
+        .route("/api/v1/avatars/system", get(avatars::list_system_avatars))
+        .route(
+            "/api/v1/avatars/system/:key",
+            get(avatars::read_system_avatar),
+        )
         .route(
             "/api/v1/users",
             get(users::list_users).post(users::create_user),
         )
-        .route("/api/v1/users/:id", patch(users::update_user))
+        .route(
+            "/api/v1/users/:id",
+            patch(users::update_user).delete(users::delete_user),
+        )
+        .route("/api/v1/users/:id/avatar", patch(users::update_user_avatar))
         .route(
             "/api/v1/libraries",
             get(libraries::list_libraries).post(libraries::create_library),
@@ -105,6 +115,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/libraries/:library_id",
             patch(libraries::update_library).delete(libraries::delete_library),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/join",
+            post(libraries::join_library),
         )
         .route(
             "/api/v1/libraries/:library_id/enabled",

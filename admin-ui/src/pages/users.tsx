@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Power, Search, UserPlus } from "lucide-react";
+import { Pencil, Plus, Power, Search, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { TeamUser } from "../api";
+import type { SystemAvatar, TeamUser } from "../api";
 import { api } from "../api";
 import type { PageContext } from "../types";
-import { PageFrame, StatusDot } from "../components/common";
-import { UserDialog, UserLibraryAccessDialog } from "../components/dialogs";
+import { PageFrame, StatusDot, UserAvatar } from "../components/common";
+import { AvatarDialog, DeleteUserDialog, UserDialog, UserLibraryAccessDialog } from "../components/dialogs";
 import { defaultNewUserPassword } from "../constants";
+import { defaultSystemAvatars } from "../utils/avatars";
 import { canManageServerRole, formatDateTime, isUserOnline, roleLabel } from "../utils/format";
 
 function emailPrefix(value: string) {
@@ -25,6 +26,11 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
   const [libraryAccessManageOpen, setLibraryAccessManageOpen] = useState(false);
   const [libraryAccessTarget, setLibraryAccessTarget] = useState<TeamUser | null>(null);
   const [query, setQuery] = useState("");
+  const [avatarTarget, setAvatarTarget] = useState<TeamUser | null>(null);
+  const [avatars, setAvatars] = useState<SystemAvatar[]>(defaultSystemAvatars);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TeamUser | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const canManageUsers = canManageServerRole(currentUser?.role ?? "");
   const canManageAccountIdentity = currentUser?.role === "owner";
@@ -174,6 +180,49 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
     }
   };
 
+  const openAvatarDialog = async (user: TeamUser) => {
+    if (!token) {
+      setMessage(t("plannedNote"));
+      return;
+    }
+    setAvatarTarget(user);
+    try {
+      setAvatars(await api.listSystemAvatars(token));
+    } catch {
+      setAvatars(defaultSystemAvatars);
+    }
+  };
+
+  const updateAvatar = async (avatarKey: string) => {
+    if (!token || !avatarTarget) return;
+    setAvatarBusy(true);
+    try {
+      await api.updateUserAvatar(token, avatarTarget.id, avatarKey);
+      setAvatarTarget(null);
+      setMessage(t("avatarUpdated"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    if (!token || !deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await api.deleteUser(token, deleteTarget.id);
+      setDeleteTarget(null);
+      setMessage(t("userDeleted"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <PageFrame
       title={t("users")}
@@ -218,6 +267,24 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
         onClose={closeLibraryAccessDialog}
         onSave={saveLibraryAccess}
       />
+      <AvatarDialog
+        avatars={avatars}
+        busy={avatarBusy}
+        currentAvatarKey={avatarTarget?.avatarKey}
+        open={Boolean(avatarTarget)}
+        t={t}
+        targetName={avatarTarget?.displayName ?? ""}
+        onClose={() => !avatarBusy && setAvatarTarget(null)}
+        onSelect={(avatarKey) => { void updateAvatar(avatarKey); }}
+      />
+      <DeleteUserDialog
+        busy={deleteBusy}
+        open={Boolean(deleteTarget)}
+        t={t}
+        user={deleteTarget}
+        onClose={() => !deleteBusy && setDeleteTarget(null)}
+        onConfirm={deleteUser}
+      />
       <section className="management-list-card users-surface">
         <div className="users-toolbar">
           <label className="users-search">
@@ -245,6 +312,7 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
               ) : filteredUsers.map((item) => {
                   const hasGlobalLibraryAccess = item.globalRole === "owner" || item.globalRole === "admin";
                   const canEditUser = canManageUsers && (canManageAccountIdentity || !hasGlobalLibraryAccess);
+                  const canDeleteUser = canEditUser && currentUser?.id !== item.id;
                   const online = isUserOnline(item);
                   const activityTime = online ? item.lastSeenAt : item.lastLoginAt;
                   const activityLabel = online ? t("lastActive") : t("lastLogin");
@@ -252,13 +320,21 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
                     <tr key={item.id}>
                       <td className="users-identity-column">
                         <div className="user-identity-cell">
-                          <div className="user-identity-heading">
-                            <strong>{item.displayName}</strong>
-                            {(item.globalRole === "owner" || item.globalRole === "admin") && (
-                              <em className={`is-${item.globalRole}`}>{roleLabel(t, item.globalRole)}</em>
-                            )}
+                          <UserAvatar
+                            avatarKey={item.avatarKey}
+                            label={item.displayName}
+                            size="lg"
+                            onClick={canEditUser ? () => { void openAvatarDialog(item); } : undefined}
+                          />
+                          <div className="user-identity-main">
+                            <div className="user-identity-heading">
+                              <strong>{item.displayName}</strong>
+                              {(item.globalRole === "owner" || item.globalRole === "admin") && (
+                                <em className={`is-${item.globalRole}`}>{roleLabel(t, item.globalRole)}</em>
+                              )}
+                            </div>
+                            <span>{item.email}</span>
                           </div>
-                          <span>{item.email}</span>
                         </div>
                       </td>
                       <td className="users-libraries-column">
@@ -327,6 +403,9 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
                           </Button>
                           <Button className="users-action-button" size="icon" type="button" variant="ghost" title={item.isActive ? t("deactivate") : t("activate")} aria-label={item.isActive ? t("deactivate") : t("activate")} onClick={() => void toggleUserActive(item)} disabled={!canEditUser}>
                             <Power size={14} />
+                          </Button>
+                          <Button className="users-action-button is-destructive" size="icon" type="button" variant="ghost" title={t("deleteUser")} aria-label={t("deleteUser")} onClick={() => setDeleteTarget(item)} disabled={!canDeleteUser}>
+                            <Trash2 size={14} />
                           </Button>
                         </div>
                       </td>

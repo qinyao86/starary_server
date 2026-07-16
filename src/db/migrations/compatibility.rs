@@ -10,6 +10,8 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;",
     )
     .await?;
+    tx.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_key TEXT;")
+        .await?;
     tx.execute(
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();",
     )
@@ -22,6 +24,14 @@ pub(super) async fn upgrade_existing_schema(tx: &mut MigrationTx<'_>) -> anyhow:
         .await?;
     tx.execute(
         "ALTER TABLE libraries ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;",
+    )
+    .await?;
+    tx.execute(
+        "ALTER TABLE libraries ADD COLUMN IF NOT EXISTS access_mode TEXT NOT NULL DEFAULT 'invite';",
+    )
+    .await?;
+    tx.execute(
+        "UPDATE libraries SET access_mode = 'invite' WHERE access_mode NOT IN ('public', 'invite');",
     )
     .await?;
     tx.execute("ALTER TABLE libraries ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;")

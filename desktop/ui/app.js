@@ -97,6 +97,8 @@ function render(next) {
   elements.port.disabled = running || busy;
   elements["save-port"].disabled = running || busy;
   elements.port.value = next.port;
+  elements["launch-at-login"].checked = Boolean(next.launchAtLogin);
+  elements["launch-at-login"].disabled = busy;
   elements["select-log-directory"].disabled = running || busy;
   if (document.activeElement !== elements["log-directory"]) {
     elements["log-directory"].value = next.logDirectory ?? "";
@@ -146,6 +148,11 @@ elements["service-toggle"].addEventListener("click", () => {
   run(running ? "stop_service" : "start_service", running ? "serviceStoppedToast" : "serviceStartedToast");
 });
 elements["save-port"].addEventListener("click", () => run("change_service_port", "portSavedToast", { port: Number(elements.port.value) }));
+elements["launch-at-login"].addEventListener("change", () => {
+  run("set_launch_at_login", elements["launch-at-login"].checked ? "launchAtLoginEnabledToast" : "launchAtLoginDisabledToast", {
+    enabled: elements["launch-at-login"].checked
+  });
+});
 elements["select-log-directory"].addEventListener("click", async () => {
   if (busy) return;
   busy = true;
@@ -176,7 +183,6 @@ elements["copy-url"].addEventListener("click", async () => {
   }
 });
 elements["open-log"].addEventListener("click", () => invoke("open_log").catch(showError));
-elements["open-data"].addEventListener("click", () => invoke("open_data_directory").catch(showError));
 elements["check-updates"].addEventListener("click", () => showToast(t("updateCheckPlaceholderToast")));
 elements["device-management"].addEventListener("click", () => showToast(t("deviceManagementPlanned")));
 document.querySelectorAll("[data-panel-target]").forEach((button) => {

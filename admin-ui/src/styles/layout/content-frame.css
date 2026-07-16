@@ -1,10 +1,16 @@
 .content {
   --page-content-max: 1180px;
+  --page-content-padding-x: 24px;
+  --page-content-padding-y: 20px;
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: 24px 18px;
-  overflow: auto;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
   border: 1px solid #dededb;
   border-right: 0;
   border-radius: 18px 0 0 0;
@@ -12,34 +18,72 @@
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.055);
 }
 
+.content:hover {
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content::-webkit-scrollbar-thumb {
+  min-height: 42px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-color: transparent;
+  background-clip: content-box;
+}
+
+.content:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.55);
+}
+
+.content::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.content-inner {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: var(--page-content-padding-y) var(--page-content-padding-x) 28px;
+}
+
 .page-frame {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .page-intro {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin: -24px -18px 0;
-  height: 64px;
-  padding: 0 18px;
+  gap: 22px;
+  width: min(100%, var(--page-content-max));
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0;
   border-bottom: 0;
 }
 
 .page-intro h2 {
   margin: 0;
   color: #111827;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 740;
-  line-height: 20px;
+  line-height: 26px;
 }
 
 .page-intro-copy {
   display: grid;
-  gap: 3px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -47,8 +91,8 @@
   overflow: hidden;
   margin: 0;
   color: #7b8796;
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -56,17 +100,17 @@
 .page-back-button {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 28px;
+  gap: 8px;
+  height: 34px;
   width: fit-content;
   flex: 0 0 auto;
   border: 1px solid transparent;
-  padding-inline: 9px;
-  border-radius: 7px;
+  padding-inline: 11px;
+  border-radius: 8px;
   color: #526071;
   background: transparent;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
 }
 
@@ -76,26 +120,26 @@
 }
 
 .page-back-button svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
 }
 
 .page-intro-action {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .page-intro-action button {
-  height: 32px;
-  padding-inline: 11px;
-  font-size: 13px;
-  border-radius: 7px;
+  height: 38px;
+  padding-inline: 15px;
+  font-size: 14px;
+  border-radius: 9px;
 }
 
 .page-intro-action button svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
 }
 
 .page-frame > :not(.page-intro):not(.dialog-backdrop) {
@@ -108,6 +152,8 @@
     display: grid;
     grid-template-columns: minmax(180px, 1fr) minmax(0, var(--page-content-max)) minmax(180px, 1fr);
     column-gap: 18px;
+    width: 100%;
+    margin-inline: 0;
   }
 
   .page-intro-copy {
@@ -119,4 +165,12 @@
     justify-self: end;
     padding-right: 2px;
   }
+}
+
+.theme-dark .content:hover {
+  scrollbar-color: rgba(113, 113, 122, 0.58) transparent;
+}
+
+.theme-dark .content:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(113, 113, 122, 0.58);
 }

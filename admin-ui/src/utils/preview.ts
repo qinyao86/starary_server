@@ -8,8 +8,11 @@ export function buildPreviewLibraries(t: TranslatorContext["t"]): TeamLibrary[] 
     id: `preview-library-${index}`,
     displayName: item.name,
     currentUserRole: index === 0 ? "owner" : "library_manager",
+    accessMode: index === 0 ? "public" : "invite",
+    isMember: true,
     enabled: index !== 2,
     libraryManagerNames: [designUsers[index % designUsers.length]?.name ?? "Qin Yao"],
+    libraryManagerAvatarKeys: [`${index % 2 === 0 ? "male" : "female"}-${String((index % 20) + 1).padStart(2, "0")}`],
     memberNames: designUsers.slice(0, Math.min(3, item.members)).map((user) => user.name),
     assetCount: Number(item.assets.replace(/,/g, "")),
     folderCount: Math.max(0, Math.round(Number(item.assets.replace(/,/g, "")) / 120)),
@@ -30,6 +33,7 @@ export function buildPreviewUsers(): TeamUser[] {
     id: `preview-user-${index}`,
     email: item.email,
     displayName: item.name,
+    avatarKey: `${index < 2 ? "male" : "female"}-${String((index % 20) + 1).padStart(2, "0")}`,
     globalRole: item.role === "manager" ? "library_manager" : item.role,
     isActive: item.status !== "pending",
     lastLoginAt: new Date(now - index * 30 * 60 * 1000).toISOString(),
@@ -45,5 +49,6 @@ export const previewCurrentUser: CurrentUser = {
   id: "preview-owner",
   email: "owner@madlibrary.local",
   displayName: "Qin Yao",
+  avatarKey: "male-01",
   role: "owner"
 };

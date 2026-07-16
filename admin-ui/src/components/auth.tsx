@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowRight, Check, Database, HardDrive, Languages, Network, Server, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoImage from "../assets/logo.png";
-import { api, type CurrentUser } from "../api";
+import { api, ApiError, type CurrentUser } from "../api";
 import { rememberedLoginEmailStorageKey } from "../constants";
 import type { ColorTheme, TranslatorContext } from "../types";
 import type { Language } from "../i18n";
@@ -214,28 +214,52 @@ export function FirstRunSetup({
   );
 }
 
-export function LoginForm({ t, onDone }: TranslatorContext & { onDone: (response: { accessToken: string; user: CurrentUser }) => void }) {
+export function LoginForm({
+  t,
+  onDone
+}: TranslatorContext & {
+  onDone: (
+    response: { accessToken: string; user: CurrentUser },
+    options?: { rememberDevice?: boolean },
+  ) => void;
+}) {
   const [email, setEmail] = useState(() => localStorage.getItem(rememberedLoginEmailStorageKey) ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(false);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
       const normalizedEmail = email.trim();
       const response = await api.login({ email: normalizedEmail, password });
-      localStorage.setItem(rememberedLoginEmailStorageKey, normalizedEmail);
-      onDone(response);
+      if (rememberDevice) {
+        localStorage.setItem(rememberedLoginEmailStorageKey, normalizedEmail);
+      } else {
+        localStorage.removeItem(rememberedLoginEmailStorageKey);
+      }
+      onDone(response, { rememberDevice });
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
+      if (nextError instanceof ApiError && nextError.code === "console_login_forbidden") {
+        setError(t("consoleLoginForbidden"));
+      } else {
+        setError(nextError instanceof Error ? nextError.message : String(nextError));
+      }
     }
   };
 
   return (
-    <form className="auth-form" onSubmit={submit}>
+    <form autoComplete={rememberDevice ? "on" : "off"} className="auth-form" onSubmit={submit}>
       <p>{t("loginHint")}</p>
-      <TextField label={t("email")} value={email} onChange={setEmail} />
-      <TextField label={t("password")} value={password} onChange={setPassword} type="password" />
+      <TextField autoComplete={rememberDevice ? "username" : "off"} label={t("email")} name="madlibrary-admin-email" value={email} onChange={setEmail} />
+      <TextField autoComplete={rememberDevice ? "current-password" : "off"} label={t("password")} name="madlibrary-admin-password" value={password} onChange={setPassword} type="password" />
+      <label className="auth-trust-device">
+        <input checked={rememberDevice} type="checkbox" onChange={(event) => setRememberDevice(event.target.checked)} />
+        <span>
+          <b>{t("rememberTrustedDevice")}</b>
+          <small>{t("rememberTrustedDeviceHint")}</small>
+        </span>
+      </label>
       {error && <div className="form-error">{error}</div>}
       <button className="primary-button" type="submit">{t("login")}</button>
     </form>

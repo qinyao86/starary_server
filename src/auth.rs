@@ -23,6 +23,7 @@ pub struct AuthUser {
     pub id: Uuid,
     pub email: String,
     pub display_name: String,
+    pub avatar_key: Option<String>,
     pub role: Role,
 }
 
@@ -82,7 +83,7 @@ pub async fn auth_user_from_token(state: &AppState, token: &str) -> AppResult<Au
     let user_id = Uuid::parse_str(&token.claims.sub).map_err(|_| AppError::Unauthorized)?;
     let user = sqlx::query_as::<_, UserRecord>(
         r#"
-        SELECT id, email, display_name, global_role, is_active, created_at, updated_at
+        SELECT id, email, display_name, avatar_key, global_role, is_active, created_at, updated_at
         FROM users
         WHERE id = $1
         "#,
@@ -105,6 +106,7 @@ pub async fn auth_user_from_token(state: &AppState, token: &str) -> AppResult<Au
         id: user.id,
         email: user.email,
         display_name: user.display_name,
+        avatar_key: user.avatar_key,
         role,
     })
 }

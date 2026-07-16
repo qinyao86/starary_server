@@ -29,14 +29,16 @@
 }
 
 .library-card-grid {
+  --library-card-grid-gap: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 360px));
-  justify-content: center;
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: stretch;
+  gap: var(--library-card-grid-gap);
+  width: 100%;
 }
 
 .library-list-page-frame > :not(.page-intro):not(.dialog-backdrop) {
-  width: min(100%, 1500px);
+  width: min(100%, var(--page-content-max));
 }
 
 .library-list-page-frame {
@@ -49,6 +51,7 @@
 }
 
 .library-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -56,7 +59,7 @@
   padding: 20px;
   border: 1px solid var(--admin-card-border);
   border-radius: var(--admin-card-radius);
-  background: var(--admin-card-background);
+  background: #ffffff;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -66,7 +69,7 @@
 
 .library-card:hover {
   border-color: #93c5fd;
-  background: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  background: #ffffff;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
 
@@ -77,15 +80,60 @@
 
 .library-card.is-disabled .library-card-title,
 .library-card.is-disabled .library-card-storage-path,
+.library-card.is-disabled .library-card-manager-row strong,
 .library-card.is-disabled .library-card-metric strong {
   color: #667085;
 }
 
 .library-card-top {
+  display: block;
+  min-width: 0;
+}
+
+.library-card-action-buttons {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.library-card-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 86px;
+  height: 36px;
+  border: 1px solid #d7d7d4;
+  border-radius: 8px;
+  padding: 0 11px;
+  color: #475569;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 720;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.library-card-action-button:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.library-card-action-button.is-danger:hover {
+  border-color: #fecaca;
+  color: #dc2626;
+  background: #fff1f2;
+}
+
+.library-card-footer {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
+  padding-top: 4px;
+  min-width: 0;
 }
 
 .library-card-heading {
@@ -98,6 +146,36 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.library-card.has-switch .library-card-title-row {
+  padding-right: 58px;
+}
+
+.library-card-title-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.library-card-meta-group {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.library-card-access-badge.is-public {
+  border-color: #bbf7d0;
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.library-card-access-badge.is-invite {
+  border-color: #fed7aa;
+  color: #c2410c;
+  background: #fff7ed;
 }
 
 .library-card-title {
@@ -133,7 +211,6 @@
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
-  margin-top: 10px;
   color: #7a8697;
 }
 
@@ -152,9 +229,55 @@
   white-space: nowrap;
 }
 
+.library-card-manager-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  color: #7a8697;
+}
+
+.library-card-manager-row > svg {
+  color: #94a3b8;
+}
+
+.library-card-manager-row > span {
+  color: #7a8697;
+  font-size: 11px;
+  font-weight: 680;
+  line-height: 14px;
+}
+
+.library-card-manager-users {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 7px;
+  overflow: hidden;
+}
+
+.library-card-manager-user {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 5px;
+}
+
+.library-card-manager-row strong {
+  overflow: hidden;
+  min-width: 0;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .library-card-switch {
-  position: relative;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 20px;
+  right: 20px;
   width: 46px;
   height: 26px;
   border: 1px solid #cbd5e1;
@@ -232,7 +355,7 @@
 
 .library-card-metrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
   margin-top: 2px;
 }
@@ -240,18 +363,27 @@
 .library-card-metric {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  flex-direction: row;
+  justify-content: center;
+  flex-direction: column;
   min-width: 0;
-  min-height: 66px;
+  min-height: 82px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 9px;
   padding: 10px 11px;
   color: #94a3b8;
-  background: rgba(248, 248, 247, 0.74);
+  background: #ffffff;
 }
 
-.library-card-metric > svg {
+.library-card-metric-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-width: 0;
+  gap: 6px;
+}
+
+.library-card-metric-heading > svg {
   flex: 0 0 auto;
 }
 
@@ -259,23 +391,23 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  margin-left: 8px;
   color: #7a8697;
   font-size: 11px;
   font-weight: 680;
   line-height: 14px;
+  text-align: center;
 }
 
 .library-card-metric strong {
   display: block;
   overflow: hidden;
   max-width: 100%;
-  margin-left: auto;
-  padding-left: 8px;
+  margin-top: 9px;
   color: #1f2937;
   font-size: 17px;
   font-weight: 780;
   line-height: 20px;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -286,16 +418,36 @@
   outline-offset: 2px;
 }
 
+@media (max-width: 1120px) {
+  .library-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
   .library-card-grid {
     grid-template-columns: 1fr;
   }
 
   .library-card-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .library-card-path-row {
     grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .library-card-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .library-card-action-buttons {
+    width: 100%;
+  }
+
+  .library-card-action-button {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }

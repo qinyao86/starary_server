@@ -41,6 +41,7 @@
 .theme-dark .library-detail-stats strong,
 .theme-dark .library-card-metric strong,
 .theme-dark .library-card-storage-path,
+.theme-dark .library-card-manager-row strong,
 .theme-dark .member-row strong,
 .theme-dark .user-identity-cell strong,
 .theme-dark .data-table td,
@@ -57,6 +58,8 @@
 .theme-dark .activity-time,
 .theme-dark .library-card-metric span,
 .theme-dark .library-card-storage-kind,
+.theme-dark .library-card-manager-row,
+.theme-dark .library-card-manager-row span,
 .theme-dark .library-detail-hero p,
 .theme-dark .library-detail-stat span,
 .theme-dark .member-row span,
@@ -114,11 +117,48 @@
 .theme-dark .nav-item.is-active {
   color: #fafafa;
   background: #27272a;
-  box-shadow: inset 3px 0 0 #3b82f6;
+  box-shadow: inset 3px 0 0 #71717a;
 }
 
 .theme-dark .sidebar-footer {
   border-color: #2f2f33;
+}
+
+.theme-dark .sidebar-account {
+  color: #fafafa;
+  background: transparent;
+}
+
+.theme-dark .sidebar-account-avatar {
+  color: #fafafa;
+  background: #3a3a42;
+}
+
+.theme-dark .sidebar-account-name {
+  color: #fafafa;
+}
+
+.theme-dark .sidebar-account-menu-button {
+  color: #a1a1aa;
+}
+
+.theme-dark .sidebar-account-menu-button:hover {
+  color: #fafafa;
+  background: #2a2a2e;
+}
+
+.theme-dark .sidebar-account-menu {
+  border-color: #2f2f33;
+  background: #23232a;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+}
+
+.theme-dark .sidebar-account-menu-header strong {
+  color: #fafafa;
+}
+
+.theme-dark .sidebar-account-menu-header span {
+  color: #a1a1aa;
 }
 
 .theme-dark .sidebar-runtime-heading strong {

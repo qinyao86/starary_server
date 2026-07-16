@@ -1,60 +1,24 @@
-.message-bar {
+.toast {
   position: fixed;
   left: 50%;
-  bottom: max(24px, env(safe-area-inset-bottom));
+  bottom: max(18px, env(safe-area-inset-bottom));
   z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  width: fit-content;
-  min-width: 240px;
-  max-width: min(520px, calc(100vw - 48px));
-  min-height: 40px;
-  margin: 0;
-  padding: 0 10px 0 13px;
-  border: 1px solid #f2d08a;
-  border-radius: 12px;
-  color: #7c4a03;
-  background: #fff7e6;
-  font-size: 13px;
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
-  animation: toast-slide-in 160ms ease-out;
-  transform: translateX(-50%);
-}
-
-.message-bar span {
-  min-width: 0;
-  overflow: hidden;
+  max-width: min(440px, calc(100vw - 40px));
+  transform: translate(-50%, 16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 9px 13px;
+  color: #f7f7f8;
+  background: #25282e;
+  box-shadow: 0 12px 34px rgba(20, 24, 31, 0.2);
+  font-size: 12px;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 
-.message-bar button {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 7px;
-  color: inherit;
-  background: transparent;
-  cursor: pointer;
-}
-
-.message-bar button:hover {
-  background: rgba(124, 74, 3, 0.08);
-}
-
-@keyframes toast-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
+.toast.is-visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
 }

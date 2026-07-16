@@ -73,6 +73,40 @@ pub enum StorageRootKind {
     S3,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LibraryAccessMode {
+    Public,
+    Invite,
+}
+
+impl LibraryAccessMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LibraryAccessMode::Public => "public",
+            LibraryAccessMode::Invite => "invite",
+        }
+    }
+}
+
+impl fmt::Display for LibraryAccessMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for LibraryAccessMode {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "public" => Ok(LibraryAccessMode::Public),
+            "invite" => Ok(LibraryAccessMode::Invite),
+            other => Err(format!("unknown library access mode: {other}")),
+        }
+    }
+}
+
 impl StorageRootKind {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -108,6 +142,7 @@ pub struct UserRecord {
     pub id: Uuid,
     pub email: String,
     pub display_name: String,
+    pub avatar_key: Option<String>,
     pub global_role: String,
     pub is_active: bool,
     #[sqlx(default)]
@@ -127,6 +162,7 @@ pub struct UserWithPassword {
     pub id: Uuid,
     pub email: String,
     pub display_name: String,
+    pub avatar_key: Option<String>,
     pub password_hash: String,
     pub global_role: String,
     pub is_active: bool,
@@ -139,6 +175,7 @@ pub struct LibraryRecord {
     pub display_name: String,
     pub icon_url: Option<String>,
     pub enabled: bool,
+    pub access_mode: String,
     pub created_by_user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -151,9 +188,12 @@ pub struct LibraryWithRole {
     pub display_name: String,
     pub icon_url: Option<String>,
     pub enabled: bool,
+    pub access_mode: String,
     pub storage_locked_at: Option<DateTime<Utc>>,
-    pub current_user_role: String,
+    pub current_user_role: Option<String>,
+    pub is_member: bool,
     pub library_manager_names: Vec<String>,
+    pub library_manager_avatar_keys: Vec<Option<String>>,
     pub member_names: Vec<String>,
     pub asset_count: i64,
     pub folder_count: i64,
@@ -247,6 +287,7 @@ pub struct LibraryMemberRecord {
     pub user_id: Uuid,
     pub email: String,
     pub display_name: String,
+    pub avatar_key: Option<String>,
     pub role: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -284,6 +325,7 @@ pub struct ActivityLogRecord {
     pub actor_user_id: Option<Uuid>,
     pub actor_display_name: Option<String>,
     pub actor_email: Option<String>,
+    pub actor_avatar_key: Option<String>,
     pub action: String,
     pub target_type: String,
     pub target_id: Option<String>,

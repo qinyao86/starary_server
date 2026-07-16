@@ -5,6 +5,7 @@ import {
   clearStoredToken,
   getStoredToken,
   storeToken,
+  storeTokenForSession,
   type ActivityItem,
   type CurrentUser,
   type LibraryMember,
@@ -96,9 +97,9 @@ export function useAdminRuntime() {
         setAuthChecked(true);
         const [nextLibraries, nextUsers, nextActivity, nextStorageConnections] = await Promise.all([
           api.listLibraries(nextToken),
-          canManageServerRole(me.role) ? api.listUsers(nextToken) : Promise.resolve([]),
+          api.listUsers(nextToken),
           api.listServerActivity(nextToken),
-          api.listStorageConnections(nextToken)
+          canManageServerRole(me.role) ? api.listStorageConnections(nextToken) : Promise.resolve([])
         ]);
         setLibraries(nextLibraries);
         setUsers(nextUsers);
@@ -116,7 +117,7 @@ export function useAdminRuntime() {
           nextLibrary?.enabled !== false,
         );
       } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
+        if (error instanceof ApiError && (error.status === 401 || error.code === "console_login_forbidden")) {
           clearStoredToken();
           setToken(null);
           setCurrentUser(null);
@@ -184,7 +185,7 @@ export function useAdminRuntime() {
   }, [currentUser, selectedLibraryId, token]);
 
   useEffect(() => {
-    if (!token || !canManageServerRole(currentUser?.role ?? "")) {
+    if (!token || !currentUser) {
       return;
     }
 
@@ -196,7 +197,7 @@ export function useAdminRuntime() {
 
     const intervalId = window.setInterval(refreshUsers, 30_000);
     return () => window.clearInterval(intervalId);
-  }, [currentUser?.role, token]);
+  }, [currentUser, token]);
 
   const refreshAll = async () => {
     await loadPublicState();
@@ -218,8 +219,16 @@ export function useAdminRuntime() {
     }
   };
 
-  const onAuthenticated = (response: { accessToken: string; user: CurrentUser }) => {
-    storeToken(response.accessToken);
+  const onAuthenticated = (
+    response: { accessToken: string; user: CurrentUser },
+    options: { rememberDevice?: boolean } = {},
+  ) => {
+    clearStoredToken();
+    if (options.rememberDevice) {
+      storeToken(response.accessToken);
+    } else {
+      storeTokenForSession(response.accessToken);
+    }
     setToken(response.accessToken);
     setCurrentUser(response.user);
     setNeedsOwner(false);

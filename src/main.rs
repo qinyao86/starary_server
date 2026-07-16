@@ -9,6 +9,7 @@ mod path_resolver;
 mod portable;
 mod routes;
 mod state;
+mod system_avatars;
 
 use anyhow::Context;
 use config::ServerConfig;

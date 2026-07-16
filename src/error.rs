@@ -14,6 +14,8 @@ pub enum AppError {
     Unauthorized,
     #[error("forbidden")]
     Forbidden,
+    #[error("no permission to log in to the admin console")]
+    ConsoleLoginForbidden,
     #[error("not found: {0}")]
     NotFound(String),
     #[error("conflict: {0}")]
@@ -47,6 +49,7 @@ impl IntoResponse for AppError {
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::Forbidden => StatusCode::FORBIDDEN,
+            AppError::ConsoleLoginForbidden => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::StorageLocationConflict(_) => StatusCode::CONFLICT,
@@ -60,6 +63,7 @@ impl IntoResponse for AppError {
         let code = match &self {
             AppError::LibraryDisabled(_) => Some("library_disabled"),
             AppError::StorageLocationConflict(_) => Some("storage_location_conflict"),
+            AppError::ConsoleLoginForbidden => Some("console_login_forbidden"),
             _ => None,
         };
         let library_id = match &self {

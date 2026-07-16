@@ -3,6 +3,7 @@ use crate::{
     error::{AppError, AppResult},
     models::{Role, UserRecord},
     state::AppState,
+    system_avatars,
 };
 use axum::{
     extract::{ConnectInfo, State},
@@ -79,6 +80,7 @@ pub async fn create_owner(
     }
 
     let user_id = Uuid::new_v4();
+    let avatar_key = system_avatars::default_key_for_user(user_id);
     let password_hash = hash_password(&request.password)?;
     let display_name = request
         .display_name
@@ -89,14 +91,15 @@ pub async fn create_owner(
 
     let user = sqlx::query_as::<_, UserRecord>(
         r#"
-        INSERT INTO users (id, email, display_name, password_hash, global_role, last_login_at, last_seen_at)
-        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-        RETURNING id, email, display_name, global_role, is_active, created_at, updated_at
+        INSERT INTO users (id, email, display_name, avatar_key, password_hash, global_role, last_login_at, last_seen_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        RETURNING id, email, display_name, avatar_key, global_role, is_active, created_at, updated_at
         "#,
     )
     .bind(user_id)
     .bind(email)
     .bind(display_name)
+    .bind(avatar_key)
     .bind(password_hash)
     .bind(Role::Owner.as_str())
     .fetch_one(&mut *tx)

@@ -19,8 +19,8 @@ fn main() {
             change_service_port,
             change_log_directory,
             select_log_directory,
+            set_launch_at_login,
             open_admin,
-            open_data_directory,
             open_log,
             set_control_center_language,
         ])
@@ -57,25 +57,12 @@ fn main() {
             write_control_center_log("control center setup completed");
             let status = service.status();
             tray::install(app.handle(), &status)?;
-            if service.should_start_automatically() && status.state == "stopped" {
-                let app_handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    if !tray::begin_service_action(&app_handle) {
-                        return;
-                    }
-                    match service.start() {
-                        Ok(status) => {
-                            write_control_center_log("automatic service start completed");
-                            tray::finish_service_action(&app_handle, &status);
-                        }
-                        Err(error) => {
-                            write_control_center_log(&format!(
-                                "automatic service start failed: {error}"
-                            ));
-                            tray::finish_service_action(&app_handle, &service.status());
-                        }
-                    }
-                });
+            if status.state == "stopped" && service.reserve_automatic_start() {
+                schedule_automatic_service_start(
+                    app.handle(),
+                    service.clone(),
+                    "automatic service start",
+                );
             }
             Ok(())
         })
@@ -99,6 +86,13 @@ fn get_service_status(
 ) -> ServiceStatus {
     let status = service.status();
     tray::sync_service_action(&app, &status);
+    if status.state == "stopped" && service.reserve_automatic_start() {
+        schedule_automatic_service_start(
+            &app,
+            service.inner().clone(),
+            "automatic service restart",
+        );
+    }
     status
 }
 
@@ -160,6 +154,15 @@ fn select_log_directory(
 }
 
 #[tauri::command]
+fn set_launch_at_login(
+    enabled: bool,
+    service: tauri::State<'_, Arc<ManagedService>>,
+) -> Result<ServiceStatus, String> {
+    service.update_launch_at_login(enabled)?;
+    Ok(service.status())
+}
+
+#[tauri::command]
 fn open_admin(
     app: tauri::AppHandle,
     service: tauri::State<'_, Arc<ManagedService>>,
@@ -170,16 +173,6 @@ fn open_admin(
     }
     app.opener()
         .open_url(status.admin_url, None::<&str>)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn open_data_directory(
-    app: tauri::AppHandle,
-    service: tauri::State<'_, Arc<ManagedService>>,
-) -> Result<(), String> {
-    app.opener()
-        .open_path(service.data_home().display().to_string(), None::<&str>)
         .map_err(|error| error.to_string())
 }
 
@@ -282,6 +275,29 @@ fn toggle_service_from_tray(app: &tauri::AppHandle) {
             Err(error) => {
                 write_control_center_log(&format!("tray service action failed: {error}"));
                 tray::show_main_window(&app_handle);
+            }
+        }
+    });
+}
+
+fn schedule_automatic_service_start(
+    app: &tauri::AppHandle,
+    service: Arc<ManagedService>,
+    reason: &'static str,
+) {
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        if !tray::begin_service_action(&app_handle) {
+            return;
+        }
+        match service.start() {
+            Ok(status) => {
+                write_control_center_log(&format!("{reason} completed"));
+                tray::finish_service_action(&app_handle, &status);
+            }
+            Err(error) => {
+                write_control_center_log(&format!("{reason} failed: {error}"));
+                tray::finish_service_action(&app_handle, &service.status());
             }
         }
     });
