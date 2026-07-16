@@ -8,32 +8,44 @@ import { LibraryDetailPageView, LibraryListPageView } from "../components/librar
 import { useAvailableLibraryUsers } from "../hooks/use-available-library-users";
 import type { PageContext } from "../types";
 
+type PendingMemberSelection = {
+  checked: boolean;
+  role: string;
+};
+
 export function LibrariesPage({
-  t, token, currentUser, libraries, users, storageRoots, storageConnections, libraryMembers, libraryActivityItems, selectedLibraryId, setSelectedLibraryId, refreshAll, setMessage, libraryListViewVersion
+  t, token, currentUser, libraries, users, storageRoots, storageConnections, libraryMembers, libraryActivityItems, selectedLibraryId, setSelectedLibraryId, refreshAll, setMessage, libraryRouteId, navigateToLibrary
 }: PageContext) {
-  const [viewLibraryId, setViewLibraryId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [createAccessMode, setCreateAccessMode] = useState<"public" | "invite">("invite");
+  const [editAccessMode, setEditAccessMode] = useState<"public" | "invite">("invite");
   const [storageConnectionId, setStorageConnectionId] = useState("");
   const [storageDialogOpen, setStorageDialogOpen] = useState(false);
   const [assignStorageDialogOpen, setAssignStorageDialogOpen] = useState(false);
   const [storageKind, setStorageKind] = useState("server_filesystem");
   const [storageLocation, setStorageLocation] = useState("");
   const [editName, setEditName] = useState("");
-  const [memberUserId, setMemberUserId] = useState("");
-  const [memberRole, setMemberRole] = useState("viewer");
+  const [memberSelections, setMemberSelections] = useState<Record<string, PendingMemberSelection>>({});
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [libraryPendingDeletion, setLibraryPendingDeletion] = useState<TeamLibrary | null>(null);
-  const activeLibrary = libraries.find((item) => item.id === viewLibraryId) ?? null;
-  const availableUsers = useAvailableLibraryUsers(users, libraryMembers, memberUserId, setMemberUserId);
+  const activeLibrary = libraries.find((item) => item.id === libraryRouteId) ?? null;
+  const availableUsers = useAvailableLibraryUsers(users, libraryMembers);
   const canCreateLibrary = currentUser?.role === "owner" || currentUser?.role === "admin";
   const canManageLibrary = (library: TeamLibrary) =>
     ["owner", "admin", "library_manager"].includes(library.currentUserRole ?? currentUser?.role ?? "");
 
   useEffect(() => {
-    setViewLibraryId(null);
-  }, [libraryListViewVersion]);
+    if (
+      !libraryRouteId ||
+      selectedLibraryId === libraryRouteId ||
+      !libraries.some((library) => library.id === libraryRouteId)
+    ) {
+      return;
+    }
+    setSelectedLibraryId(libraryRouteId);
+  }, [libraries, libraryRouteId, selectedLibraryId, setSelectedLibraryId]);
   const storageErrorMessage = (error: unknown) => {
     if (error instanceof ApiError && error.code === "storage_location_conflict") {
       return t("storageLocationConflict");
@@ -44,6 +56,7 @@ export function LibrariesPage({
   const openCreateLibraryDialog = () => {
     cancelEditLibrary();
     setName("");
+    setCreateAccessMode("invite");
     setStorageConnectionId(
       storageConnections.find((connection) => connection.isDefault && connection.enabled)?.id ??
       storageConnections.find((connection) => connection.enabled)?.id ??
@@ -55,12 +68,13 @@ export function LibrariesPage({
   const closeCreateLibraryDialog = () => {
     setShowCreate(false);
     setName("");
+    setCreateAccessMode("invite");
     setStorageConnectionId("");
   };
 
   const openLibrary = (libraryId: string) => {
     setAssignStorageDialogOpen(false);
-    setViewLibraryId(libraryId);
+    navigateToLibrary(libraryId);
     setSelectedLibraryId(libraryId);
   };
 
@@ -68,11 +82,23 @@ export function LibrariesPage({
     setShowCreate(false);
     setEditingLibraryId(library.id);
     setEditName(library.displayName);
+    setEditAccessMode(library.accessMode ?? "invite");
+  };
+
+  const startEditLibraryById = (libraryId: string) => {
+    const library = libraries.find((item) => item.id === libraryId);
+    if (library) startEditLibrary(library);
+  };
+
+  const startDeleteLibraryById = (libraryId: string) => {
+    const library = libraries.find((item) => item.id === libraryId);
+    if (library) setLibraryPendingDeletion(library);
   };
 
   const cancelEditLibrary = () => {
     setEditingLibraryId(null);
     setEditName("");
+    setEditAccessMode("invite");
   };
 
   const openStorageDialog = () => {
@@ -117,9 +143,35 @@ export function LibrariesPage({
   };
 
   const openMemberDialog = () => {
-    setMemberUserId(availableUsers[0]?.id ?? "");
-    setMemberRole("viewer");
+    setMemberSelections(Object.fromEntries(
+      availableUsers.map((user) => [user.id, { checked: false, role: "editor" }])
+    ));
     setMemberDialogOpen(true);
+  };
+
+  const closeMemberDialog = () => {
+    setMemberDialogOpen(false);
+    setMemberSelections({});
+  };
+
+  const togglePendingMember = (userId: string, checked: boolean) => {
+    setMemberSelections((previous) => ({
+      ...previous,
+      [userId]: {
+        checked,
+        role: previous[userId]?.role ?? "editor"
+      }
+    }));
+  };
+
+  const updatePendingMemberRole = (userId: string, role: string) => {
+    setMemberSelections((previous) => ({
+      ...previous,
+      [userId]: {
+        checked: previous[userId]?.checked ?? false,
+        role
+      }
+    }));
   };
 
   const createLibrary = async (event: FormEvent) => {
@@ -135,12 +187,12 @@ export function LibrariesPage({
     try {
       await api.createLibrary(token, {
         displayName: name.trim(),
+        accessMode: createAccessMode,
         storageBinding: { connectionId: storageConnectionId }
       });
       closeCreateLibraryDialog();
       setMessage(t("saved"));
       await refreshAll();
-      setViewLibraryId(null);
     } catch (error) {
       setMessage(storageErrorMessage(error));
     }
@@ -158,7 +210,8 @@ export function LibrariesPage({
     }
     try {
       await api.updateLibrary(token, editingLibraryId, {
-        displayName: editName.trim()
+        displayName: editName.trim(),
+        accessMode: editAccessMode
       });
       cancelEditLibrary();
       setMessage(t("saved"));
@@ -211,7 +264,7 @@ export function LibrariesPage({
     }
     try {
       await api.deleteLibrary(token, library.id, { deleteFiles });
-      if (viewLibraryId === library.id) setViewLibraryId(null);
+      if (libraryRouteId === library.id) navigateToLibrary(null, { replace: true });
       if (selectedLibraryId === library.id) setSelectedLibraryId("");
       if (editingLibraryId === library.id) cancelEditLibrary();
       setLibraryPendingDeletion(null);
@@ -238,7 +291,8 @@ export function LibrariesPage({
 
   const submitMember = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedLibraryId || !memberUserId) {
+    const selectedUsers = availableUsers.filter((user) => memberSelections[user.id]?.checked);
+    if (!selectedLibraryId || selectedUsers.length === 0) {
       setMessage(t("formRequiredHint"));
       return;
     }
@@ -247,8 +301,12 @@ export function LibrariesPage({
       return;
     }
     try {
-      await api.upsertLibraryMember(token, selectedLibraryId, memberUserId, { role: memberRole });
-      setMemberDialogOpen(false);
+      await Promise.all(selectedUsers.map((user) => (
+        api.upsertLibraryMember(token, selectedLibraryId, user.id, {
+          role: memberSelections[user.id]?.role ?? "editor"
+        })
+      )));
+      closeMemberDialog();
       setMessage(t("saved"));
       await refreshAll();
     } catch (error) {
@@ -298,10 +356,12 @@ export function LibrariesPage({
           title={t("updateLibrary")}
           hint={t("editLibraryDialogHint")}
           name={editName}
+          accessMode={editAccessMode}
           submitLabel={t("submit")}
           t={t}
           onClose={cancelEditLibrary}
           onNameChange={setEditName}
+          onAccessModeChange={setEditAccessMode}
           onSubmit={updateLibrary}
         />
         <LibraryDetailPageView
@@ -310,8 +370,7 @@ export function LibrariesPage({
           libraryActivityItems={libraryActivityItems}
           libraryMembers={libraryMembers}
           memberDialogOpen={memberDialogOpen}
-          memberRole={memberRole}
-          memberUserId={memberUserId}
+          memberSelections={memberSelections}
           canDeleteLibrary={canCreateLibrary}
           canManageLibrary={canManageLibrary(activeLibrary)}
           assignStorageDialogOpen={assignStorageDialogOpen && !storageDialogOpen}
@@ -319,17 +378,18 @@ export function LibrariesPage({
           storageConnections={storageConnections}
           storageRoots={storageRoots}
           t={t}
+          users={users}
           onBack={() => {
             closeAssignStorageDialog();
-            setViewLibraryId(null);
+            navigateToLibrary(null);
           }}
           onDelete={() => setLibraryPendingDeletion(activeLibrary)}
           onEdit={() => startEditLibrary(activeLibrary)}
-          onMemberDialogClose={() => setMemberDialogOpen(false)}
+          onMemberDialogClose={closeMemberDialog}
           onMemberDialogOpen={openMemberDialog}
-          onMemberRoleChange={setMemberRole}
           onMemberSubmit={submitMember}
-          onMemberUserChange={setMemberUserId}
+          onMemberSelectionChange={togglePendingMember}
+          onMemberSelectionRoleChange={updatePendingMemberRole}
           onMemberRoleUpdate={(member, role) => void updateMemberRole(member, role)}
           onRemoveMember={(member) => void removeMember(member)}
           onAssignStorage={assignLibraryStorage}
@@ -344,6 +404,13 @@ export function LibrariesPage({
 
   return (
     <>
+      <DeleteLibraryDialog
+        library={libraryPendingDeletion}
+        open={Boolean(libraryPendingDeletion)}
+        t={t}
+        onClose={() => setLibraryPendingDeletion(null)}
+        onConfirm={deleteLibrary}
+      />
       <StorageConnectionDialog
         connection={null}
         kind={storageKind}
@@ -359,9 +426,12 @@ export function LibrariesPage({
       />
       <LibraryListPageView
       createName={name}
+      createAccessMode={createAccessMode}
       editName={editName}
+      editAccessMode={editAccessMode}
       editingLibraryId={storageDialogOpen ? null : editingLibraryId}
       libraries={libraries}
+      canDeleteLibrary={canCreateLibrary}
       canCreateLibrary={canCreateLibrary}
       canManageLibrary={canManageLibrary}
       showCreate={showCreate && !storageDialogOpen}
@@ -372,7 +442,11 @@ export function LibrariesPage({
       onCloseCreate={closeCreateLibraryDialog}
       onCreate={createLibrary}
       onCreateNameChange={setName}
+      onCreateAccessModeChange={setCreateAccessMode}
+      onDelete={startDeleteLibraryById}
       onEditNameChange={setEditName}
+      onEditAccessModeChange={setEditAccessMode}
+      onOpenEdit={startEditLibraryById}
       onOpen={openLibrary}
       onOpenCreate={openCreateLibraryDialog}
       onOpenStorageCreate={openStorageDialog}

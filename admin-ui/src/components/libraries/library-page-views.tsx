@@ -14,8 +14,7 @@ export function LibraryDetailPageView({
   libraryActivityItems,
   libraryMembers,
   memberDialogOpen,
-  memberRole,
-  memberUserId,
+  memberSelections,
   assignStorageDialogOpen,
   canDeleteLibrary,
   canManageLibrary,
@@ -23,14 +22,15 @@ export function LibraryDetailPageView({
   storageConnectionId,
   storageConnections,
   t,
+  users,
   onBack,
   onDelete,
   onEdit,
   onMemberDialogClose,
   onMemberDialogOpen,
-  onMemberRoleChange,
   onMemberSubmit,
-  onMemberUserChange,
+  onMemberSelectionChange,
+  onMemberSelectionRoleChange,
   onMemberRoleUpdate,
   onRemoveMember,
   onAssignStorage,
@@ -44,22 +44,22 @@ export function LibraryDetailPageView({
   libraryActivityItems: ActivityItem[];
   libraryMembers: LibraryMember[];
   memberDialogOpen: boolean;
-  memberRole: string;
-  memberUserId: string;
+  memberSelections: Record<string, { checked: boolean; role: string }>;
   assignStorageDialogOpen: boolean;
   canDeleteLibrary: boolean;
   canManageLibrary: boolean;
   storageRoots: StorageRoot[];
   storageConnectionId: string;
   storageConnections: StorageConnection[];
+  users: TeamUser[];
   onBack: () => void;
   onDelete: () => void;
   onEdit: () => void;
   onMemberDialogClose: () => void;
   onMemberDialogOpen: () => void;
-  onMemberRoleChange: (value: string) => void;
   onMemberSubmit: (event: FormEvent) => void | Promise<void>;
-  onMemberUserChange: (value: string) => void;
+  onMemberSelectionChange: (userId: string, checked: boolean) => void;
+  onMemberSelectionRoleChange: (userId: string, role: string) => void;
   onMemberRoleUpdate: (member: LibraryMember, role: string) => void;
   onRemoveMember: (member: LibraryMember) => void;
   onAssignStorage: (event: FormEvent) => void | Promise<void>;
@@ -70,23 +70,39 @@ export function LibraryDetailPageView({
 }) {
   return (
     <PageFrame
-      title={t("libraries")}
-      description={t("libraryPageHint")}
+      className="library-detail-page-frame"
+      title={activeLibrary.displayName}
+      description=""
       titleSlot={
-        <button className="page-back-button" type="button" onClick={onBack}>
-          <ArrowLeft size={16} />
-          <span>{t("backToLibraries")}</span>
-        </button>
+        <div className="library-detail-heading">
+          <button
+            aria-label={t("backToLibraries")}
+            className="page-back-button library-detail-back-button"
+            title={t("backToLibraries")}
+            type="button"
+            onClick={onBack}
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <h2>{activeLibrary.displayName}</h2>
+        </div>
       }
       action={
         <div className="library-detail-page-actions">
-          {canManageLibrary && <Button size="sm" type="button" variant="outline" onClick={onEdit}>
+          {canManageLibrary && <Button className="library-edit-button" size="sm" type="button" onClick={onEdit}>
             <Pencil size={15} />
             <span>{t("editLibrary")}</span>
           </Button>}
-          {canDeleteLibrary && <Button size="sm" type="button" variant="destructive" onClick={onDelete}>
+          {canDeleteLibrary && <Button
+            aria-label={t("deleteLibrary")}
+            className="library-delete-button"
+            size="icon"
+            title={t("deleteLibrary")}
+            type="button"
+            variant="ghost"
+            onClick={onDelete}
+          >
             <Trash2 size={15} />
-            <span>{t("deleteLibrary")}</span>
           </Button>}
         </div>
       }
@@ -97,19 +113,19 @@ export function LibraryDetailPageView({
         libraryActivityItems={libraryActivityItems}
         libraryMembers={libraryMembers}
         memberDialogOpen={memberDialogOpen}
-        memberRole={memberRole}
-        memberUserId={memberUserId}
+        memberSelections={memberSelections}
         assignStorageDialogOpen={assignStorageDialogOpen}
         canAssignStorage={canManageLibrary && storageRoots.length === 0 && (activeLibrary.storageRootCount ?? 0) === 0}
         storageConnectionId={storageConnectionId}
         storageConnections={storageConnections}
         storageRoots={storageRoots}
         t={t}
+        users={users}
         onMemberDialogClose={onMemberDialogClose}
         onMemberDialogOpen={onMemberDialogOpen}
-        onMemberRoleChange={onMemberRoleChange}
         onMemberSubmit={onMemberSubmit}
-        onMemberUserChange={onMemberUserChange}
+        onMemberSelectionChange={onMemberSelectionChange}
+        onMemberSelectionRoleChange={onMemberSelectionRoleChange}
         onMemberRoleUpdate={onMemberRoleUpdate}
         onRemoveMember={onRemoveMember}
         onAssignStorage={onAssignStorage}
@@ -124,9 +140,12 @@ export function LibraryDetailPageView({
 
 export function LibraryListPageView({
   createName,
+  createAccessMode,
   editName,
+  editAccessMode,
   editingLibraryId,
   libraries,
+  canDeleteLibrary,
   canCreateLibrary,
   canManageLibrary,
   showCreate,
@@ -136,8 +155,12 @@ export function LibraryListPageView({
   onCloseCreate,
   onCancelEdit,
   onCreate,
+  onCreateAccessModeChange,
   onCreateNameChange,
+  onDelete,
+  onEditAccessModeChange,
   onEditNameChange,
+  onOpenEdit,
   onOpen,
   onOpenCreate,
   onOpenStorageCreate,
@@ -146,9 +169,12 @@ export function LibraryListPageView({
   onStorageConnectionChange
 }: TranslatorContext & {
   createName: string;
+  createAccessMode: "public" | "invite";
   editName: string;
+  editAccessMode: "public" | "invite";
   editingLibraryId: string | null;
   libraries: TeamLibrary[];
+  canDeleteLibrary: boolean;
   canCreateLibrary: boolean;
   canManageLibrary: (library: TeamLibrary) => boolean;
   showCreate: boolean;
@@ -157,8 +183,12 @@ export function LibraryListPageView({
   onCloseCreate: () => void;
   onCancelEdit: () => void;
   onCreate: (event: FormEvent) => void | Promise<void>;
+  onCreateAccessModeChange: (value: "public" | "invite") => void;
   onCreateNameChange: (value: string) => void;
+  onDelete: (libraryId: string) => void;
+  onEditAccessModeChange: (value: "public" | "invite") => void;
   onEditNameChange: (value: string) => void;
+  onOpenEdit: (libraryId: string) => void;
   onOpen: (libraryId: string) => void;
   onOpenCreate: () => void;
   onOpenStorageCreate: () => void;
@@ -184,12 +214,14 @@ export function LibraryListPageView({
           title={t("createLibrary")}
           hint={t("createLibraryDialogHint")}
           name={createName}
+          accessMode={createAccessMode}
           submitLabel={t("submit")}
           t={t}
           showStorage
           storageConnectionId={storageConnectionId}
           storageConnections={storageConnections}
           onClose={onCloseCreate}
+          onAccessModeChange={onCreateAccessModeChange}
           onNameChange={onCreateNameChange}
           onSubmit={onCreate}
           onStorageConnectionChange={onStorageConnectionChange}
@@ -200,17 +232,22 @@ export function LibraryListPageView({
           title={t("updateLibrary")}
           hint={t("editLibraryDialogHint")}
           name={editName}
+          accessMode={editAccessMode}
           submitLabel={t("submit")}
           t={t}
           onClose={onCancelEdit}
+          onAccessModeChange={onEditAccessModeChange}
           onNameChange={onEditNameChange}
           onSubmit={onUpdate}
         />
         <LibraryCardList
           libraries={libraries}
+          canDeleteLibrary={canDeleteLibrary}
           canManageLibrary={canManageLibrary}
           t={t}
+          onDelete={onDelete}
           onOpen={onOpen}
+          onEdit={onOpenEdit}
           onToggleEnabled={onToggleEnabled}
         />
       </div>

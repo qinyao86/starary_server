@@ -1,11 +1,35 @@
 import type { ActivityItem } from "../../api";
 import type { TranslatorContext } from "../../types";
 import { activityActionLabel } from "../../utils/format";
+import { UserAvatar } from "./user-avatar";
 import { StatusDot } from "./status";
 
-export function ActivityList({ t, activityItems, compact = false }: TranslatorContext & { activityItems: ActivityItem[]; compact?: boolean }) {
+export function ActivityList({
+  t,
+  activityItems,
+  compact = false,
+  resolveAvatarKey
+}: TranslatorContext & {
+  activityItems: ActivityItem[];
+  compact?: boolean;
+  resolveAvatarKey?: (item: ActivityItem) => string | null | undefined;
+}) {
+  return ActivityListWithAvatarLookup({ t, activityItems, compact, resolveAvatarKey });
+}
+
+export function ActivityListWithAvatarLookup({
+  t,
+  activityItems,
+  compact = false,
+  resolveAvatarKey
+}: TranslatorContext & {
+  activityItems: ActivityItem[];
+  compact?: boolean;
+  resolveAvatarKey?: (item: ActivityItem) => string | null | undefined;
+}) {
   const rows = activityItems.map((item) => ({
     actor: item.actorDisplayName ?? item.actorEmail ?? item.actorUserId ?? t("system"),
+    avatarKey: resolveAvatarKey?.(item) ?? item.actorAvatarKey ?? null,
     action: activityActionLabel(t, item.action),
     target: item.targetName ?? item.targetType ?? t("unknownTarget"),
     time: new Date(item.createdAt).toLocaleString()
@@ -18,7 +42,7 @@ export function ActivityList({ t, activityItems, compact = false }: TranslatorCo
       ) : (
         rows.map((item) => (
           <div className="activity-item" key={`${item.actor}-${item.time}-${item.action}`}>
-            <div className="activity-avatar">{item.actor.slice(0, 1).toUpperCase()}</div>
+            <UserAvatar avatarKey={item.avatarKey} label={item.actor} size="md" />
             <div className="activity-main">
               <div className="activity-action">{item.action}</div>
               <div className="activity-meta">

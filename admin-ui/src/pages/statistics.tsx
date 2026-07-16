@@ -7,6 +7,13 @@ export function StatisticsPage({ activityItems, libraries, serverInfo, serviceRu
   const assetTotal = libraries.reduce((total, library) => total + (library.assetCount ?? 0), 0);
   const totalSize = libraries.reduce((total, library) => total + (library.totalSizeBytes ?? 0), 0);
   const onlineUsers = users.filter(isUserOnline).length;
+  const resolveAvatarKey = (item: (typeof activityItems)[number]) => {
+    const user = users.find((candidate) =>
+      candidate.id === item.actorUserId ||
+      candidate.email.toLowerCase() === item.actorEmail?.toLowerCase()
+    );
+    return user?.avatarKey ?? item.actorAvatarKey ?? null;
+  };
 
   return (
     <PageFrame title={t("statistics")} description={t("statisticsMergedPageHint")}>
@@ -25,7 +32,7 @@ export function StatisticsPage({ activityItems, libraries, serverInfo, serviceRu
           </div>
         </Panel>
         <Panel title={t("recentActivity")} icon={Activity} className="span-12">
-          <ActivityList t={t} activityItems={activityItems.slice(0, 16)} />
+          <ActivityList t={t} activityItems={activityItems.slice(0, 16)} resolveAvatarKey={resolveAvatarKey} />
         </Panel>
       </div>
     </PageFrame>

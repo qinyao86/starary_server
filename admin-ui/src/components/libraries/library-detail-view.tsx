@@ -1,12 +1,11 @@
-import { ChevronDown, ListChecks, Network, Trash2, UserPlus, Users } from "lucide-react";
+import { ChevronDown, Database, HardDrive, History, Package2, Trash2, UserPlus, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { Badge as UiBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ActivityItem, LibraryMember, StorageConnection, StorageRoot, TeamLibrary, TeamUser } from "../../api";
 import type { TranslatorContext } from "../../types";
-import { formatBytes, formatCount, formatMemberNames, isLibraryManagerRole, roleLabel, storageKindLabel } from "../../utils/format";
-import { ActivityList, Badge, LibraryDetailStat, Panel } from "../common";
+import { formatBytes, formatCount, isLibraryManagerRole, roleLabel, storageKindLabel } from "../../utils/format";
+import { ActivityList, LibraryDetailStat, Panel, UserAvatar } from "../common";
 import { LibraryDialog, MemberDialog } from "../dialogs";
 
 export function LibraryDetailView({
@@ -15,19 +14,19 @@ export function LibraryDetailView({
   libraryActivityItems,
   libraryMembers,
   memberDialogOpen,
-  memberRole,
-  memberUserId,
+  memberSelections,
   assignStorageDialogOpen,
   canAssignStorage,
   storageConnectionId,
   storageConnections,
   storageRoots,
   t,
+  users,
   onMemberDialogClose,
   onMemberDialogOpen,
-  onMemberRoleChange,
   onMemberSubmit,
-  onMemberUserChange,
+  onMemberSelectionChange,
+  onMemberSelectionRoleChange,
   onMemberRoleUpdate,
   onRemoveMember,
   onAssignStorage,
@@ -41,18 +40,18 @@ export function LibraryDetailView({
   libraryActivityItems: ActivityItem[];
   libraryMembers: LibraryMember[];
   memberDialogOpen: boolean;
-  memberRole: string;
-  memberUserId: string;
+  memberSelections: Record<string, { checked: boolean; role: string }>;
   assignStorageDialogOpen: boolean;
   canAssignStorage: boolean;
   storageConnectionId: string;
   storageConnections: StorageConnection[];
   storageRoots: StorageRoot[];
+  users: TeamUser[];
   onMemberDialogClose: () => void;
   onMemberDialogOpen: () => void;
-  onMemberRoleChange: (value: string) => void;
   onMemberSubmit: (event: FormEvent) => void | Promise<void>;
-  onMemberUserChange: (value: string) => void;
+  onMemberSelectionChange: (userId: string, checked: boolean) => void;
+  onMemberSelectionRoleChange: (userId: string, role: string) => void;
   onMemberRoleUpdate: (member: LibraryMember, role: string) => void;
   onRemoveMember: (member: LibraryMember) => void;
   onAssignStorage: (event: FormEvent) => void | Promise<void>;
@@ -63,6 +62,13 @@ export function LibraryDetailView({
 }) {
   const libraryManagerCount = libraryMembers.filter((member) => isLibraryManagerRole(member.role)).length;
   const visibleMemberCount = Math.max(libraryMembers.length, activeLibrary.memberNames?.length ?? 0);
+  const resolveAvatarKey = (item: ActivityItem) => {
+    const user = users.find((candidate) =>
+      candidate.id === item.actorUserId ||
+      candidate.email.toLowerCase() === item.actorEmail?.toLowerCase()
+    );
+    return user?.avatarKey ?? item.actorAvatarKey ?? null;
+  };
 
   return (
     <div className="library-page">
@@ -70,12 +76,11 @@ export function LibraryDetailView({
         open={memberDialogOpen}
         t={t}
         users={availableUsers}
-        memberUserId={memberUserId}
-        memberRole={memberRole}
+        memberSelections={memberSelections}
         onClose={onMemberDialogClose}
-        onRoleChange={onMemberRoleChange}
         onSubmit={onMemberSubmit}
-        onUserChange={onMemberUserChange}
+        onSelectionChange={onMemberSelectionChange}
+        onRoleChange={onMemberSelectionRoleChange}
       />
 
       <LibraryDialog
@@ -96,61 +101,55 @@ export function LibraryDetailView({
         onSubmit={onAssignStorage}
       />
 
-      <Card className="library-detail-hero">
-        <CardHeader className="p-0">
-          <CardDescription>{t("libraryDetails")}</CardDescription>
-          <CardTitle className="text-[22px]">{activeLibrary.displayName}</CardTitle>
-        </CardHeader>
-        <CardContent className="library-detail-stats p-0">
-          <LibraryDetailStat label={t("totalSize")} value={formatBytes(activeLibrary.totalSizeBytes)} />
-          <LibraryDetailStat label={t("members")} value={formatCount(visibleMemberCount)} />
-          <LibraryDetailStat label={t("assets")} value={formatCount(activeLibrary.assetCount)} />
-          <LibraryDetailStat label={t("tags")} value={formatCount(activeLibrary.tagCount)} />
-          <LibraryDetailStat label={t("libraryManager")} value={formatMemberNames(activeLibrary.libraryManagerNames, "-")} />
-          <LibraryDetailStat label={t("role")} value={roleLabel(t, activeLibrary.currentUserRole ?? "owner")} />
-        </CardContent>
-      </Card>
-
-      <div className="page-grid">
-        <Panel
-          title={t("libraryMembers")}
-          icon={Users}
-          className="span-12"
-          action={
-            <div className="panel-actions">
-              <UiBadge className="control-badge" variant="secondary">{libraryMembers.length ? t("realData") : t("empty")}</UiBadge>
-              <Button className="panel-action-button" size="sm" type="button" onClick={onMemberDialogOpen} disabled={availableUsers.length === 0}>
-                <UserPlus size={15} />
-                <span>{t("addMember")}</span>
-              </Button>
+      <div className="library-detail-layout">
+        <div className="library-detail-main-column">
+          <section className="library-detail-overview" aria-label={t("libraryOverview")}>
+            <div className="library-detail-stats">
+              <LibraryDetailStat icon={Package2} label={t("assets")} value={formatCount(activeLibrary.assetCount)} />
+              <LibraryDetailStat icon={Database} label={t("totalSize")} value={formatBytes(activeLibrary.totalSizeBytes)} />
+              <LibraryDetailStat icon={Users} label={t("members")} value={formatCount(visibleMemberCount)} />
             </div>
-          }
-        >
-          <LibraryMemberList
-            activeLibrary={activeLibrary}
-            libraryManagerCount={libraryManagerCount}
-            libraryMembers={libraryMembers}
-            t={t}
-            onMemberRoleUpdate={onMemberRoleUpdate}
-            onRemoveMember={onRemoveMember}
-          />
-        </Panel>
+          </section>
 
-        <Panel
-          title={t("storage")}
-          icon={Network}
-          className="span-6"
-          action={canAssignStorage ? (
-            <Button size="sm" type="button" onClick={onAssignStorageDialogOpen}>
-              <Network size={15} />
-              <span>{t("assignStorage")}</span>
-            </Button>
-          ) : <Badge>{storageRoots.length ? t("realData") : t("empty")}</Badge>}
-        >
-          <LibraryStorageList storageRoots={storageRoots} t={t} />
-        </Panel>
-        <Panel title={t("libraryActivity")} icon={ListChecks} className="span-6" action={<Badge>{libraryActivityItems.length ? t("realData") : t("empty")}</Badge>}>
-          <ActivityList t={t} activityItems={libraryActivityItems} compact />
+          <Panel
+            title={t("storage")}
+            icon={HardDrive}
+            action={canAssignStorage ? (
+              <Button className="panel-action-button" size="sm" type="button" variant="secondary" onClick={onAssignStorageDialogOpen}>
+                <HardDrive size={15} />
+                <span>{t("configureStorage")}</span>
+              </Button>
+            ) : undefined}
+          >
+            <LibraryStorageList storageRoots={storageRoots} t={t} />
+          </Panel>
+
+          <Panel
+            title={t("members")}
+            icon={Users}
+            action={
+              <div className="panel-actions">
+                <UiBadge className="control-badge" title={t("members")} variant="secondary">{formatCount(visibleMemberCount)}</UiBadge>
+                <Button className="panel-action-button" size="sm" type="button" variant="secondary" onClick={onMemberDialogOpen} disabled={availableUsers.length === 0}>
+                  <UserPlus size={15} />
+                  <span>{t("addMember")}</span>
+                </Button>
+              </div>
+            }
+          >
+            <LibraryMemberList
+              activeLibrary={activeLibrary}
+              libraryManagerCount={libraryManagerCount}
+              libraryMembers={libraryMembers}
+              t={t}
+              onMemberRoleUpdate={onMemberRoleUpdate}
+              onRemoveMember={onRemoveMember}
+            />
+          </Panel>
+        </div>
+
+        <Panel title={t("recentLibraryActivity")} icon={History} className="library-detail-activity-panel">
+          <ActivityList t={t} activityItems={libraryActivityItems} compact resolveAvatarKey={resolveAvatarKey} />
         </Panel>
       </div>
     </div>
@@ -215,6 +214,7 @@ function LibraryMemberList({
       <div className="member-list">
         {activeLibrary.memberNames.map((name) => (
           <div className="member-row is-readonly" key={name}>
+            <UserAvatar label={name} size="lg" />
             <div>
               <strong>{name}</strong>
               <span>{t("readOnly")}</span>
@@ -236,6 +236,7 @@ function LibraryMemberList({
         const roleLocked = removingWouldOrphanLibrary || member.role === "owner" || member.role === "admin";
         return (
           <div className="member-row" key={member.userId}>
+            <UserAvatar avatarKey={member.avatarKey} label={member.displayName} size="lg" />
             <div>
               <strong>{member.displayName}</strong>
               <span>{member.email}</span>
@@ -255,15 +256,16 @@ function LibraryMemberList({
               <ChevronDown aria-hidden="true" size={14} />
             </label>
             <Button
-              className="member-action-button"
-              size="sm"
+              aria-label={t("remove")}
+              className="member-action-button icon-only"
+              size="icon"
+              title={t("remove")}
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={() => onRemoveMember(member)}
               disabled={removingWouldOrphanLibrary}
             >
               <Trash2 size={15} />
-              <span>{t("remove")}</span>
             </Button>
           </div>
         );
