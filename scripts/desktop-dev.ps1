@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$env:CARGO_TARGET_DIR = Join-Path $root "target\desktop"
-$env:MADLIBRARY_DESKTOP_RUNTIME = Join-Path $root "target\desktop-runtime"
+$env:CARGO_TARGET_DIR = Join-Path $root "target\build-dev\desktop"
+$env:MADLIBRARY_ADMIN_UI_OUT_DIR = Join-Path $root "target\build-dev\frontend\admin-ui"
 
 Push-Location (Join-Path $root "admin-ui")
 try {

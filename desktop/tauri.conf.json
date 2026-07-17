@@ -4,8 +4,10 @@
   "version": "0.1.0",
   "identifier": "cn.madlibrary.server.desktop",
   "build": {
+    "beforeDevCommand": "..\\admin-ui\\node_modules\\.bin\\vite.cmd ..\\target\\build-dev\\frontend\\ui --host 127.0.0.1 --port 14310 --strictPort",
     "beforeBuildCommand": "powershell -ExecutionPolicy Bypass -File ../scripts/prepare-desktop-bundle.ps1",
-    "frontendDist": "ui"
+    "devUrl": "http://127.0.0.1:14310",
+    "frontendDist": "../target/build/frontend/ui"
   },
   "app": {
     "withGlobalTauri": true,
@@ -36,7 +38,7 @@
     "targets": ["nsis"],
     "icon": ["icons/icon.ico"],
     "resources": {
-      "bundle-resources/runtime": "runtime"
+      "../target/build/desktop/runtime": "runtime"
     },
     "windows": {
       "nsis": {

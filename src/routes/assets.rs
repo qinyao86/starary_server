@@ -9,7 +9,7 @@ use crate::{
 use axum::{
     body::Body,
     extract::{Path, Query, State},
-    http::{header, Response, StatusCode},
+    http::{header, HeaderMap, Response, StatusCode},
     Json,
 };
 use base64::{engine::general_purpose, Engine};
@@ -19,8 +19,14 @@ use sqlx::Row;
 use std::{
     collections::{HashMap, HashSet},
     fs,
+    io::SeekFrom,
     path::{Component, Path as StdPath, PathBuf},
 };
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncSeekExt},
+};
+use tokio_util::io::ReaderStream;
 use uuid::Uuid;
 
 mod duplicates;
@@ -135,6 +141,8 @@ pub struct AssetResponse {
     asset: AssetRecord,
     folders: Vec<FolderRecord>,
     tags: Vec<TagRecord>,
+    starred: bool,
+    favorite_count: i64,
     file_urls: AssetFileUrls,
     file_paths: AssetFilePaths,
 }
@@ -187,7 +195,7 @@ pub async fn list_assets(
         offset,
     )
     .await?;
-    let items = build_asset_responses(&state, &library_id, records).await?;
+    let items = build_asset_responses(&state, &library_id, user.id, records).await?;
 
     Ok(Json(AssetListResponse {
         items,
@@ -364,7 +372,7 @@ pub async fn import_assets(
     tx.commit().await?;
 
     let records = query_assets_by_ids(&state, &library_id, &imported_asset_ids).await?;
-    let items = build_asset_responses(&state, &library_id, records).await?;
+    let items = build_asset_responses(&state, &library_id, user.id, records).await?;
     let total = count_assets(&state, &library_id, false, false).await?;
 
     Ok(Json(ImportAssetsResponse {
@@ -381,6 +389,7 @@ fn default_limit() -> i64 {
 pub async fn read_library_storage_file(
     State(state): State<AppState>,
     Path((library_id, storage_root_id, relative_path)): Path<(String, Uuid, String)>,
+    headers: HeaderMap,
     Query(query): Query<AssetFileQuery>,
 ) -> AppResult<Response<Body>> {
     let user = auth_user_from_token(&state, &query.token).await?;
@@ -390,20 +399,119 @@ pub async fn read_library_storage_file(
     let base_path =
         storage_root_write_base_path(&state, storage_root_id, Some(&library_id)).await?;
     let file_path = join_safe_relative_path(&base_path, &relative_path);
-    let bytes = tokio::fs::read(&file_path).await.map_err(|error| {
+    let mut file = File::open(&file_path).await.map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             AppError::NotFound("asset file not found".to_string())
         } else {
-            AppError::BadRequest(format!("could not read asset file: {error}"))
+            AppError::BadRequest(format!("could not open asset file: {error}"))
         }
     })?;
+    let file_size = file
+        .metadata()
+        .await
+        .map_err(|error| {
+            AppError::BadRequest(format!("could not read asset file metadata: {error}"))
+        })?
+        .len();
+    let requested_range = headers.get(header::RANGE);
+    let byte_range = requested_range.and_then(|value| {
+        value
+            .to_str()
+            .ok()
+            .and_then(|value| parse_single_byte_range(value, file_size))
+    });
 
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, content_type_for_path(&relative_path))
+    if requested_range.is_some() && byte_range.is_none() {
+        return Response::builder()
+            .status(StatusCode::RANGE_NOT_SATISFIABLE)
+            .header(header::ACCEPT_RANGES, "bytes")
+            .header(header::CONTENT_RANGE, format!("bytes */{file_size}"))
+            .body(Body::empty())
+            .map_err(|error| AppError::BadRequest(error.to_string()));
+    }
+
+    let response = Response::builder()
+        .header(header::ACCEPT_RANGES, "bytes")
         .header(header::CACHE_CONTROL, "private, max-age=86400")
-        .body(Body::from(bytes))
-        .map_err(|error| AppError::BadRequest(error.to_string()))
+        .header(header::CONTENT_TYPE, content_type_for_path(&relative_path));
+
+    if let Some((start, end)) = byte_range {
+        let content_length = end - start + 1;
+        file.seek(SeekFrom::Start(start))
+            .await
+            .map_err(|error| AppError::BadRequest(format!("could not seek asset file: {error}")))?;
+        response
+            .status(StatusCode::PARTIAL_CONTENT)
+            .header(header::CONTENT_LENGTH, content_length.to_string())
+            .header(
+                header::CONTENT_RANGE,
+                format!("bytes {start}-{end}/{file_size}"),
+            )
+            .body(Body::from_stream(ReaderStream::new(
+                file.take(content_length),
+            )))
+            .map_err(|error| AppError::BadRequest(error.to_string()))
+    } else {
+        response
+            .status(StatusCode::OK)
+            .header(header::CONTENT_LENGTH, file_size.to_string())
+            .body(Body::from_stream(ReaderStream::new(file)))
+            .map_err(|error| AppError::BadRequest(error.to_string()))
+    }
+}
+
+fn parse_single_byte_range(value: &str, file_size: u64) -> Option<(u64, u64)> {
+    if file_size == 0 {
+        return None;
+    }
+
+    let range = value.trim().strip_prefix("bytes=")?;
+    if range.contains(',') {
+        return None;
+    }
+    let (start, end) = range.split_once('-')?;
+
+    if start.is_empty() {
+        let suffix_length = end.parse::<u64>().ok()?;
+        if suffix_length == 0 {
+            return None;
+        }
+        let start = file_size.saturating_sub(suffix_length);
+        return Some((start, file_size - 1));
+    }
+
+    let start = start.parse::<u64>().ok()?;
+    if start >= file_size {
+        return None;
+    }
+    let end = if end.is_empty() {
+        file_size - 1
+    } else {
+        end.parse::<u64>().ok()?.min(file_size - 1)
+    };
+    (end >= start).then_some((start, end))
+}
+
+#[cfg(test)]
+mod byte_range_tests {
+    use super::parse_single_byte_range;
+
+    #[test]
+    fn parses_supported_single_ranges() {
+        assert_eq!(parse_single_byte_range("bytes=0-9", 100), Some((0, 9)));
+        assert_eq!(parse_single_byte_range("bytes=90-", 100), Some((90, 99)));
+        assert_eq!(parse_single_byte_range("bytes=-10", 100), Some((90, 99)));
+        assert_eq!(parse_single_byte_range("bytes=90-200", 100), Some((90, 99)));
+    }
+
+    #[test]
+    fn rejects_invalid_or_multiple_ranges() {
+        assert_eq!(parse_single_byte_range("bytes=100-", 100), None);
+        assert_eq!(parse_single_byte_range("bytes=20-10", 100), None);
+        assert_eq!(parse_single_byte_range("bytes=0-1,4-5", 100), None);
+        assert_eq!(parse_single_byte_range("items=0-9", 100), None);
+        assert_eq!(parse_single_byte_range("bytes=0-9", 0), None);
+    }
 }
 
 async fn query_assets_page(
@@ -455,6 +563,7 @@ async fn query_assets_page(
 pub(super) async fn build_asset_responses(
     state: &AppState,
     library_id: &str,
+    user_id: Uuid,
     records: Vec<AssetRecord>,
 ) -> AppResult<Vec<AssetResponse>> {
     if records.is_empty() {
@@ -467,6 +576,8 @@ pub(super) async fn build_asset_responses(
         .collect::<Vec<_>>();
     let mut folders_by_asset = query_asset_folder_relations(state, library_id, &asset_ids).await?;
     let mut tags_by_asset = query_asset_tag_relations(state, library_id, &asset_ids).await?;
+    let favorite_state_by_asset =
+        query_asset_favorite_states(state, library_id, user_id, &asset_ids).await?;
     let storage_root_ids = records
         .iter()
         .filter_map(|asset| asset.storage_root_id)
@@ -488,15 +599,62 @@ pub(super) async fn build_asset_responses(
             );
             let folders = folders_by_asset.remove(&asset.id).unwrap_or_default();
             let tags = tags_by_asset.remove(&asset.id).unwrap_or_default();
+            let (starred, favorite_count) = favorite_state_by_asset
+                .get(&asset.id)
+                .copied()
+                .unwrap_or((false, 0));
             AssetResponse {
                 asset,
                 folders,
                 tags,
+                starred,
+                favorite_count,
                 file_urls,
                 file_paths,
             }
         })
         .collect())
+}
+
+async fn query_asset_favorite_states(
+    state: &AppState,
+    library_id: &str,
+    user_id: Uuid,
+    asset_ids: &[String],
+) -> AppResult<HashMap<String, (bool, i64)>> {
+    if asset_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            asset_id,
+            BOOL_OR(user_id = $2) AS starred,
+            COUNT(*)::BIGINT AS favorite_count
+        FROM asset_favorites
+        WHERE library_id = $1
+          AND asset_id = ANY($3)
+        GROUP BY asset_id
+        "#,
+    )
+    .bind(library_id)
+    .bind(user_id)
+    .bind(asset_ids)
+    .fetch_all(&state.pool)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            Ok((
+                row.try_get::<String, _>("asset_id")?,
+                (
+                    row.try_get::<bool, _>("starred")?,
+                    row.try_get::<i64, _>("favorite_count")?,
+                ),
+            ))
+        })
+        .collect()
 }
 
 async fn query_asset_storage_roots(
@@ -742,7 +900,7 @@ fn build_asset_file_path_variants(
     })
 }
 
-fn build_asset_file_url(
+pub(super) fn build_asset_file_url(
     library_id: &str,
     storage_root_id: Uuid,
     relative_path: &str,
@@ -1051,6 +1209,7 @@ pub(super) fn normalize_readable_storage_file_relative_path(value: &str) -> AppR
     if normalized.starts_with("assets/")
         || normalized.starts_with(".madlibrary/thumbs/")
         || normalized.starts_with(".madlibrary/previews/")
+        || normalized == ".madlibrary/cover.webp"
     {
         return Ok(normalized);
     }
@@ -1089,7 +1248,7 @@ pub(super) fn join_safe_relative_path(base_path: &StdPath, relative_path: &str) 
         .fold(base_path.to_path_buf(), |path, segment| path.join(segment))
 }
 
-fn write_file_atomic(target_path: &StdPath, bytes: &[u8]) -> AppResult<()> {
+pub(super) fn write_file_atomic(target_path: &StdPath, bytes: &[u8]) -> AppResult<()> {
     let parent = target_path
         .parent()
         .ok_or_else(|| AppError::BadRequest("derived file path is invalid".to_string()))?;

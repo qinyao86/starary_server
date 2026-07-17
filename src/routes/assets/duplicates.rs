@@ -132,10 +132,9 @@ pub async fn merge_duplicate_assets(
                 metadata = metadata || jsonb_build_object(
                     'description', $4::text,
                     'url', $5::text,
-                    'rating', $6::bigint,
-                    'starred', $7::boolean
+                    'rating', $6::bigint
                 ),
-                updated_by_user_id = $8,
+                updated_by_user_id = $7,
                 updated_at = NOW()
             WHERE library_id = $1 AND id = $2 AND deleted_at IS NULL
             "#,
@@ -146,10 +145,44 @@ pub async fn merge_duplicate_assets(
         .bind(description)
         .bind(url)
         .bind(decision.rating)
-        .bind(decision.starred)
         .bind(user.id)
         .execute(&mut *tx)
         .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO asset_favorites (library_id, asset_id, user_id)
+            SELECT $1, $2, user_id
+            FROM asset_favorites
+            WHERE library_id = $1 AND asset_id = ANY($3)
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(&library_id)
+        .bind(&decision.primary_asset_id)
+        .bind(&group_asset_ids)
+        .execute(&mut *tx)
+        .await?;
+
+        if decision.starred {
+            sqlx::query(
+                "INSERT INTO asset_favorites (library_id, asset_id, user_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            )
+            .bind(&library_id)
+            .bind(&decision.primary_asset_id)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            sqlx::query(
+                "DELETE FROM asset_favorites WHERE library_id = $1 AND asset_id = $2 AND user_id = $3",
+            )
+            .bind(&library_id)
+            .bind(&decision.primary_asset_id)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await?;
+        }
 
         replace_relations(
             &mut tx,
@@ -215,8 +248,9 @@ pub async fn merge_duplicate_assets(
 
     let primary_records = query_assets_by_ids(&state, &library_id, &primary_asset_ids).await?;
     let trashed_records = query_assets_by_ids(&state, &library_id, &trashed_asset_ids).await?;
-    let items = build_asset_responses(&state, &library_id, primary_records).await?;
-    let trashed_items = build_asset_responses(&state, &library_id, trashed_records).await?;
+    let items = build_asset_responses(&state, &library_id, user.id, primary_records).await?;
+    let trashed_items =
+        build_asset_responses(&state, &library_id, user.id, trashed_records).await?;
     let total = sqlx::query_scalar(
         "SELECT COUNT(*) FROM assets WHERE library_id = $1 AND deleted_at IS NULL",
     )

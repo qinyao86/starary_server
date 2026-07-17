@@ -13,7 +13,14 @@ use crate::{
         storage_identity, storage_locations_overlap, validate_aliases_with_policy,
         validate_storage_root_with_policy,
     },
-    routes::access::ensure_library_manager,
+    routes::{
+        access::ensure_library_manager,
+        assets::{
+            build_asset_file_url, join_safe_relative_path,
+            normalize_readable_storage_file_relative_path, storage_root_write_base_path,
+            write_file_atomic,
+        },
+    },
     state::AppState,
 };
 use axum::{
@@ -21,6 +28,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use base64::{engine::general_purpose, Engine};
 use sqlx::{FromRow, Postgres, Transaction};
 use std::{fs, path::Path as FilePath, str::FromStr};
 use uuid::Uuid;
@@ -35,8 +43,12 @@ use queries::{
 };
 use requests::{
     CreateDefaultStorageRootRequest, CreateLibraryRequest, DeleteLibraryRequest,
-    StorageBindingRequest, UpdateLibraryEnabledRequest, UpdateLibraryRequest,
+    SetLibraryIconFromAssetRequest, StorageBindingRequest, UpdateLibraryEnabledRequest,
+    UpdateLibraryRequest, UploadLibraryIconRequest,
 };
+
+const LIBRARY_COVER_RELATIVE_PATH: &str = ".madlibrary/cover.webp";
+const MAX_LIBRARY_COVER_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(FromRow)]
 struct StorageConnectionLocation {
@@ -351,21 +363,19 @@ pub async fn update_library(
         return Err(AppError::BadRequest("library name is required".to_string()));
     }
     ensure_unique_library_display_name(&state, display_name, Some(&library_id)).await?;
-    let icon_url = normalize_optional_text(request.icon_url);
     let access_mode = request.access_mode.map(|mode| mode.as_str().to_string());
 
     let mut tx = state.pool.begin().await?;
     let library = sqlx::query_as::<_, LibraryRecord>(
         r#"
         UPDATE libraries
-        SET display_name = $2, icon_url = $3, access_mode = COALESCE($4, access_mode), updated_at = NOW()
+        SET display_name = $2, access_mode = COALESCE($3, access_mode), updated_at = NOW()
         WHERE id = $1 AND deleted_at IS NULL
         RETURNING id, display_name, icon_url, enabled, access_mode, created_by_user_id, created_at, updated_at
         "#,
     )
     .bind(&library_id)
     .bind(display_name)
-    .bind(icon_url)
     .bind(access_mode.as_deref())
     .fetch_optional(&mut *tx)
     .await?
@@ -386,6 +396,194 @@ pub async fn update_library(
     tx.commit().await?;
 
     Ok(Json(library))
+}
+
+pub async fn upload_library_icon(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+    Json(request): Json<UploadLibraryIconRequest>,
+) -> AppResult<Json<LibraryRecord>> {
+    ensure_library_manager(&state, &user, &library_id).await?;
+    let bytes = decode_library_cover(&request)?;
+    let storage_root_id = primary_library_storage_root_id(&state, &library_id).await?;
+    let base_path =
+        storage_root_write_base_path(&state, storage_root_id, Some(&library_id)).await?;
+    let cover_path = join_safe_relative_path(&base_path, LIBRARY_COVER_RELATIVE_PATH);
+    write_file_atomic(&cover_path, &bytes)?;
+    let icon_url = build_asset_file_url(&library_id, storage_root_id, LIBRARY_COVER_RELATIVE_PATH)
+        .ok_or_else(|| AppError::BadRequest("library icon path is invalid".to_string()))?;
+    Ok(Json(
+        update_library_icon_reference(&state, &user, &library_id, Some(icon_url)).await?,
+    ))
+}
+
+pub async fn set_library_icon_from_asset(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+    Json(request): Json<SetLibraryIconFromAssetRequest>,
+) -> AppResult<Json<LibraryRecord>> {
+    ensure_library_manager(&state, &user, &library_id).await?;
+    let asset_id = request.asset_id.trim();
+    if asset_id.is_empty() {
+        return Err(AppError::BadRequest("asset id is required".to_string()));
+    }
+
+    let row = sqlx::query(
+        r#"
+        SELECT asset_kind, storage_root_id, metadata->>'thumbnailPath' AS thumbnail_path
+        FROM assets
+        WHERE library_id = $1 AND id = $2 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(&library_id)
+    .bind(asset_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("asset not found".to_string()))?;
+    let asset_kind: String = sqlx::Row::try_get(&row, "asset_kind")?;
+    if asset_kind != "image" && asset_kind != "video" {
+        return Err(AppError::BadRequest(
+            "only image or video thumbnails can be used as a library icon".to_string(),
+        ));
+    }
+    let storage_root_id: Option<Uuid> = sqlx::Row::try_get(&row, "storage_root_id")?;
+    let storage_root_id = storage_root_id.ok_or_else(|| {
+        AppError::BadRequest("asset thumbnail has no storage workspace".to_string())
+    })?;
+    let thumbnail_path: Option<String> = sqlx::Row::try_get(&row, "thumbnail_path")?;
+    let thumbnail_path = thumbnail_path
+        .filter(|path| !path.trim().is_empty())
+        .ok_or_else(|| AppError::BadRequest("asset has no thumbnail".to_string()))?;
+    let thumbnail_path = normalize_readable_storage_file_relative_path(&thumbnail_path)?;
+    let base_path =
+        storage_root_write_base_path(&state, storage_root_id, Some(&library_id)).await?;
+    if !join_safe_relative_path(&base_path, &thumbnail_path).is_file() {
+        return Err(AppError::NotFound(
+            "asset thumbnail file not found".to_string(),
+        ));
+    }
+    let icon_url = build_asset_file_url(&library_id, storage_root_id, &thumbnail_path)
+        .ok_or_else(|| AppError::BadRequest("asset thumbnail path is invalid".to_string()))?;
+
+    remove_managed_library_covers(&state, &library_id).await;
+    Ok(Json(
+        update_library_icon_reference(&state, &user, &library_id, Some(icon_url)).await?,
+    ))
+}
+
+pub async fn clear_library_icon(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+) -> AppResult<Json<LibraryRecord>> {
+    ensure_library_manager(&state, &user, &library_id).await?;
+    remove_managed_library_covers(&state, &library_id).await;
+    Ok(Json(
+        update_library_icon_reference(&state, &user, &library_id, None).await?,
+    ))
+}
+
+fn decode_library_cover(request: &UploadLibraryIconRequest) -> AppResult<Vec<u8>> {
+    let encoded = request
+        .content_base64
+        .split_once(',')
+        .map(|(_, payload)| payload)
+        .unwrap_or(request.content_base64.as_str())
+        .trim();
+    let bytes = general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|_| AppError::BadRequest("library icon is not valid base64".to_string()))?;
+    if bytes.is_empty() || bytes.len() > MAX_LIBRARY_COVER_BYTES {
+        return Err(AppError::BadRequest(
+            "library icon must be between 1 byte and 2 MB".to_string(),
+        ));
+    }
+    if request
+        .size_bytes
+        .is_some_and(|size| size != bytes.len() as u64)
+    {
+        return Err(AppError::BadRequest(
+            "library icon size does not match its payload".to_string(),
+        ));
+    }
+    if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WEBP" {
+        return Err(AppError::BadRequest(
+            "library icon must be a WebP image".to_string(),
+        ));
+    }
+    Ok(bytes)
+}
+
+async fn primary_library_storage_root_id(state: &AppState, library_id: &str) -> AppResult<Uuid> {
+    sqlx::query_scalar(
+        r#"
+        SELECT sr.id
+        FROM storage_roots sr
+        INNER JOIN storage_connections sc ON sc.id = sr.storage_connection_id
+        WHERE sr.library_id = $1 AND sr.enabled = TRUE AND sc.enabled = TRUE
+        ORDER BY sr.created_at ASC
+        LIMIT 1
+        "#,
+    )
+    .bind(library_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::BadRequest("library has no enabled storage".to_string()))
+}
+
+async fn remove_managed_library_covers(state: &AppState, library_id: &str) {
+    let root_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM storage_roots WHERE library_id = $1 AND enabled = TRUE")
+            .bind(library_id)
+            .fetch_all(&state.pool)
+            .await
+            .unwrap_or_default();
+    for root_id in root_ids {
+        if let Ok(base_path) = storage_root_write_base_path(state, root_id, Some(library_id)).await
+        {
+            let _ = fs::remove_file(join_safe_relative_path(
+                &base_path,
+                LIBRARY_COVER_RELATIVE_PATH,
+            ));
+        }
+    }
+}
+
+async fn update_library_icon_reference(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+    icon_url: Option<String>,
+) -> AppResult<LibraryRecord> {
+    let mut tx = state.pool.begin().await?;
+    let library = sqlx::query_as::<_, LibraryRecord>(
+        r#"
+        UPDATE libraries
+        SET icon_url = $2, updated_at = NOW()
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id, display_name, icon_url, enabled, access_mode, created_by_user_id, created_at, updated_at
+        "#,
+    )
+    .bind(library_id)
+    .bind(icon_url)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("library not found".to_string()))?;
+    sqlx::query(
+        r#"
+        INSERT INTO activity_log (id, library_id, actor_user_id, action, target_type, target_id)
+        VALUES ($1, $2, $3, 'library.icon_updated', 'library', $2)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(library_id)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(library)
 }
 
 pub async fn assign_library_storage(

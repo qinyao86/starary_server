@@ -1,4 +1,5 @@
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ImageOff, ImageUp, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import type { ActivityItem, LibraryMember, StorageConnection, StorageRoot, TeamLibrary, TeamUser } from "../../api";
@@ -7,6 +8,7 @@ import { PageFrame } from "../common";
 import { LibraryDialog } from "../dialogs";
 import { LibraryCardList } from "./library-card-list";
 import { LibraryDetailView } from "./library-detail-view";
+import { LibraryIcon } from "./library-icon";
 
 export function LibraryDetailPageView({
   activeLibrary,
@@ -18,6 +20,8 @@ export function LibraryDetailPageView({
   assignStorageDialogOpen,
   canDeleteLibrary,
   canManageLibrary,
+  token,
+  iconUpdatingLibraryId,
   storageRoots,
   storageConnectionId,
   storageConnections,
@@ -26,6 +30,8 @@ export function LibraryDetailPageView({
   onBack,
   onDelete,
   onEdit,
+  onChangeIcon,
+  onClearIcon,
   onMemberDialogClose,
   onMemberDialogOpen,
   onMemberSubmit,
@@ -48,6 +54,8 @@ export function LibraryDetailPageView({
   assignStorageDialogOpen: boolean;
   canDeleteLibrary: boolean;
   canManageLibrary: boolean;
+  token: string | null;
+  iconUpdatingLibraryId: string | null;
   storageRoots: StorageRoot[];
   storageConnectionId: string;
   storageConnections: StorageConnection[];
@@ -55,6 +63,8 @@ export function LibraryDetailPageView({
   onBack: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onChangeIcon: () => void;
+  onClearIcon: () => void;
   onMemberDialogClose: () => void;
   onMemberDialogOpen: () => void;
   onMemberSubmit: (event: FormEvent) => void | Promise<void>;
@@ -68,6 +78,24 @@ export function LibraryDetailPageView({
   onStorageConnectionChange: (value: string) => void;
   onOpenStorageCreate: () => void;
 }) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setActionsOpen(false);
+  }, [activeLibrary.id]);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", closeOnOutsidePress);
+    return () => window.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, [actionsOpen]);
+
   return (
     <PageFrame
       className="library-detail-page-frame"
@@ -84,6 +112,15 @@ export function LibraryDetailPageView({
           >
             <ArrowLeft size={16} />
           </button>
+          <LibraryIcon
+            busy={iconUpdatingLibraryId === activeLibrary.id}
+            editable={canManageLibrary}
+            library={activeLibrary}
+            size="sm"
+            t={t}
+            token={token}
+            onChange={onChangeIcon}
+          />
           <h2>{activeLibrary.displayName}</h2>
         </div>
       }
@@ -93,17 +130,59 @@ export function LibraryDetailPageView({
             <Pencil size={15} />
             <span>{t("editLibrary")}</span>
           </Button>}
-          {canDeleteLibrary && <Button
-            aria-label={t("deleteLibrary")}
-            className="library-delete-button"
-            size="icon"
-            title={t("deleteLibrary")}
-            type="button"
-            variant="ghost"
-            onClick={onDelete}
-          >
-            <Trash2 size={15} />
-          </Button>}
+          {(canManageLibrary || canDeleteLibrary) && <div className="library-detail-more" ref={actionsRef}>
+            <Button
+              aria-expanded={actionsOpen}
+              aria-haspopup="menu"
+              aria-label={t("action")}
+              className="library-detail-more-button"
+              size="icon"
+              title={t("action")}
+              type="button"
+              variant="ghost"
+              onClick={() => setActionsOpen((open) => !open)}
+            >
+              <MoreHorizontal size={16} />
+            </Button>
+            {actionsOpen && <div className="library-detail-actions-menu" role="menu">
+              {canManageLibrary && <button
+                disabled={iconUpdatingLibraryId === activeLibrary.id}
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  setActionsOpen(false);
+                  onChangeIcon();
+                }}
+              >
+                <ImageUp size={15} />
+                <span>{t("changeLibraryIcon")}</span>
+              </button>}
+              {canManageLibrary && activeLibrary.iconUrl && <button
+                disabled={iconUpdatingLibraryId === activeLibrary.id}
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  setActionsOpen(false);
+                  onClearIcon();
+                }}
+              >
+                <ImageOff size={15} />
+                <span>{t("clearLibraryIcon")}</span>
+              </button>}
+              {canDeleteLibrary && <button
+                className="is-danger"
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  setActionsOpen(false);
+                  onDelete();
+                }}
+              >
+                <Trash2 size={15} />
+                <span>{t("deleteLibrary")}</span>
+              </button>}
+            </div>}
+          </div>}
         </div>
       }
     >
@@ -148,6 +227,8 @@ export function LibraryListPageView({
   canDeleteLibrary,
   canCreateLibrary,
   canManageLibrary,
+  token,
+  iconUpdatingLibraryId,
   showCreate,
   t,
   storageConnectionId,
@@ -161,6 +242,7 @@ export function LibraryListPageView({
   onEditAccessModeChange,
   onEditNameChange,
   onOpenEdit,
+  onChangeIcon,
   onOpen,
   onOpenCreate,
   onOpenStorageCreate,
@@ -177,6 +259,8 @@ export function LibraryListPageView({
   canDeleteLibrary: boolean;
   canCreateLibrary: boolean;
   canManageLibrary: (library: TeamLibrary) => boolean;
+  token: string | null;
+  iconUpdatingLibraryId: string | null;
   showCreate: boolean;
   storageConnectionId: string;
   storageConnections: StorageConnection[];
@@ -189,6 +273,7 @@ export function LibraryListPageView({
   onEditAccessModeChange: (value: "public" | "invite") => void;
   onEditNameChange: (value: string) => void;
   onOpenEdit: (libraryId: string) => void;
+  onChangeIcon: (libraryId: string) => void;
   onOpen: (libraryId: string) => void;
   onOpenCreate: () => void;
   onOpenStorageCreate: () => void;
@@ -244,10 +329,13 @@ export function LibraryListPageView({
           libraries={libraries}
           canDeleteLibrary={canDeleteLibrary}
           canManageLibrary={canManageLibrary}
+          token={token}
+          iconUpdatingLibraryId={iconUpdatingLibraryId}
           t={t}
           onDelete={onDelete}
           onOpen={onOpen}
           onEdit={onOpenEdit}
+          onChangeIcon={onChangeIcon}
           onToggleEnabled={onToggleEnabled}
         />
       </div>

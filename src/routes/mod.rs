@@ -9,6 +9,7 @@ mod initialization;
 mod libraries;
 mod library_structure;
 mod members;
+mod preferences;
 mod presets;
 mod runtime;
 mod setup;
@@ -21,7 +22,7 @@ use axum::{
     extract::DefaultBodyLimit,
     handler::Handler,
     response::Redirect,
-    routing::{get, patch, post},
+    routing::{get, patch, post, put},
     Router,
 };
 use tower_http::services::{ServeDir, ServeFile};
@@ -117,6 +118,14 @@ pub fn router(state: AppState) -> Router {
             patch(libraries::update_library).delete(libraries::delete_library),
         )
         .route(
+            "/api/v1/libraries/:library_id/icon",
+            put(libraries::upload_library_icon).delete(libraries::clear_library_icon),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/icon/from-asset",
+            put(libraries::set_library_icon_from_asset),
+        )
+        .route(
             "/api/v1/libraries/:library_id/join",
             post(libraries::join_library),
         )
@@ -149,6 +158,14 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/libraries/:library_id/assets/starred",
             patch(assets::update_assets_starred),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/preferences",
+            get(preferences::get_library_preferences),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/preferences/quick-access",
+            put(preferences::update_quick_access),
         )
         .route(
             "/api/v1/libraries/:library_id/assets/viewer",
@@ -201,6 +218,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/libraries/:library_id/folders/reorder",
             post(library_structure::reorder_folders),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/folders/import-plan",
+            post(library_structure::create_folder_import_plan),
         )
         .route(
             "/api/v1/libraries/:library_id/folders/:folder_id",

@@ -6,6 +6,7 @@ import type { TeamLibrary } from "../../api";
 import type { TranslatorContext } from "../../types";
 import { formatBytes, formatCount, formatMemberNames, storageKindLabel } from "../../utils/format";
 import { EmptyState, UserAvatar } from "../common";
+import { LibraryIcon } from "./library-icon";
 
 function libraryStorageMeta(library: TeamLibrary, t: TranslatorContext["t"]) {
   const storagePath = preferredStoragePath(library);
@@ -97,18 +98,24 @@ export function LibraryCardList({
   libraries,
   canDeleteLibrary,
   canManageLibrary,
+  token,
+  iconUpdatingLibraryId,
   t,
   onOpen,
   onDelete,
   onEdit,
+  onChangeIcon,
   onToggleEnabled
 }: TranslatorContext & {
   libraries: TeamLibrary[];
   canDeleteLibrary: boolean;
   canManageLibrary: (library: TeamLibrary) => boolean;
+  token: string | null;
+  iconUpdatingLibraryId: string | null;
   onDelete: (libraryId: string) => void;
   onOpen: (libraryId: string) => void;
   onEdit: (libraryId: string) => void;
+  onChangeIcon: (libraryId: string) => void;
   onToggleEnabled: (library: TeamLibrary, enabled: boolean) => void;
 }) {
   if (libraries.length === 0) {
@@ -136,11 +143,19 @@ export function LibraryCardList({
             }}
           >
             <div className="library-card-top">
-              <div className="library-card-heading">
-                <div className="library-card-title-row">
-                  <div className="library-card-title">{library.displayName}</div>
-                </div>
-                <div className="library-card-meta-group">
+              <div className="library-card-identity">
+                <LibraryIcon
+                  busy={iconUpdatingLibraryId === library.id}
+                  editable={canManage}
+                  library={library}
+                  t={t}
+                  token={token}
+                  onChange={() => onChangeIcon(library.id)}
+                />
+                <div className="library-card-heading">
+                  <div className="library-card-title-row">
+                    <div className="library-card-title">{library.displayName}</div>
+                  </div>
                   <div className="library-card-title-meta">
                     <span className={`library-card-status${isEnabled ? " is-on" : " is-off"}`}>
                       {isEnabled ? t("libraryStarted") : t("libraryNotStarted")}
@@ -149,55 +164,57 @@ export function LibraryCardList({
                       {library.accessMode === "public" ? t("libraryAccessPublic") : t("libraryAccessInvite")}
                     </span>
                   </div>
-                  <div className="library-card-path-row">
-                    <HardDrive aria-hidden="true" size={14} />
-                    <span className="library-card-storage-kind">
-                      {storageMeta.kind}
-                      {storageMeta.extraCount > 0 ? ` +${storageMeta.extraCount}` : ""}
-                    </span>
-                    <strong
-                      className="library-card-storage-path"
-                      title={storageMeta.path}
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      {storageMeta.path}
-                    </strong>
-                    <button
-                      aria-label={t("copyMode")}
-                      className="library-card-storage-tool"
-                      disabled={!storageMeta.rawPath}
-                      title={t("copyMode")}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void copyTextToClipboard(storageMeta.rawPath);
-                      }}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </div>
-                  <div className="library-card-manager-row">
-                    <UserRound aria-hidden="true" size={14} />
-                    <span>{t("libraryManager")}</span>
-                    <div className="library-card-manager-users" title={formatMemberNames(library.libraryManagerNames, "-")}>
-                      {(library.libraryManagerNames ?? []).length === 0 ? (
-                        <strong>-</strong>
-                      ) : (
-                        <>
-                          {(library.libraryManagerNames ?? []).slice(0, 3).map((name, index) => (
-                            <span className="library-card-manager-user" key={`${name}-${index}`}>
-                              <UserAvatar avatarKey={library.libraryManagerAvatarKeys?.[index]} label={name} size="sm" />
-                              <strong>{name}</strong>
-                            </span>
-                          ))}
-                          {(library.libraryManagerNames ?? []).length > 3 && (
-                            <strong>+{(library.libraryManagerNames ?? []).length - 3}</strong>
-                          )}
-                        </>
-                      )}
-                    </div>
+                </div>
+              </div>
+              <div className="library-card-meta-group">
+                <div className="library-card-path-row">
+                  <HardDrive aria-hidden="true" size={14} />
+                  <span className="library-card-storage-kind">
+                    {storageMeta.kind}
+                    {storageMeta.extraCount > 0 ? ` +${storageMeta.extraCount}` : ""}
+                  </span>
+                  <strong
+                    className="library-card-storage-path"
+                    title={storageMeta.path}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    {storageMeta.path}
+                  </strong>
+                  <button
+                    aria-label={t("copyMode")}
+                    className="library-card-storage-tool"
+                    disabled={!storageMeta.rawPath}
+                    title={t("copyMode")}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void copyTextToClipboard(storageMeta.rawPath);
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+                <div className="library-card-manager-row">
+                  <UserRound aria-hidden="true" size={14} />
+                  <span>{t("libraryManager")}</span>
+                  <div className="library-card-manager-users" title={formatMemberNames(library.libraryManagerNames, "-")}>
+                    {(library.libraryManagerNames ?? []).length === 0 ? (
+                      <strong>-</strong>
+                    ) : (
+                      <>
+                        {(library.libraryManagerNames ?? []).slice(0, 3).map((name, index) => (
+                          <span className="library-card-manager-user" key={`${name}-${index}`}>
+                            <UserAvatar avatarKey={library.libraryManagerAvatarKeys?.[index]} label={name} size="sm" />
+                            <strong>{name}</strong>
+                          </span>
+                        ))}
+                        {(library.libraryManagerNames ?? []).length > 3 && (
+                          <strong>+{(library.libraryManagerNames ?? []).length - 3}</strong>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

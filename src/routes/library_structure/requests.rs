@@ -11,6 +11,21 @@ pub struct CreateFolderRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateFolderImportPlanRequest {
+    pub parent_id: Option<String>,
+    pub folders: Vec<CreateFolderImportPlanItem>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFolderImportPlanItem {
+    pub key: String,
+    pub parent_key: Option<String>,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateFolderRequest {
     pub name: Option<String>,
     pub description: Option<String>,

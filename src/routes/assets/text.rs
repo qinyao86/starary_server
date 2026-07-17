@@ -82,7 +82,7 @@ pub async fn update_asset_text(
     }
 
     Ok(Json(
-        mutation_response(&state, &library_id, vec![asset_id]).await?,
+        mutation_response(&state, &library_id, user.id, vec![asset_id]).await?,
     ))
 }
 

@@ -149,7 +149,7 @@ pub async fn update_image_sequence_frame_numbers(
     )?;
     if moves_are_unchanged(&moves) {
         return Ok(Json(
-            mutation_response(&state, &library_id, vec![asset_id]).await?,
+            mutation_response(&state, &library_id, user.id, vec![asset_id]).await?,
         ));
     }
 
@@ -183,7 +183,7 @@ pub async fn update_image_sequence_frame_numbers(
         let _ = fs::remove_file(&move_item.temporary_path);
     }
     Ok(Json(
-        mutation_response(&state, &library_id, vec![asset_id]).await?,
+        mutation_response(&state, &library_id, user.id, vec![asset_id]).await?,
     ))
 }
 

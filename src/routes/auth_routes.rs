@@ -93,9 +93,6 @@ pub async fn login(
         return Err(AppError::Unauthorized);
     }
 
-    let role = parse_console_role(&user.global_role)?;
-    ensure_console_access(&state, user.id, role).await?;
-
     let token = issue_token(&state, &user)?;
 
     sqlx::query(
@@ -185,11 +182,9 @@ pub async fn redeem_browser_handoff(
 }
 
 pub async fn me(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<CurrentUserResponse>> {
-    ensure_console_access(&state, user.id, user.role).await?;
-
     Ok(Json(CurrentUserResponse {
         id: user.id.to_string(),
         email: user.email,

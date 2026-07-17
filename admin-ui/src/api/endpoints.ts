@@ -23,6 +23,15 @@ import type {
   TeamUser
 } from "./types";
 
+function bytesToBase64(bytes: number[]) {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
 export const api = {
   health: () => request<{ status: string }>("/health"),
   serverInfo: () => request<ServerInfo>("/api/v1/server/info"),
@@ -124,11 +133,25 @@ export const api = {
       token,
       body: JSON.stringify(payload)
     }),
-  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; iconUrl?: string | null; accessMode?: "public" | "invite" }) =>
+  updateLibrary: (token: string, libraryId: string, payload: { displayName: string; accessMode?: "public" | "invite" }) =>
     request<TeamLibrary>(`/api/v1/libraries/${libraryId}`, {
       method: "PATCH",
       token,
       body: JSON.stringify(payload)
+    }),
+  uploadLibraryIcon: (token: string, libraryId: string, imageBytes: number[]) =>
+    request<TeamLibrary>(`/api/v1/libraries/${libraryId}/icon`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify({
+        contentBase64: bytesToBase64(imageBytes),
+        sizeBytes: imageBytes.length
+      })
+    }),
+  clearLibraryIcon: (token: string, libraryId: string) =>
+    request<TeamLibrary>(`/api/v1/libraries/${libraryId}/icon`, {
+      method: "DELETE",
+      token
     }),
   joinLibrary: (token: string, libraryId: string) =>
     request<void>(`/api/v1/libraries/${libraryId}/join`, {

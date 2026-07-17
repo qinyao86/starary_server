@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 
+const adminUiOutDir = process.env.MADLIBRARY_ADMIN_UI_OUT_DIR ?? "dist";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: "/admin/",
@@ -22,7 +24,7 @@ export default defineConfig({
     strictPort: true
   },
   build: {
-    outDir: "dist",
+    outDir: adminUiOutDir,
     emptyOutDir: true
   }
 });

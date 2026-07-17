@@ -44,6 +44,7 @@ export type LoginResponse = {
 export type TeamLibrary = {
   id: string;
   displayName: string;
+  iconUrl?: string | null;
   currentUserRole?: string | null;
   enabled: boolean;
   accessMode?: "public" | "invite";

@@ -7,6 +7,11 @@ import { DeleteLibraryDialog, LibraryDialog, StorageConnectionDialog } from "../
 import { LibraryDetailPageView, LibraryListPageView } from "../components/libraries/library-page-views";
 import { useAvailableLibraryUsers } from "../hooks/use-available-library-users";
 import type { PageContext } from "../types";
+import {
+  fileToLibraryIconWebpBytes,
+  LibraryIconImageError,
+  pickLibraryIconFile
+} from "../utils/library-icons";
 
 type PendingMemberSelection = {
   checked: boolean;
@@ -30,6 +35,7 @@ export function LibrariesPage({
   const [memberSelections, setMemberSelections] = useState<Record<string, PendingMemberSelection>>({});
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [libraryPendingDeletion, setLibraryPendingDeletion] = useState<TeamLibrary | null>(null);
+  const [iconUpdatingLibraryId, setIconUpdatingLibraryId] = useState<string | null>(null);
   const activeLibrary = libraries.find((item) => item.id === libraryRouteId) ?? null;
   const availableUsers = useAvailableLibraryUsers(users, libraryMembers);
   const canCreateLibrary = currentUser?.role === "owner" || currentUser?.role === "admin";
@@ -70,6 +76,45 @@ export function LibrariesPage({
     setName("");
     setCreateAccessMode("invite");
     setStorageConnectionId("");
+  };
+
+  const libraryIconErrorMessage = (error: unknown) => {
+    if (error instanceof LibraryIconImageError) {
+      return t("invalidLibraryIcon");
+    }
+    return error instanceof Error ? error.message : String(error);
+  };
+
+  const changeLibraryIcon = async (libraryId: string) => {
+    if (!token || iconUpdatingLibraryId) return;
+    const file = await pickLibraryIconFile();
+    if (!file) return;
+
+    setIconUpdatingLibraryId(libraryId);
+    try {
+      const imageBytes = await fileToLibraryIconWebpBytes(file);
+      await api.uploadLibraryIcon(token, libraryId, imageBytes);
+      await refreshAll();
+      setMessage(t("libraryIconUpdated"));
+    } catch (error) {
+      setMessage(libraryIconErrorMessage(error));
+    } finally {
+      setIconUpdatingLibraryId(null);
+    }
+  };
+
+  const clearLibraryIcon = async (libraryId: string) => {
+    if (!token || iconUpdatingLibraryId) return;
+    setIconUpdatingLibraryId(libraryId);
+    try {
+      await api.clearLibraryIcon(token, libraryId);
+      await refreshAll();
+      setMessage(t("libraryIconCleared"));
+    } catch (error) {
+      setMessage(libraryIconErrorMessage(error));
+    } finally {
+      setIconUpdatingLibraryId(null);
+    }
   };
 
   const openLibrary = (libraryId: string) => {
@@ -373,6 +418,8 @@ export function LibrariesPage({
           memberSelections={memberSelections}
           canDeleteLibrary={canCreateLibrary}
           canManageLibrary={canManageLibrary(activeLibrary)}
+          token={token}
+          iconUpdatingLibraryId={iconUpdatingLibraryId}
           assignStorageDialogOpen={assignStorageDialogOpen && !storageDialogOpen}
           storageConnectionId={storageConnectionId}
           storageConnections={storageConnections}
@@ -385,6 +432,8 @@ export function LibrariesPage({
           }}
           onDelete={() => setLibraryPendingDeletion(activeLibrary)}
           onEdit={() => startEditLibrary(activeLibrary)}
+          onChangeIcon={() => void changeLibraryIcon(activeLibrary.id)}
+          onClearIcon={() => void clearLibraryIcon(activeLibrary.id)}
           onMemberDialogClose={closeMemberDialog}
           onMemberDialogOpen={openMemberDialog}
           onMemberSubmit={submitMember}
@@ -434,6 +483,8 @@ export function LibrariesPage({
       canDeleteLibrary={canCreateLibrary}
       canCreateLibrary={canCreateLibrary}
       canManageLibrary={canManageLibrary}
+      token={token}
+      iconUpdatingLibraryId={iconUpdatingLibraryId}
       showCreate={showCreate && !storageDialogOpen}
       t={t}
       storageConnectionId={storageConnectionId}
@@ -447,6 +498,7 @@ export function LibrariesPage({
       onEditNameChange={setEditName}
       onEditAccessModeChange={setEditAccessMode}
       onOpenEdit={startEditLibraryById}
+      onChangeIcon={(libraryId) => void changeLibraryIcon(libraryId)}
       onOpen={openLibrary}
       onOpenCreate={openCreateLibraryDialog}
       onOpenStorageCreate={openStorageDialog}

@@ -23,9 +23,9 @@ target/                         Disposable compiler and package caches
   |- core/                      Server core build output for desktop packaging
   `- desktop/                   Tauri desktop build output
 admin-ui/node_modules/          Installed frontend development dependencies
-admin-ui/dist/                  Vite production build output
+target/build/frontend/admin-ui/   Vite production build output
 .dev/                           Local development data and storage
-artifacts/windows-x64/           Final distributable artifacts only
+target/release/windows-x64/      Final distributable artifacts only
   |- Mad-Library-Server_0.1.0_windows-x64-setup.exe
   |- Mad-Library-Server_0.1.0_windows-x64-portable.zip
   `- SHA256SUMS.txt

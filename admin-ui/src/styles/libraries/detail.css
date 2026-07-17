@@ -36,6 +36,66 @@
   gap: 6px;
 }
 
+.library-detail-more {
+  position: relative;
+}
+
+.library-detail-more-button {
+  width: 34px;
+  height: 34px;
+  color: #697586;
+}
+
+.library-detail-actions-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  width: 184px;
+  border: 1px solid #dededa;
+  border-radius: 8px;
+  padding: 5px;
+  background: #ffffff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+}
+
+.library-detail-actions-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: #374151;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.library-detail-actions-menu button:hover:not(:disabled) {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.library-detail-actions-menu button.is-danger {
+  color: #b42318;
+}
+
+.library-detail-actions-menu button.is-danger:hover {
+  color: #b42318;
+  background: #feeceb;
+}
+
+.library-detail-actions-menu button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 .library-detail-page-frame .page-intro-action button {
   height: 34px;
 }
@@ -219,12 +279,49 @@
   background: rgba(180, 83, 9, 0.22);
 }
 
-.theme-dark .library-delete-button,
 .theme-dark .member-action-button.icon-only {
   color: #fda29b;
 }
 
-.theme-dark .library-delete-button:hover,
+.theme-dark .library-identity-icon {
+  border-color: #3f3f46;
+  color: #d4d4d8;
+  background: #27272a;
+}
+
+.theme-dark .library-detail-more-button {
+  color: #a1a1aa;
+}
+
+.theme-dark .library-detail-more-button:hover {
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.theme-dark .library-detail-actions-menu {
+  border-color: #3f3f46;
+  background: #232326;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+}
+
+.theme-dark .library-detail-actions-menu button {
+  color: #e4e4e7;
+}
+
+.theme-dark .library-detail-actions-menu button:hover:not(:disabled) {
+  color: #dbeafe;
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.theme-dark .library-detail-actions-menu button.is-danger {
+  color: #fda4af;
+}
+
+.theme-dark .library-detail-actions-menu button.is-danger:hover {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.28);
+}
+
 .theme-dark .member-action-button.icon-only:hover {
   color: #fecaca;
   background: rgba(127, 29, 29, 0.28);

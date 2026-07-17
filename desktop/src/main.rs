@@ -312,7 +312,9 @@ fn runtime_resources(_app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::er
         return Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("target")
-            .join("desktop-runtime"));
+            .join("build-dev")
+            .join("desktop")
+            .join("runtime"));
     }
     #[cfg(not(debug_assertions))]
     Ok(normalize_windows_path(

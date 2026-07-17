@@ -39,9 +39,21 @@ pub struct CreateDefaultStorageRootRequest {
 pub struct UpdateLibraryRequest {
     #[serde(alias = "name")]
     pub display_name: String,
-    pub icon_url: Option<String>,
     #[serde(default)]
     pub access_mode: Option<LibraryAccessMode>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UploadLibraryIconRequest {
+    pub content_base64: String,
+    pub size_bytes: Option<u64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SetLibraryIconFromAssetRequest {
+    pub asset_id: String,
 }
 
 #[derive(Deserialize)]
@@ -66,6 +78,15 @@ mod tests {
     fn update_library_request_rejects_storage_binding() {
         let result = serde_json::from_str::<UpdateLibraryRequest>(
             r#"{"displayName":"Design","storageBinding":{"connectionId":"00000000-0000-0000-0000-000000000000"}}"#,
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_library_request_rejects_icon_url() {
+        let result = serde_json::from_str::<UpdateLibraryRequest>(
+            r#"{"displayName":"Design","iconUrl":"https://example.com/icon.png"}"#,
         );
 
         assert!(result.is_err());

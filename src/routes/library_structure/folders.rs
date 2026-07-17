@@ -13,11 +13,26 @@ use crate::{
                 next_folder_sort_order, query_folder_edit_state, query_folder_name, query_folders,
                 query_sibling_folder_ids_in_tx,
             },
-            requests::{CreateFolderRequest, ReorderFoldersRequest, UpdateFolderRequest},
+            requests::{
+                CreateFolderImportPlanRequest, CreateFolderRequest, ReorderFoldersRequest,
+                UpdateFolderRequest,
+            },
         },
     },
     state::AppState,
 };
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
+
+const MAX_IMPORT_PLAN_FOLDERS: usize = 2_000;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFolderImportPlanResponse {
+    folders: Vec<crate::models::FolderRecord>,
+    folder_ids_by_key: HashMap<String, String>,
+    root_folder_ids: Vec<String>,
+}
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -82,6 +97,116 @@ pub async fn create_folder(
     .await?;
 
     Ok(Json(query_folders(&state, &library_id).await?))
+}
+
+pub async fn create_folder_import_plan(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+    Json(request): Json<CreateFolderImportPlanRequest>,
+) -> AppResult<Json<CreateFolderImportPlanResponse>> {
+    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_parent_folder(&state, &library_id, request.parent_id.as_deref()).await?;
+
+    if request.folders.len() > MAX_IMPORT_PLAN_FOLDERS {
+        return Err(AppError::BadRequest(format!(
+            "folder import plan cannot exceed {MAX_IMPORT_PLAN_FOLDERS} folders"
+        )));
+    }
+
+    let mut seen_keys = HashSet::new();
+    let mut normalized_folders = Vec::with_capacity(request.folders.len());
+    for folder in request.folders {
+        let key = folder.key.trim().to_string();
+        if key.is_empty() || !seen_keys.insert(key.clone()) {
+            return Err(AppError::BadRequest(
+                "folder import plan contains an invalid or duplicate key".to_string(),
+            ));
+        }
+        normalized_folders.push((
+            key,
+            folder
+                .parent_key
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            normalize_required_name(&folder.name, "folder name")?,
+        ));
+    }
+
+    let mut tx = state.pool.begin().await?;
+    let mut folder_ids_by_key = HashMap::with_capacity(normalized_folders.len());
+    let mut root_folder_ids = Vec::new();
+    let mut created_folder_names = Vec::with_capacity(normalized_folders.len());
+
+    for (key, parent_key, name) in normalized_folders {
+        let parent_id = match parent_key.as_deref() {
+            Some(parent_key) => {
+                Some(folder_ids_by_key.get(parent_key).cloned().ok_or_else(|| {
+                    AppError::BadRequest(
+                        "folder import plan parents must appear before their children".to_string(),
+                    )
+                })?)
+            }
+            None => request.parent_id.clone(),
+        };
+        let folder_id = new_prefixed_id("folder_");
+        let sort_order = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COALESCE(MAX(sort_order), 0) + 1000
+            FROM folders
+            WHERE library_id = $1 AND parent_id IS NOT DISTINCT FROM $2
+            "#,
+        )
+        .bind(&library_id)
+        .bind(parent_id.as_deref())
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO folders (
+                id, library_id, parent_id, name, description, icon, color, sort_order,
+                created_by_user_id, updated_by_user_id
+            )
+            VALUES ($1, $2, $3, $4, '', 'folder', 'default', $5, $6, $6)
+            "#,
+        )
+        .bind(&folder_id)
+        .bind(&library_id)
+        .bind(parent_id)
+        .bind(&name)
+        .bind(sort_order)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await?;
+
+        if parent_key.is_none() {
+            root_folder_ids.push(folder_id.clone());
+        }
+        folder_ids_by_key.insert(key, folder_id.clone());
+        created_folder_names.push((folder_id, name));
+    }
+
+    tx.commit().await?;
+
+    for (folder_id, name) in created_folder_names {
+        insert_activity(
+            &state,
+            &library_id,
+            user.id,
+            "folder.created",
+            "folder",
+            &folder_id,
+            &name,
+        )
+        .await?;
+    }
+
+    Ok(Json(CreateFolderImportPlanResponse {
+        folders: query_folders(&state, &library_id).await?,
+        folder_ids_by_key,
+        root_folder_ids,
+    }))
 }
 
 pub async fn update_folder(

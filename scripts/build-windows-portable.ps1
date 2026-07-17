@@ -4,10 +4,10 @@ $serverDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $postgresManifestPath = Join-Path $serverDir "packaging\postgresql-windows-x64.json"
 $postgresManifest = Get-Content -Raw -LiteralPath $postgresManifestPath | ConvertFrom-Json
 $postgresSource = Join-Path $serverDir "binaries\windows-x64\postgresql"
-$coreTarget = Join-Path $serverDir "target\core"
+$coreTarget = Join-Path $serverDir "target\build\desktop"
 
-$outputDir = Join-Path $serverDir "artifacts\windows-x64"
-$packageWorkDir = Join-Path $serverDir "target\package"
+$outputDir = Join-Path $serverDir "target\release\windows-x64"
+$packageWorkDir = Join-Path $serverDir "target\build\package"
 $stagingDir = Join-Path $packageWorkDir "windows-x64"
 $packageDir = Join-Path $stagingDir "madlibrary-server-windows-x64"
 $packageZip = Join-Path $outputDir "Mad-Library-Server_0.1.0_windows-x64-portable.zip"
@@ -35,9 +35,11 @@ if (Test-Path -LiteralPath $packageZip) {
 Write-Host "Building admin UI..."
 Push-Location (Join-Path $serverDir "admin-ui")
 try {
+  $env:MADLIBRARY_ADMIN_UI_OUT_DIR = Join-Path $serverDir "target\build\frontend\admin-ui"
   npm ci
   npm run build
 } finally {
+  Remove-Item Env:MADLIBRARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
   Pop-Location
 }
 
@@ -57,7 +59,7 @@ New-Item -ItemType Directory -Force -Path $postgresDestination | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $packageDir "admin-ui") | Out-Null
 
 Copy-Item -LiteralPath (Join-Path $coreTarget "release\madlibrary-server.exe") -Destination $packageDir
-Copy-Item -Path (Join-Path $serverDir "admin-ui\dist\*") -Destination (Join-Path $packageDir "admin-ui") -Recurse
+Copy-Item -Path (Join-Path $serverDir "target\build\frontend\admin-ui\*") -Destination (Join-Path $packageDir "admin-ui") -Recurse
 Copy-Item -LiteralPath (Join-Path $serverDir "packaging\windows\start-server.cmd") -Destination $packageDir
 Copy-Item -LiteralPath (Join-Path $serverDir "packaging\windows\README.txt") -Destination $packageDir
 

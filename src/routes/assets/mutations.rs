@@ -5,7 +5,7 @@ use super::{
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    routes::access::ensure_library_write_access,
+    routes::access::{ensure_library_access, ensure_library_write_access},
     state::AppState,
 };
 use axum::{
@@ -247,7 +247,7 @@ pub async fn update_asset(
     )
     .await?;
     Ok(Json(
-        mutation_response(&state, &library_id, vec![asset_id]).await?,
+        mutation_response(&state, &library_id, user.id, vec![asset_id]).await?,
     ))
 }
 
@@ -304,7 +304,7 @@ pub async fn update_asset_derived_files(
     .await?;
     tx.commit().await?;
     Ok(Json(
-        mutation_response(&state, &library_id, vec![asset_id]).await?,
+        mutation_response(&state, &library_id, user.id, vec![asset_id]).await?,
     ))
 }
 
@@ -335,16 +335,40 @@ pub async fn update_assets_starred(
     Path(library_id): Path<String>,
     Json(request): Json<UpdateAssetsStarredRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    mutate_metadata_field(
-        &state,
-        &user,
-        &library_id,
-        request.asset_ids,
-        "starred",
-        json!(request.starred),
-        "assets.starred_updated",
-    )
-    .await
+    ensure_library_access(&state, &user, &library_id).await?;
+    let asset_ids = normalize_ids(request.asset_ids, "assets")?;
+    let mut tx = state.pool.begin().await?;
+    ensure_assets_in_library(&mut tx, &library_id, &asset_ids, false).await?;
+
+    if request.starred {
+        sqlx::query(
+            r#"
+            INSERT INTO asset_favorites (library_id, asset_id, user_id)
+            SELECT $1, asset_id, $3
+            FROM UNNEST($2::text[]) AS ids(asset_id)
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(&library_id)
+        .bind(&asset_ids)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        sqlx::query(
+            "DELETE FROM asset_favorites WHERE library_id = $1 AND asset_id = ANY($2) AND user_id = $3",
+        )
+        .bind(&library_id)
+        .bind(&asset_ids)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok(Json(
+        mutation_response(&state, &library_id, user.id, asset_ids).await?,
+    ))
 }
 
 pub async fn update_assets_viewer(
@@ -451,7 +475,7 @@ pub async fn set_asset_folders(
     .await?;
     tx.commit().await?;
     Ok(Json(
-        mutation_response(&state, &library_id, asset_ids).await?,
+        mutation_response(&state, &library_id, user.id, asset_ids).await?,
     ))
 }
 
@@ -507,7 +531,7 @@ pub async fn set_asset_tags(
     .await?;
     tx.commit().await?;
     Ok(Json(
-        mutation_response(&state, &library_id, asset_ids).await?,
+        mutation_response(&state, &library_id, user.id, asset_ids).await?,
     ))
 }
 
@@ -600,7 +624,7 @@ pub async fn delete_assets_permanently(
         let _ = fs::remove_file(file);
     }
     Ok(Json(
-        mutation_response(&state, &library_id, Vec::new())
+        mutation_response(&state, &library_id, user.id, Vec::new())
             .await?
             .with_ids(deleted_ids),
     ))
@@ -631,7 +655,9 @@ async fn mutate_metadata_field(
     .await?;
     insert_activity_tx(&mut tx, library_id, user.id, activity, &asset_ids).await?;
     tx.commit().await?;
-    Ok(Json(mutation_response(state, library_id, asset_ids).await?))
+    Ok(Json(
+        mutation_response(state, library_id, user.id, asset_ids).await?,
+    ))
 }
 
 async fn change_deleted_state(
@@ -672,17 +698,18 @@ async fn change_deleted_state(
     insert_activity_tx(&mut tx, library_id, user.id, action, &returned_ids).await?;
     tx.commit().await?;
     Ok(Json(
-        mutation_response(state, library_id, returned_ids).await?,
+        mutation_response(state, library_id, user.id, returned_ids).await?,
     ))
 }
 
 pub(super) async fn mutation_response(
     state: &AppState,
     library_id: &str,
+    user_id: Uuid,
     asset_ids: Vec<String>,
 ) -> AppResult<AssetMutationResponse> {
     let records = query_assets_by_ids(state, library_id, &asset_ids).await?;
-    let items = build_asset_responses(state, library_id, records).await?;
+    let items = build_asset_responses(state, library_id, user_id, records).await?;
     let total = sqlx::query_scalar(
         "SELECT COUNT(*) FROM assets WHERE library_id = $1 AND deleted_at IS NULL",
     )
