@@ -29,6 +29,7 @@ export function ActivityListWithAvatarLookup({
 }) {
   const rows = activityItems.map((item) => ({
     actor: item.actorDisplayName ?? item.actorEmail ?? item.actorUserId ?? t("system"),
+    actorUserId: item.actorUserId ?? undefined,
     avatarKey: resolveAvatarKey?.(item) ?? item.actorAvatarKey ?? null,
     action: activityActionLabel(t, item.action),
     target: item.targetName ?? item.targetType ?? t("unknownTarget"),
@@ -42,7 +43,7 @@ export function ActivityListWithAvatarLookup({
       ) : (
         rows.map((item) => (
           <div className="activity-item" key={`${item.actor}-${item.time}-${item.action}`}>
-            <UserAvatar avatarKey={item.avatarKey} label={item.actor} size="md" />
+            <UserAvatar avatarKey={item.avatarKey} label={item.actor} size="md" userId={item.actorUserId} />
             <div className="activity-main">
               <div className="activity-action">{item.action}</div>
               <div className="activity-meta">

@@ -1,7 +1,16 @@
 import type { SystemAvatar } from "../api";
 
-export function avatarUrl(avatarKey?: string | null) {
-  return avatarKey ? `/api/v1/avatars/system/${encodeURIComponent(avatarKey)}` : "";
+export function avatarUrl(
+  avatarKey?: string | null,
+  userId?: string,
+  updatedAt?: string
+) {
+  if (!avatarKey) return "";
+  if (avatarKey.startsWith("custom:") && userId) {
+    const params = updatedAt ? `?v=${encodeURIComponent(updatedAt)}` : "";
+    return `/api/v1/avatars/users/${encodeURIComponent(userId)}${params}`;
+  }
+  return `/api/v1/avatars/system/${encodeURIComponent(avatarKey.replace(/^custom:/, ""))}`;
 }
 
 export const defaultSystemAvatars: SystemAvatar[] = [

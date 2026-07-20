@@ -25,6 +25,7 @@ pub struct AuthUser {
     pub display_name: String,
     pub avatar_key: Option<String>,
     pub role: Role,
+    pub updated_at: chrono::DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -108,6 +109,7 @@ pub async fn auth_user_from_token(state: &AppState, token: &str) -> AppResult<Au
         display_name: user.display_name,
         avatar_key: user.avatar_key,
         role,
+        updated_at: user.updated_at,
     })
 }
 

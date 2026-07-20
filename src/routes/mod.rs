@@ -8,6 +8,7 @@ mod health;
 mod initialization;
 mod libraries;
 mod library_structure;
+mod library_transfer;
 mod members;
 mod preferences;
 mod presets;
@@ -97,6 +98,10 @@ pub fn router(state: AppState) -> Router {
             get(avatars::read_system_avatar),
         )
         .route(
+            "/api/v1/avatars/users/:user_id",
+            get(avatars::read_user_avatar),
+        )
+        .route(
             "/api/v1/users",
             get(users::list_users).post(users::create_user),
         )
@@ -104,7 +109,13 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/users/:id",
             patch(users::update_user).delete(users::delete_user),
         )
-        .route("/api/v1/users/:id/avatar", patch(users::update_user_avatar))
+        .route(
+            "/api/v1/users/:id/avatar",
+            patch(users::update_user_avatar)
+                .put(avatars::upload_user_avatar)
+                .delete(avatars::delete_user_avatar)
+                .layer(DefaultBodyLimit::max(3 * 1024 * 1024)),
+        )
         .route(
             "/api/v1/libraries",
             get(libraries::list_libraries).post(libraries::create_library),
@@ -142,6 +153,10 @@ pub fn router(state: AppState) -> Router {
             get(members::list_members),
         )
         .route(
+            "/api/v1/libraries/:library_id/contributors",
+            get(members::list_contributors),
+        )
+        .route(
             "/api/v1/libraries/:library_id/members/:user_id",
             post(members::upsert_member).delete(members::remove_member),
         )
@@ -150,6 +165,22 @@ pub fn router(state: AppState) -> Router {
             get(assets::list_assets)
                 .post(assets::import_assets.layer(DefaultBodyLimit::max(384 * 1024 * 1024)))
                 .delete(assets::delete_assets_permanently),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/transfer/asset",
+            post(library_transfer::transfer_asset),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/transfer/folder",
+            post(library_transfer::transfer_folder),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/transfer/export/assets/:asset_id",
+            get(library_transfer::export_asset),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/transfer/export/folders/:folder_id",
+            get(library_transfer::export_folder),
         )
         .route(
             "/api/v1/libraries/:library_id/assets/rating",

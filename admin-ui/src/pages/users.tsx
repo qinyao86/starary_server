@@ -8,6 +8,7 @@ import { PageFrame, StatusDot, UserAvatar } from "../components/common";
 import { AvatarDialog, DeleteUserDialog, UserDialog, UserLibraryAccessDialog } from "../components/dialogs";
 import { defaultNewUserPassword } from "../constants";
 import { defaultSystemAvatars } from "../utils/avatars";
+import { prepareAvatarImage } from "../utils/avatar-image";
 import { canManageServerRole, formatDateTime, isUserOnline, roleLabel } from "../utils/format";
 
 function emailPrefix(value: string) {
@@ -208,6 +209,36 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
     }
   };
 
+  const uploadAvatar = async (file: File) => {
+    if (!token || !avatarTarget) return;
+    setAvatarBusy(true);
+    try {
+      await api.uploadUserAvatar(token, avatarTarget.id, await prepareAvatarImage(file));
+      setAvatarTarget(null);
+      setMessage(t("avatarUpdated"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!token || !avatarTarget) return;
+    setAvatarBusy(true);
+    try {
+      await api.removeUserAvatar(token, avatarTarget.id);
+      setAvatarTarget(null);
+      setMessage(t("avatarUpdated"));
+      await refreshAll();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   const deleteUser = async () => {
     if (!token || !deleteTarget) return;
     setDeleteBusy(true);
@@ -271,11 +302,14 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
         avatars={avatars}
         busy={avatarBusy}
         currentAvatarKey={avatarTarget?.avatarKey}
+        currentAvatarUpdatedAt={avatarTarget?.updatedAt}
+        currentAvatarUserId={avatarTarget?.id}
         open={Boolean(avatarTarget)}
         t={t}
         targetName={avatarTarget?.displayName ?? ""}
         onClose={() => !avatarBusy && setAvatarTarget(null)}
         onSelect={(avatarKey) => { void updateAvatar(avatarKey); }}
+        onUpload={(file) => { void uploadAvatar(file); }}
       />
       <DeleteUserDialog
         busy={deleteBusy}
@@ -323,6 +357,8 @@ export function UsersPage({ t, token, users, currentUser, libraries, refreshAll,
                           <UserAvatar
                             avatarKey={item.avatarKey}
                             label={item.displayName}
+                            updatedAt={item.updatedAt}
+                            userId={item.id}
                             size="lg"
                             onClick={canEditUser ? () => { void openAvatarDialog(item); } : undefined}
                           />

@@ -236,7 +236,7 @@ function LibraryMemberList({
         const roleLocked = removingWouldOrphanLibrary || member.role === "owner" || member.role === "admin";
         return (
           <div className="member-row" key={member.userId}>
-            <UserAvatar avatarKey={member.avatarKey} label={member.displayName} size="lg" />
+            <UserAvatar avatarKey={member.avatarKey} label={member.displayName} size="lg" userId={member.userId} />
             <div>
               <strong>{member.displayName}</strong>
               <span>{member.email}</span>

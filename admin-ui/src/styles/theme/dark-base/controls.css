@@ -14,6 +14,20 @@
   color: #fafafa;
 }
 
+/* Keep the shadcn outline buttons inside the same restrained dark-theme contrast. */
+.theme-dark button.border {
+  border-color: #3f3f46;
+  background: #23232a;
+  color: #e4e4e7;
+  box-shadow: none;
+}
+
+.theme-dark button.border:hover:not(:disabled) {
+  border-color: #52525b;
+  background: #2d2d33;
+  color: #fafafa;
+}
+
 .theme-dark .storage-kind-radio {
   color: #d4d4d8;
 }

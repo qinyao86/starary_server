@@ -31,7 +31,7 @@ export function DeleteUserDialog({
     >
       <div className="delete-user-body">
         <div className="delete-user-identity">
-          <UserAvatar avatarKey={user?.avatarKey} label={user?.displayName ?? ""} size="lg" />
+          <UserAvatar avatarKey={user?.avatarKey} label={user?.displayName ?? ""} size="lg" updatedAt={user?.updatedAt} userId={user?.id} />
           <div>
             <strong>{user?.displayName ?? ""}</strong>
             <span>{user?.email ?? ""}</span>

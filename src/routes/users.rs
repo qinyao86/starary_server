@@ -97,7 +97,7 @@ struct UserLibraryMembershipRow {
     role: String,
 }
 
-async fn attach_library_memberships(
+pub(crate) async fn attach_library_memberships(
     state: &AppState,
     users: Vec<UserRecord>,
     allowed_library_ids: Option<&[String]>,
@@ -384,6 +384,16 @@ pub async fn update_user_avatar(
     .ok_or_else(|| AppError::NotFound("user not found".to_string()))?;
 
     let mut users = attach_library_memberships(&state, vec![user], None).await?;
+    let avatar_path = super::avatars::custom_avatar_path(&state.config.storage_dir, user_id);
+    if let Err(error) = tokio::fs::remove_file(&avatar_path).await {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!(
+                path = %avatar_path.display(),
+                %error,
+                "could not remove replaced custom avatar"
+            );
+        }
+    }
     Ok(Json(users.pop().expect("updated user response is present")))
 }
 
@@ -524,6 +534,16 @@ pub async fn delete_user(
 
     tx.commit().await?;
     state.browser_handoffs.revoke_user(user_id);
+    let avatar_path = super::avatars::custom_avatar_path(&state.config.storage_dir, user_id);
+    if let Err(error) = tokio::fs::remove_file(&avatar_path).await {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!(
+                path = %avatar_path.display(),
+                %error,
+                "could not remove deleted user's custom avatar"
+            );
+        }
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

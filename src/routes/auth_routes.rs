@@ -66,6 +66,7 @@ pub struct CurrentUserResponse {
     display_name: String,
     avatar_key: Option<String>,
     role: String,
+    updated_at: String,
 }
 
 pub async fn login(
@@ -75,7 +76,7 @@ pub async fn login(
     let email = request.email.trim().to_ascii_lowercase();
     let user = sqlx::query_as::<_, UserWithPassword>(
         r#"
-        SELECT id, email, display_name, avatar_key, password_hash, global_role, is_active
+        SELECT id, email, display_name, avatar_key, password_hash, global_role, is_active, updated_at
         FROM users
         WHERE email = $1
         "#,
@@ -115,6 +116,7 @@ pub async fn login(
             display_name: user.display_name,
             avatar_key: user.avatar_key,
             role: user.global_role,
+            updated_at: user.updated_at.to_rfc3339(),
         },
     }))
 }
@@ -177,6 +179,7 @@ pub async fn redeem_browser_handoff(
             display_name: user.display_name,
             avatar_key: user.avatar_key,
             role: user.global_role,
+            updated_at: user.updated_at.to_rfc3339(),
         },
     }))
 }
@@ -191,6 +194,7 @@ pub async fn me(
         display_name: user.display_name,
         avatar_key: user.avatar_key,
         role: user.role.to_string(),
+        updated_at: user.updated_at.to_rfc3339(),
     }))
 }
 
@@ -206,12 +210,12 @@ pub async fn update_me(
 
     ensure_unique_display_name(&state, display_name, Some(user.id)).await?;
 
-    let display_name: String = sqlx::query_scalar(
+    let (display_name, updated_at): (String, chrono::DateTime<Utc>) = sqlx::query_as(
         r#"
         UPDATE users
         SET display_name = $2, updated_at = NOW()
         WHERE id = $1
-        RETURNING display_name
+        RETURNING display_name, updated_at
         "#,
     )
     .bind(user.id)
@@ -225,6 +229,7 @@ pub async fn update_me(
         display_name,
         avatar_key: user.avatar_key,
         role: user.role.to_string(),
+        updated_at: updated_at.to_rfc3339(),
     }))
 }
 

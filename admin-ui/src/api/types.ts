@@ -27,6 +27,7 @@ export type CurrentUser = {
   displayName: string;
   avatarKey?: string | null;
   role: string;
+  updatedAt?: string;
 };
 
 export type SystemAvatar = {
@@ -51,6 +52,7 @@ export type TeamLibrary = {
   isMember?: boolean;
   storageLockedAt?: string | null;
   libraryManagerNames?: string[];
+  libraryManagerUserIds?: string[];
   libraryManagerAvatarKeys?: Array<string | null>;
   memberNames?: string[];
   assetCount?: number;
@@ -208,7 +210,9 @@ export type LibraryMember = {
   email: string;
   displayName: string;
   avatarKey?: string | null;
+  avatarUpdatedAt?: string;
   role: string;
+  importedAssetCount: number;
   createdAt: string;
   updatedAt: string;
 };

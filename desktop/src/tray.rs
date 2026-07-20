@@ -22,7 +22,7 @@ struct TrayMenuState {
 
 pub fn install(app: &AppHandle, status: &ServiceStatus) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, MENU_SHOW, "打开", true, None::<&str>)?;
-    let open_admin = MenuItem::with_id(app, MENU_OPEN_ADMIN, "后台管理", true, None::<&str>)?;
+    let open_admin = MenuItem::with_id(app, MENU_OPEN_ADMIN, "控制台", true, None::<&str>)?;
     let service_action = MenuItem::with_id(
         app,
         MENU_TOGGLE_SERVICE,
@@ -125,7 +125,7 @@ pub fn set_language(app: &AppHandle, language: &str, status: &ServiceStatus) -> 
         .set_text(if english { "Open" } else { "打开" })
         .map_err(|error| error.to_string())?;
     menu.open_admin
-        .set_text(if english { "Admin" } else { "后台管理" })
+        .set_text(if english { "Console" } else { "控制台" })
         .map_err(|error| error.to_string())?;
     menu.exit
         .set_text(if english { "Exit" } else { "退出" })

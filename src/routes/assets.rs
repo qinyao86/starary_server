@@ -87,9 +87,33 @@ pub struct ImportAssetRequest {
     relative_path: Option<String>,
     metadata: Option<Value>,
     folder_id: Option<String>,
+    #[serde(default)]
+    folder_ids: Vec<String>,
+    #[serde(default)]
+    tags: Vec<ImportAssetTagRequest>,
     source_file: Option<ImportAssetFileRequest>,
     #[serde(default)]
+    additional_files: Vec<ImportAssetFileRequest>,
+    #[serde(default)]
     derived_files: Vec<ImportAssetDerivedFileRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetTagRequest {
+    name: String,
+    color: Option<String>,
+    starred: Option<bool>,
+    sort_order: Option<i64>,
+    group: Option<ImportAssetTagGroupRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetTagGroupRequest {
+    name: String,
+    color: Option<String>,
+    sort_order: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -112,10 +136,10 @@ pub struct ImportAssetDerivedFileRequest {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetFileUrls {
-    source: Option<String>,
-    thumbnail: Option<String>,
-    preview_image: Option<String>,
-    preview_video: Option<String>,
+    pub(super) source: Option<String>,
+    pub(super) thumbnail: Option<String>,
+    pub(super) preview_image: Option<String>,
+    pub(super) preview_video: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -138,13 +162,13 @@ pub struct AssetFilePaths {
 #[serde(rename_all = "camelCase")]
 pub struct AssetResponse {
     #[serde(flatten)]
-    asset: AssetRecord,
-    folders: Vec<FolderRecord>,
-    tags: Vec<TagRecord>,
-    starred: bool,
-    favorite_count: i64,
-    file_urls: AssetFileUrls,
-    file_paths: AssetFilePaths,
+    pub(super) asset: AssetRecord,
+    pub(super) folders: Vec<FolderRecord>,
+    pub(super) tags: Vec<TagRecord>,
+    pub(super) starred: bool,
+    pub(super) favorite_count: i64,
+    pub(super) file_urls: AssetFileUrls,
+    pub(super) file_paths: AssetFilePaths,
 }
 
 #[derive(Serialize)]
@@ -231,12 +255,29 @@ pub async fn import_assets(
 
     for asset in request.assets {
         let derived_files = asset.derived_files;
+        let additional_files = asset.additional_files;
         let source_file = asset.source_file;
         let asset_id = normalize_asset_id(asset.id);
         let name = normalize_required_text(&asset.name, "asset name")?;
         let asset_kind = normalize_required_text(&asset.asset_kind, "asset kind")?;
         let import_mode = normalize_import_mode(asset.import_mode.as_deref())?;
         let mut metadata = asset.metadata.unwrap_or_else(|| json!({}));
+        if let Some(operation_id) = metadata_string(&metadata, "transferOperationId") {
+            let existing_operation_id = sqlx::query_scalar::<_, String>(
+                "SELECT metadata->>'transferOperationId' FROM assets WHERE library_id = $1 AND id = $2",
+            )
+            .bind(&library_id)
+            .bind(&asset_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+            if let Some(existing_operation_id) = existing_operation_id {
+                if existing_operation_id == operation_id {
+                    imported_asset_ids.push(asset_id);
+                    continue;
+                }
+                return Err(AppError::Conflict("asset already exists".to_string()));
+            }
+        }
 
         let mut storage_key = normalize_optional_text(asset.storage_key);
         let storage_root_id = asset.storage_root_id.or(default_storage_root_id);
@@ -266,16 +307,29 @@ pub async fn import_assets(
             if let Some(source_file) = source_file.as_ref() {
                 write_asset_source_file(&state, root_id, &asset_id, source_file).await?;
             }
+            for additional_file in &additional_files {
+                write_asset_source_file(&state, root_id, &asset_id, additional_file).await?;
+            }
             if !derived_files.is_empty() {
                 write_asset_derived_files(&state, root_id, &derived_files).await?;
             }
-        } else if source_file.is_some() || !derived_files.is_empty() {
+        } else if source_file.is_some() || !additional_files.is_empty() || !derived_files.is_empty()
+        {
             return Err(AppError::BadRequest(
                 "asset files require an enabled workspace".to_string(),
             ));
         }
-        let folder_id = normalize_optional_text(asset.folder_id);
-        if let Some(folder_id) = folder_id.as_deref() {
+        let mut folder_ids = asset
+            .folder_ids
+            .into_iter()
+            .filter_map(|value| normalize_optional_text(Some(value)))
+            .collect::<Vec<_>>();
+        if let Some(folder_id) = normalize_optional_text(asset.folder_id) {
+            folder_ids.push(folder_id);
+        }
+        folder_ids.sort();
+        folder_ids.dedup();
+        for folder_id in &folder_ids {
             ensure_folder_in_library(&mut tx, &library_id, folder_id).await?;
         }
 
@@ -319,7 +373,7 @@ pub async fn import_assets(
         .await
         .map_err(map_asset_insert_error)?;
 
-        if let Some(folder_id) = folder_id {
+        for folder_id in folder_ids {
             sqlx::query(
                 r#"
                 INSERT INTO asset_folders (asset_id, folder_id)
@@ -329,6 +383,17 @@ pub async fn import_assets(
             )
             .bind(&asset_id)
             .bind(&folder_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        for tag in asset.tags {
+            let tag_id = upsert_import_tag(&mut tx, &library_id, user.id, tag).await?;
+            sqlx::query(
+                "INSERT INTO asset_tags (asset_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            )
+            .bind(&asset_id)
+            .bind(tag_id)
             .execute(&mut *tx)
             .await?;
         }
@@ -380,6 +445,80 @@ pub async fn import_assets(
         total,
         items,
     }))
+}
+
+async fn upsert_import_tag(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    library_id: &str,
+    user_id: Uuid,
+    tag: ImportAssetTagRequest,
+) -> AppResult<String> {
+    let name = normalize_required_text(&tag.name, "tag name")?;
+    if let Some(tag_id) = sqlx::query_scalar::<_, String>(
+        "SELECT id FROM tags WHERE library_id = $1 AND LOWER(name) = LOWER($2) ORDER BY created_at ASC LIMIT 1",
+    )
+    .bind(library_id)
+    .bind(&name)
+    .fetch_optional(&mut **tx)
+    .await?
+    {
+        return Ok(tag_id);
+    }
+
+    let group_id = if let Some(group) = tag.group {
+        let group_name = normalize_required_text(&group.name, "tag group name")?;
+        if let Some(group_id) = sqlx::query_scalar::<_, String>(
+            "SELECT id FROM tag_groups WHERE library_id = $1 AND LOWER(name) = LOWER($2) ORDER BY created_at ASC LIMIT 1",
+        )
+        .bind(library_id)
+        .bind(&group_name)
+        .fetch_optional(&mut **tx)
+        .await?
+        {
+            Some(group_id)
+        } else {
+            let group_id = generate_id("tag_group_");
+            sqlx::query(
+                r#"
+                INSERT INTO tag_groups (
+                    id, library_id, name, color, sort_order, created_by_user_id, updated_by_user_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $6)
+                "#,
+            )
+            .bind(&group_id)
+            .bind(library_id)
+            .bind(group_name)
+            .bind(group.color.unwrap_or_else(|| "default".to_string()))
+            .bind(group.sort_order.unwrap_or(0))
+            .bind(user_id)
+            .execute(&mut **tx)
+            .await?;
+            Some(group_id)
+        }
+    } else {
+        None
+    };
+
+    let tag_id = generate_id("tag_");
+    sqlx::query(
+        r#"
+        INSERT INTO tags (
+            id, library_id, group_id, name, color, starred, sort_order,
+            created_by_user_id, updated_by_user_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+        "#,
+    )
+    .bind(&tag_id)
+    .bind(library_id)
+    .bind(group_id)
+    .bind(name)
+    .bind(tag.color)
+    .bind(tag.starred.unwrap_or(false))
+    .bind(tag.sort_order.unwrap_or(0))
+    .bind(user_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(tag_id)
 }
 
 fn default_limit() -> i64 {

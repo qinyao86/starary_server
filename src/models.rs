@@ -166,6 +166,7 @@ pub struct UserWithPassword {
     pub password_hash: String,
     pub global_role: String,
     pub is_active: bool,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, FromRow, Serialize)]
@@ -193,6 +194,7 @@ pub struct LibraryWithRole {
     pub current_user_role: Option<String>,
     pub is_member: bool,
     pub library_manager_names: Vec<String>,
+    pub library_manager_user_ids: Vec<Uuid>,
     pub library_manager_avatar_keys: Vec<Option<String>>,
     pub member_names: Vec<String>,
     pub asset_count: i64,
@@ -288,9 +290,20 @@ pub struct LibraryMemberRecord {
     pub email: String,
     pub display_name: String,
     pub avatar_key: Option<String>,
+    pub avatar_updated_at: DateTime<Utc>,
     pub role: String,
+    pub imported_asset_count: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryContributorRecord {
+    pub user_id: Uuid,
+    pub email: String,
+    pub display_name: String,
+    pub avatar_key: Option<String>,
 }
 
 #[derive(Debug, FromRow, Serialize)]

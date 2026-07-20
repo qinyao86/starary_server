@@ -123,13 +123,22 @@ pub async fn create_folder_import_plan(
                 "folder import plan contains an invalid or duplicate key".to_string(),
             ));
         }
+        let requested_id = folder
+            .id
+            .map(|value| value.trim().to_string())
+            .filter(|value| value.starts_with("folder_") && value.len() == "folder_".len() + 12);
         normalized_folders.push((
+            requested_id,
             key,
             folder
                 .parent_key
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty()),
             normalize_required_name(&folder.name, "folder name")?,
+            folder.description.unwrap_or_default(),
+            normalize_required_text(folder.icon, "folder"),
+            normalize_required_text(folder.color, "default"),
+            folder.sort_order,
         ));
     }
 
@@ -138,7 +147,9 @@ pub async fn create_folder_import_plan(
     let mut root_folder_ids = Vec::new();
     let mut created_folder_names = Vec::with_capacity(normalized_folders.len());
 
-    for (key, parent_key, name) in normalized_folders {
+    for (requested_id, key, parent_key, name, description, icon, color, requested_sort_order) in
+        normalized_folders
+    {
         let parent_id = match parent_key.as_deref() {
             Some(parent_key) => {
                 Some(folder_ids_by_key.get(parent_key).cloned().ok_or_else(|| {
@@ -149,18 +160,34 @@ pub async fn create_folder_import_plan(
             }
             None => request.parent_id.clone(),
         };
-        let folder_id = new_prefixed_id("folder_");
-        let sort_order = sqlx::query_scalar::<_, i64>(
-            r#"
+        let folder_id = requested_id.unwrap_or_else(|| new_prefixed_id("folder_"));
+        if let Some(existing_library_id) =
+            sqlx::query_scalar::<_, String>("SELECT library_id FROM folders WHERE id = $1")
+                .bind(&folder_id)
+                .fetch_optional(&mut *tx)
+                .await?
+        {
+            if existing_library_id != library_id {
+                return Err(AppError::Conflict("folder id already exists".to_string()));
+            }
+            folder_ids_by_key.insert(key, folder_id);
+            continue;
+        }
+        let sort_order = if let Some(sort_order) = requested_sort_order {
+            sort_order
+        } else {
+            sqlx::query_scalar::<_, i64>(
+                r#"
             SELECT COALESCE(MAX(sort_order), 0) + 1000
             FROM folders
             WHERE library_id = $1 AND parent_id IS NOT DISTINCT FROM $2
             "#,
-        )
-        .bind(&library_id)
-        .bind(parent_id.as_deref())
-        .fetch_one(&mut *tx)
-        .await?;
+            )
+            .bind(&library_id)
+            .bind(parent_id.as_deref())
+            .fetch_one(&mut *tx)
+            .await?
+        };
 
         sqlx::query(
             r#"
@@ -168,13 +195,16 @@ pub async fn create_folder_import_plan(
                 id, library_id, parent_id, name, description, icon, color, sort_order,
                 created_by_user_id, updated_by_user_id
             )
-            VALUES ($1, $2, $3, $4, '', 'folder', 'default', $5, $6, $6)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
             "#,
         )
         .bind(&folder_id)
         .bind(&library_id)
         .bind(parent_id)
         .bind(&name)
+        .bind(description)
+        .bind(icon)
+        .bind(color)
         .bind(sort_order)
         .bind(user.id)
         .execute(&mut *tx)

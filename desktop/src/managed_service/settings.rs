@@ -36,7 +36,10 @@ impl DesktopSettings {
             let mut settings: Self =
                 serde_json::from_value(raw).map_err(|error| error.to_string())?;
             if settings.version != 1 {
-                return Err(format!("desktop settings file is invalid: {}", path.display()));
+                return Err(format!(
+                    "desktop settings file is invalid: {}",
+                    path.display()
+                ));
             }
             settings.log_directory =
                 Self::normalize_log_directory(data_home, settings.log_directory)?;
@@ -138,7 +141,11 @@ fn apply_launch_at_login(enabled: bool) -> Result<(), String> {
             .args(["add", RUN_KEY, "/v", RUN_VALUE_NAME, "/t", "REG_SZ", "/d"])
             .arg(executable)
             .args(["/f"]);
-        if command.status().map_err(|error| error.to_string())?.success() {
+        if command
+            .status()
+            .map_err(|error| error.to_string())?
+            .success()
+        {
             Ok(())
         } else {
             Err("无法写入开机启动项。".to_string())

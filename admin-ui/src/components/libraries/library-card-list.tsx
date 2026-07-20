@@ -206,7 +206,7 @@ export function LibraryCardList({
                       <>
                         {(library.libraryManagerNames ?? []).slice(0, 3).map((name, index) => (
                           <span className="library-card-manager-user" key={`${name}-${index}`}>
-                            <UserAvatar avatarKey={library.libraryManagerAvatarKeys?.[index]} label={name} size="sm" />
+                            <UserAvatar avatarKey={library.libraryManagerAvatarKeys?.[index]} label={name} size="sm" userId={library.libraryManagerUserIds?.[index]} />
                             <strong>{name}</strong>
                           </span>
                         ))}

@@ -1,8 +1,8 @@
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    models::{LibraryMemberRecord, Role},
-    routes::access::ensure_library_manager,
+    models::{LibraryContributorRecord, LibraryMemberRecord, Role},
+    routes::access::{ensure_library_access, ensure_library_manager},
     state::AppState,
 };
 use axum::{
@@ -18,12 +18,46 @@ mod requests;
 use guards::{current_library_role, ensure_another_library_manager};
 use requests::UpsertMemberRequest;
 
+pub async fn list_contributors(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+) -> AppResult<Json<Vec<LibraryContributorRecord>>> {
+    ensure_library_access(&state, &user, &library_id).await?;
+
+    let contributors = sqlx::query_as::<_, LibraryContributorRecord>(
+        r#"
+        SELECT
+            u.id AS user_id,
+            u.email,
+            u.display_name,
+            u.avatar_key
+        FROM users u
+        INNER JOIN (
+            SELECT COALESCE(imported_by_user_id, created_by_user_id) AS user_id
+            FROM assets
+            WHERE library_id = $1
+            UNION
+            SELECT created_by_user_id AS user_id
+            FROM folders
+            WHERE library_id = $1 AND created_by_user_id IS NOT NULL
+        ) contributor_ids ON contributor_ids.user_id = u.id
+        ORDER BY u.display_name ASC, u.email ASC
+        "#,
+    )
+    .bind(&library_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(Json(contributors))
+}
+
 pub async fn list_members(
     State(state): State<AppState>,
     user: AuthUser,
     Path(library_id): Path<String>,
 ) -> AppResult<Json<Vec<LibraryMemberRecord>>> {
-    ensure_library_manager(&state, &user, &library_id).await?;
+    ensure_library_access(&state, &user, &library_id).await?;
 
     let members = sqlx::query_as::<_, LibraryMemberRecord>(
         r#"
@@ -33,11 +67,24 @@ pub async fn list_members(
             u.email,
             u.display_name,
             u.avatar_key,
+            u.updated_at AS avatar_updated_at,
             m.role,
+            COALESCE(contributions.imported_asset_count, 0) AS imported_asset_count,
             m.created_at,
             m.updated_at
         FROM library_memberships m
         INNER JOIN users u ON u.id = m.user_id
+        LEFT JOIN (
+            SELECT
+                library_id,
+                COALESCE(imported_by_user_id, created_by_user_id) AS user_id,
+                COUNT(*) AS imported_asset_count
+            FROM assets
+            WHERE library_id = $1 AND deleted_at IS NULL
+            GROUP BY library_id, COALESCE(imported_by_user_id, created_by_user_id)
+        ) contributions
+            ON contributions.library_id = m.library_id
+           AND contributions.user_id = m.user_id
         WHERE m.library_id = $1
         ORDER BY u.display_name ASC, u.email ASC
         "#,
@@ -117,11 +164,24 @@ pub async fn upsert_member(
             u.email,
             u.display_name,
             u.avatar_key,
+            u.updated_at AS avatar_updated_at,
             m.role,
+            COALESCE(contributions.imported_asset_count, 0) AS imported_asset_count,
             m.created_at,
             m.updated_at
         FROM library_memberships m
         INNER JOIN users u ON u.id = m.user_id
+        LEFT JOIN (
+            SELECT
+                library_id,
+                COALESCE(imported_by_user_id, created_by_user_id) AS user_id,
+                COUNT(*) AS imported_asset_count
+            FROM assets
+            WHERE library_id = $1 AND deleted_at IS NULL
+            GROUP BY library_id, COALESCE(imported_by_user_id, created_by_user_id)
+        ) contributions
+            ON contributions.library_id = m.library_id
+           AND contributions.user_id = m.user_id
         WHERE m.library_id = $1 AND m.user_id = $2
         "#,
     )

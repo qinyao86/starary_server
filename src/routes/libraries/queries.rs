@@ -18,6 +18,7 @@ library_manager_stats AS (
     SELECT
         m.library_id,
         ARRAY_AGG(u.display_name ORDER BY u.display_name) AS library_manager_names,
+        ARRAY_AGG(u.id ORDER BY u.display_name) AS library_manager_user_ids,
         ARRAY_AGG(u.avatar_key ORDER BY u.display_name) AS library_manager_avatar_keys
     FROM library_memberships m
     INNER JOIN users u ON u.id = m.user_id
@@ -82,6 +83,7 @@ SELECT
     {role_expression} AS current_user_role,
     {member_expression} AS is_member,
     COALESCE(lms.library_manager_names, ARRAY[]::TEXT[]) AS library_manager_names,
+    COALESCE(lms.library_manager_user_ids, ARRAY[]::UUID[]) AS library_manager_user_ids,
     COALESCE(lms.library_manager_avatar_keys, ARRAY[]::TEXT[]) AS library_manager_avatar_keys,
     COALESCE(ms.member_names, ARRAY[]::TEXT[]) AS member_names,
     COALESCE(ast.asset_count, 0) AS asset_count,

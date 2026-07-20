@@ -5,21 +5,39 @@ export function UserAvatar({
   avatarKey,
   label,
   onClick,
-  size = "md"
+  size = "md",
+  updatedAt,
+  userId
 }: {
   avatarKey?: string | null;
   label: string;
   onClick?: () => void;
   size?: "sm" | "md" | "lg";
+  updatedAt?: string;
+  userId?: string;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [useSystemFallback, setUseSystemFallback] = useState(false);
   const fallback = label.trim().charAt(0).toUpperCase() || "U";
   useEffect(() => {
     setImageFailed(false);
-  }, [avatarKey]);
+    setUseSystemFallback(false);
+  }, [avatarKey, updatedAt, userId]);
 
-  const content = avatarKey && !imageFailed ? (
-    <img alt="" src={avatarUrl(avatarKey)} onError={() => setImageFailed(true)} />
+  const isCustom = avatarKey?.startsWith("custom:") ?? false;
+  const imageUrl = useSystemFallback
+    ? avatarUrl(avatarKey)
+    : avatarUrl(avatarKey, userId, updatedAt);
+
+  const content = imageUrl && !imageFailed ? (
+    <img
+      alt=""
+      src={imageUrl}
+      onError={() => {
+        if (isCustom && !useSystemFallback) setUseSystemFallback(true);
+        else setImageFailed(true);
+      }}
+    />
   ) : (
     <span>{fallback}</span>
   );
@@ -28,7 +46,7 @@ export function UserAvatar({
     return (
       <button
         aria-label={label}
-        className={`user-avatar user-avatar-${size} is-clickable`}
+        className={`user-avatar user-avatar-${size} is-clickable${isCustom ? " is-custom" : ""}`}
         title={label}
         type="button"
         onClick={onClick}
@@ -39,7 +57,7 @@ export function UserAvatar({
   }
 
   return (
-    <span className={`user-avatar user-avatar-${size}`} title={label}>
+    <span className={`user-avatar user-avatar-${size}${isCustom ? " is-custom" : ""}`} title={label}>
       {content}
     </span>
   );

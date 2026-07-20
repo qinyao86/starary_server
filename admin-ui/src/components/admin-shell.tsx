@@ -6,6 +6,7 @@ import { api, type CurrentUser, type ServerInfo, type SystemAvatar } from "../ap
 import { visibleNavItems } from "../navigation";
 import type { ColorTheme, DeploymentMode, Section, TranslatorContext } from "../types";
 import { defaultSystemAvatars } from "../utils/avatars";
+import { prepareAvatarImage } from "../utils/avatar-image";
 import { deploymentModeLabel, roleLabel } from "../utils/format";
 import { Segmented, UserAvatar } from "./common";
 import { AvatarDialog } from "./dialogs";
@@ -243,20 +244,53 @@ function SidebarFooter({ currentUser, t, token, onLogout, onRefresh, onSetMessag
     }
   };
 
+  const uploadAvatar = async (file: File) => {
+    if (!currentUser || !token) return;
+    setAvatarBusy(true);
+    try {
+      await api.uploadUserAvatar(token, currentUser.id, await prepareAvatarImage(file));
+      setAvatarOpen(false);
+      onSetMessage(t("avatarUpdated"));
+      await onRefresh();
+    } catch (error) {
+      onSetMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!currentUser || !token) return;
+    setAvatarBusy(true);
+    try {
+      await api.removeUserAvatar(token, currentUser.id);
+      setAvatarOpen(false);
+      onSetMessage(t("avatarUpdated"));
+      await onRefresh();
+    } catch (error) {
+      onSetMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   return (
     <div className="sidebar-footer" ref={menuRef}>
       <AvatarDialog
         avatars={avatars}
         busy={avatarBusy}
         currentAvatarKey={currentUser?.avatarKey}
+        currentAvatarUpdatedAt={currentUser?.updatedAt}
+        currentAvatarUserId={currentUser?.id}
         open={avatarOpen}
         t={t}
         targetName={displayName}
         onClose={() => !avatarBusy && setAvatarOpen(false)}
         onSelect={(avatarKey) => { void updateAvatar(avatarKey); }}
+        onUpload={(file) => { void uploadAvatar(file); }}
       />
       <div className="sidebar-account" title={title}>
-        <UserAvatar avatarKey={currentUser?.avatarKey} label={displayName} size="lg" onClick={() => { void openAvatarDialog(); }} />
+        <UserAvatar avatarKey={currentUser?.avatarKey} label={displayName} size="lg" updatedAt={currentUser?.updatedAt} userId={currentUser?.id} onClick={() => { void openAvatarDialog(); }} />
         <div className="sidebar-account-main">
           <div className="sidebar-account-name">{displayName}</div>
           {currentUser?.role && <div className="sidebar-account-role">{roleLabel(t, currentUser.role)}</div>}

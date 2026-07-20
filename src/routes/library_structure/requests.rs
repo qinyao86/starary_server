@@ -19,9 +19,14 @@ pub struct CreateFolderImportPlanRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateFolderImportPlanItem {
+    pub id: Option<String>,
     pub key: String,
     pub parent_key: Option<String>,
     pub name: String,
+    pub description: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub sort_order: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]

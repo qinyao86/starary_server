@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod machine_permissions;
 mod managed_service;
 mod tray;
 
@@ -50,11 +51,18 @@ fn main() {
         .setup(|app| {
             let resources = runtime_resources(app.handle())?;
             let data_home = machine_data_home()?;
+            let permissions_error =
+                machine_permissions::ensure_machine_data_permissions(&data_home).err();
             fs::create_dir_all(data_home.join("logs"))?;
             let service =
                 Arc::new(ManagedService::new(resources, data_home).map_err(std::io::Error::other)?);
             app.manage(service.clone());
             write_control_center_log("control center setup completed");
+            if let Some(error) = permissions_error {
+                write_control_center_log(&format!(
+                    "machine data permission repair failed: {error}"
+                ));
+            }
             let status = service.status();
             tray::install(app.handle(), &status)?;
             if status.state == "stopped" && service.reserve_automatic_start() {

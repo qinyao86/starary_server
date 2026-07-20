@@ -100,6 +100,20 @@ export const api = {
       token,
       body: JSON.stringify({ avatarKey })
     }),
+  uploadUserAvatar: (token: string, userId: string, file: File) => {
+    const form = new FormData();
+    form.set("file", file);
+    return request<TeamUser>(`/api/v1/users/${userId}/avatar`, {
+      method: "PUT",
+      token,
+      body: form
+    });
+  },
+  removeUserAvatar: (token: string, userId: string) =>
+    request<TeamUser>(`/api/v1/users/${userId}/avatar`, {
+      method: "DELETE",
+      token
+    }),
   listMyLibraries: (token: string) => request<TeamLibrary[]>("/api/v1/me/libraries", { token }),
   listMyLibraryStatuses: (token: string) => request<LibraryStatusResponse>("/api/v1/me/library-status", { token }),
   updatePresence: (token: string, payload: { libraryId?: string | null } = {}) =>

@@ -6,6 +6,7 @@ export function DialogShell({
   children,
   className,
   closeLabel,
+  headerContent,
   open,
   subtitle,
   title,
@@ -15,6 +16,7 @@ export function DialogShell({
   children: ReactNode;
   className: string;
   closeLabel: string;
+  headerContent?: ReactNode;
   open: boolean;
   subtitle: string;
   title: string;
@@ -43,11 +45,13 @@ export function DialogShell({
       }}
     >
       <section className={`dialog-panel ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="dialog-header">
-          <div>
-            <h2 className="dialog-title" id={titleId}>{title}</h2>
-            <p className="dialog-subtitle">{subtitle}</p>
-          </div>
+        <div className={`dialog-header${headerContent ? " has-custom-content" : ""}`}>
+          {headerContent ?? (
+            <div>
+              <h2 className="dialog-title" id={titleId}>{title}</h2>
+              <p className="dialog-subtitle">{subtitle}</p>
+            </div>
+          )}
           <Button className="dialog-close" type="button" variant="ghost" size="icon" aria-label={closeLabel} onClick={onClose}>
             <X size={16} />
           </Button>
