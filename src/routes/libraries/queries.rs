@@ -27,8 +27,17 @@ library_manager_stats AS (
 ),
 asset_stats AS (
     SELECT
-        library_id,
+        a.library_id,
         COUNT(*) FILTER (WHERE deleted_at IS NULL)::BIGINT AS asset_count,
+        COUNT(*) FILTER (WHERE deleted_at IS NOT NULL)::BIGINT AS trash_asset_count,
+        COUNT(*) FILTER (
+            WHERE deleted_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM asset_tags rel WHERE rel.asset_id = a.id)
+        )::BIGINT AS untagged_asset_count,
+        COUNT(*) FILTER (
+            WHERE deleted_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM asset_folders rel WHERE rel.asset_id = a.id)
+        )::BIGINT AS uncategorized_asset_count,
         COALESCE(SUM(
             CASE
                 WHEN deleted_at IS NULL AND (metadata->>'sizeBytes') ~ '^[0-9]+$' THEN (metadata->>'sizeBytes')::BIGINT
@@ -37,7 +46,15 @@ asset_stats AS (
                 ELSE 0
             END
         ), 0)::BIGINT AS total_size_bytes
-    FROM assets
+    FROM assets a
+    GROUP BY a.library_id
+),
+favorite_stats AS (
+    SELECT
+        library_id,
+        COUNT(*)::BIGINT AS favorite_asset_count
+    FROM asset_favorites
+    WHERE user_id = $1
     GROUP BY library_id
 ),
 folder_stats AS (
@@ -87,6 +104,10 @@ SELECT
     COALESCE(lms.library_manager_avatar_keys, ARRAY[]::TEXT[]) AS library_manager_avatar_keys,
     COALESCE(ms.member_names, ARRAY[]::TEXT[]) AS member_names,
     COALESCE(ast.asset_count, 0) AS asset_count,
+    COALESCE(ast.trash_asset_count, 0) AS trash_asset_count,
+    COALESCE(ast.untagged_asset_count, 0) AS untagged_asset_count,
+    COALESCE(ast.uncategorized_asset_count, 0) AS uncategorized_asset_count,
+    COALESCE(favs.favorite_asset_count, 0) AS favorite_asset_count,
     COALESCE(fs.folder_count, 0) AS folder_count,
     COALESCE(ts.tag_count, 0) AS tag_count,
     COALESCE(ast.total_size_bytes, 0) AS total_size_bytes,
@@ -121,6 +142,7 @@ pub async fn list_libraries_for_server_manager(
         LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN favorite_stats favs ON favs.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
         LEFT JOIN storage_stats ss ON ss.library_id = l.id
@@ -151,6 +173,7 @@ pub async fn list_libraries_for_member(
         LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN favorite_stats favs ON favs.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
         LEFT JOIN storage_stats ss ON ss.library_id = l.id
@@ -181,6 +204,7 @@ pub async fn list_libraries_for_library_manager(
         LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN favorite_stats favs ON favs.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
         LEFT JOIN storage_stats ss ON ss.library_id = l.id

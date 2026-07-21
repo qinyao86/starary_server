@@ -45,6 +45,10 @@ pub(super) async fn create_indexes(tx: &mut MigrationTx<'_>) -> anyhow::Result<(
 
     tx.execute("CREATE INDEX IF NOT EXISTS idx_assets_library_id ON assets(library_id);")
         .await?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS idx_assets_library_deleted_at ON assets(library_id, deleted_at);",
+    )
+    .await?;
     tx.execute("CREATE INDEX IF NOT EXISTS idx_assets_storage_root_id ON assets(storage_root_id);")
         .await?;
     tx.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_storage_connections_name ON storage_connections(lower(name));")
@@ -91,6 +95,10 @@ pub(super) async fn create_indexes(tx: &mut MigrationTx<'_>) -> anyhow::Result<(
         .await?;
     tx.execute(
         "CREATE INDEX IF NOT EXISTS idx_asset_tags_tag_asset ON asset_tags(tag_id, asset_id);",
+    )
+    .await?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS idx_asset_favorites_user_library ON asset_favorites(user_id, library_id);",
     )
     .await?;
     tx.execute(

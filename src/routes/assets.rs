@@ -32,6 +32,7 @@ use uuid::Uuid;
 mod duplicates;
 mod file_metadata;
 mod mutations;
+mod query;
 mod sequence;
 mod text;
 
@@ -41,6 +42,7 @@ pub use mutations::{
     update_asset, update_asset_derived_files, update_assets_rating, update_assets_starred,
     update_assets_viewer,
 };
+pub use query::{query_asset_ids, query_assets};
 pub use sequence::update_image_sequence_frame_numbers;
 pub use text::{read_asset_text, update_asset_text};
 

@@ -167,6 +167,14 @@ pub fn router(state: AppState) -> Router {
                 .delete(assets::delete_assets_permanently),
         )
         .route(
+            "/api/v1/libraries/:library_id/assets/query",
+            post(assets::query_assets),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/query/ids",
+            post(assets::query_asset_ids),
+        )
+        .route(
             "/api/v1/libraries/:library_id/transfer/asset",
             post(library_transfer::transfer_asset),
         )
