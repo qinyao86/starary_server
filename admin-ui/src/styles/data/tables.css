@@ -206,6 +206,23 @@
   text-overflow: ellipsis;
 }
 
+.permission-matrix .permission-category-row th {
+  width: auto;
+  padding: 9px 12px;
+  color: #526071;
+  background: #f5f7fa;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.permission-plan-note {
+  padding: 0 0 12px;
+  color: #687587;
+  font-size: 13px;
+  line-height: 20px;
+}
+
 .check-cell {
   display: inline-flex;
   align-items: center;
@@ -237,4 +254,13 @@
   border-color: #2f2f33;
   color: #d4d4d8;
   background: #18181b;
+}
+
+.theme-dark .permission-matrix .permission-category-row th {
+  color: #c7c7cc;
+  background: #202024;
+}
+
+.theme-dark .permission-plan-note {
+  color: #a1a1aa;
 }

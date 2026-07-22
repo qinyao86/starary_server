@@ -14,6 +14,7 @@ export function PermissionsPage({ t }: TranslatorContext) {
     { key: "editor", label: "libraryEditorRole" },
     { key: "viewer", label: "libraryViewerRole" }
   ] as const;
+  let currentCategory = "";
 
   return (
     <PageFrame title={t("permissions")} description={t("permissionsPageHint")}>
@@ -43,6 +44,7 @@ export function PermissionsPage({ t }: TranslatorContext) {
       </Panel>
 
       <Panel title={t("clientPermissions")} icon={AppWindowMac} className="span-12">
+        <div className="permission-plan-note">{t("clientPermissionsPlanNote")}</div>
         <table className="matrix permission-matrix">
           <thead>
             <tr>
@@ -53,14 +55,25 @@ export function PermissionsPage({ t }: TranslatorContext) {
             </tr>
           </thead>
           <tbody>
-            {libraryPermissions.map((row) => (
-              <tr key={row.action}>
-                <td>{t(row.action)}</td>
-                <td><CheckCell checked={row.manager} /></td>
-                <td><CheckCell checked={row.editor} /></td>
-                <td><CheckCell checked={row.viewer} /></td>
-              </tr>
-            ))}
+            {libraryPermissions.flatMap((row) => {
+              const categoryChanged = row.category !== currentCategory;
+              currentCategory = row.category;
+              return [
+                ...(categoryChanged
+                  ? [
+                      <tr className="permission-category-row" key={row.category}>
+                        <th colSpan={4}>{t(row.category)}</th>
+                      </tr>
+                    ]
+                  : []),
+                <tr key={row.action}>
+                  <td>{t(row.action)}</td>
+                  <td><CheckCell checked={row.manager} /></td>
+                  <td><CheckCell checked={row.editor} /></td>
+                  <td><CheckCell checked={row.viewer} /></td>
+                </tr>
+              ];
+            })}
           </tbody>
         </table>
       </Panel>

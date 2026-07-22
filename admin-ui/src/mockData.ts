@@ -71,13 +71,35 @@ export const serverPermissions = [
 ] as const;
 
 export const libraryPermissions = [
-  { action: "manageLibrary", manager: true, editor: false, viewer: false },
-  { action: "importAssets", manager: true, editor: true, viewer: false },
-  { action: "editOwnAssets", manager: true, editor: true, viewer: false },
-  { action: "editAllAssets", manager: true, editor: false, viewer: false },
-  { action: "deleteAssets", manager: true, editor: false, viewer: false },
-  { action: "manageTags", manager: true, editor: false, viewer: false },
-  { action: "downloadAssets", manager: true, editor: true, viewer: true }
+  { category: "permissionCategoryAccess", action: "viewLibrary", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryAccess", action: "previewAssets", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryAccess", action: "downloadAssets", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryPersonal", action: "favoriteAssets", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryPersonal", action: "managePersonalQuickAccess", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryPersonal", action: "managePersonalPresets", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryAssets", action: "importAssets", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryAssets", action: "editOwnAssets", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryAssets", action: "editAllAssets", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryAssets", action: "organizeAssets", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryAssets", action: "manageAssetThumbnails", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryAssets", action: "manageImageSequences", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryAssets", action: "moveAssetsToTrash", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryAssets", action: "restoreAssets", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryAssets", action: "deleteAssetsPermanently", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryAssets", action: "mergeDuplicateAssets", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryStructure", action: "createEditFolders", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryStructure", action: "deleteFolders", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryStructure", action: "manageTags", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryStructure", action: "manageSharedPresets", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryTransfer", action: "copyAssetsAcrossLibraries", manager: true, editor: true, viewer: false },
+  { category: "permissionCategoryTransfer", action: "exportAssets", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryManagement", action: "viewMembers", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryManagement", action: "viewLibraryActivity", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryManagement", action: "manageMembers", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryManagement", action: "manageLibraryDetails", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryManagement", action: "manageLibraryIcon", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryManagement", action: "manageLibraryStorage", manager: true, editor: false, viewer: false },
+  { category: "permissionCategoryManagement", action: "deleteLibrary", manager: true, editor: false, viewer: false }
 ] as const;
 
 export const assetBreakdown = [
