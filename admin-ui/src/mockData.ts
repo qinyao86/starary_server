@@ -76,7 +76,7 @@ export const libraryPermissions = [
   { category: "permissionCategoryAccess", action: "downloadAssets", manager: true, editor: true, viewer: true },
   { category: "permissionCategoryPersonal", action: "favoriteAssets", manager: true, editor: true, viewer: true },
   { category: "permissionCategoryPersonal", action: "managePersonalQuickAccess", manager: true, editor: true, viewer: true },
-  { category: "permissionCategoryPersonal", action: "managePersonalPresets", manager: true, editor: true, viewer: true },
+  { category: "permissionCategoryPersonal", action: "managePersonalFilterPresets", manager: true, editor: true, viewer: true },
   { category: "permissionCategoryAssets", action: "importAssets", manager: true, editor: true, viewer: false },
   { category: "permissionCategoryAssets", action: "editOwnAssets", manager: true, editor: true, viewer: false },
   { category: "permissionCategoryAssets", action: "editAllAssets", manager: true, editor: false, viewer: false },

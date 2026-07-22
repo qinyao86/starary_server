@@ -7,7 +7,7 @@ use crate::{
     ids::generate_id,
     models::PresetRecord,
     routes::{
-        access::{ensure_library_access, ensure_library_write_access},
+        access::{ensure_library_access, ensure_library_manager},
         presets::{
             queries::{
                 next_preset_sort_order, normalize_preset_type, normalize_required_name,
@@ -82,7 +82,7 @@ pub async fn create_preset(
     Path((library_id, preset_type)): Path<(String, String)>,
     Json(request): Json<CreatePresetRequest>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     let name = normalize_required_name(&request.name)?;
     let preset_id = new_preset_id();
@@ -129,7 +129,7 @@ pub async fn update_preset(
     Path((library_id, preset_type, preset_id)): Path<(String, String, String)>,
     Json(request): Json<UpdatePresetRequest>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     let (current_name, current_value) =
         query_preset_edit_state(&state, &library_id, &preset_type, &preset_id).await?;
@@ -187,7 +187,7 @@ pub async fn delete_preset(
     user: AuthUser,
     Path((library_id, preset_type, preset_id)): Path<(String, String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     let preset_name = query_preset_name(&state, &library_id, &preset_type, &preset_id).await?;
 
@@ -228,7 +228,7 @@ pub async fn clear_presets(
     user: AuthUser,
     Path((library_id, preset_type)): Path<(String, String)>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
 
     sqlx::query(
@@ -263,7 +263,7 @@ pub async fn reorder_presets(
     Path((library_id, preset_type)): Path<(String, String)>,
     Json(request): Json<ReorderPresetsRequest>,
 ) -> AppResult<Json<Vec<PresetRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     let preset_ids = unique_ids(&request.preset_ids);
     if preset_ids.is_empty() {
@@ -355,7 +355,7 @@ pub async fn update_preset_count(
     Path((library_id, preset_type, preset_id)): Path<(String, String, String)>,
     Json(request): Json<UpdatePresetCountRequest>,
 ) -> AppResult<Json<PresetRecord>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
     let preset_type = normalize_preset_type(&preset_type)?;
     if preset_type != SMART_FOLDER_PRESET_TYPE {
         return Err(AppError::BadRequest(

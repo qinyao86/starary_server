@@ -207,6 +207,20 @@ pub fn router(state: AppState) -> Router {
             put(preferences::update_quick_access),
         )
         .route(
+            "/api/v1/libraries/:library_id/preferences/filter-presets",
+            get(preferences::list_filter_presets)
+                .post(preferences::create_filter_preset)
+                .delete(preferences::clear_filter_presets),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/preferences/filter-presets/reorder",
+            put(preferences::reorder_filter_presets),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/preferences/filter-presets/:preset_id",
+            patch(preferences::update_filter_preset).delete(preferences::delete_filter_preset),
+        )
+        .route(
             "/api/v1/libraries/:library_id/assets/viewer",
             patch(assets::update_assets_viewer),
         )

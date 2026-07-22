@@ -4,16 +4,12 @@ use crate::{
     state::AppState,
 };
 
-pub const FILTER_PRESET_TYPE: &str = "filter";
 pub const SMART_FOLDER_PRESET_TYPE: &str = "smart_folder";
 pub const SMART_IMPORT_PRESET_TYPE: &str = "smart_import";
 
 pub fn normalize_preset_type(value: &str) -> AppResult<String> {
     let preset_type = value.trim();
-    if preset_type == FILTER_PRESET_TYPE
-        || preset_type == SMART_FOLDER_PRESET_TYPE
-        || preset_type == SMART_IMPORT_PRESET_TYPE
-    {
+    if preset_type == SMART_FOLDER_PRESET_TYPE || preset_type == SMART_IMPORT_PRESET_TYPE {
         return Ok(preset_type.to_string());
     }
 
@@ -136,4 +132,22 @@ pub fn unique_ids(ids: &[String]) -> Vec<String> {
         }
     }
     unique
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_preset_type;
+
+    #[test]
+    fn shared_presets_reject_personal_filter_type() {
+        assert!(normalize_preset_type("filter").is_err());
+        assert_eq!(
+            normalize_preset_type("smart_folder").unwrap(),
+            "smart_folder"
+        );
+        assert_eq!(
+            normalize_preset_type("smart_import").unwrap(),
+            "smart_import"
+        );
+    }
 }
