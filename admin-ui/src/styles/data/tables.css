@@ -206,6 +206,88 @@
   text-overflow: ellipsis;
 }
 
+.permission-client-matrix th:first-child,
+.permission-client-matrix td:first-child {
+  width: 38%;
+}
+
+.permission-client-matrix th.permission-scope-column,
+.permission-client-matrix td.permission-scope-column {
+  width: 14%;
+  text-align: left;
+}
+
+.permission-client-matrix th:not(:first-child):not(.permission-scope-column),
+.permission-client-matrix td:not(:first-child):not(.permission-scope-column) {
+  width: 16%;
+}
+
+.permission-action-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.permission-action-cell > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-verification-indicator {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b7c0cc;
+}
+
+.permission-verification-indicator.is-verified {
+  background: #2563eb;
+}
+
+.permission-scope-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid #dfe4ea;
+  border-radius: 6px;
+  color: #526071;
+  background: #f7f8fa;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.permission-scope-badge.scope-own,
+.permission-scope-badge.scope-personal {
+  border-color: #d7e2f3;
+  color: #3c5d87;
+  background: #f1f5fb;
+}
+
+.permission-row-unverified td {
+  color: #8994a3;
+  background: #fafbfc;
+}
+
+.permission-row-unverified .permission-scope-badge {
+  border-color: #e4e7eb;
+  color: #8c96a3;
+  background: #f5f6f7;
+}
+
+.permission-row-unverified .check-cell {
+  color: #b3bbc5;
+}
+
+.permission-row-unverified .check-cell.is-checked {
+  color: #8793a2;
+  background: #eef0f3;
+}
+
 .permission-matrix .permission-category-row th {
   width: auto;
   padding: 9px 12px;
@@ -263,4 +345,33 @@
 
 .theme-dark .permission-plan-note {
   color: #a1a1aa;
+}
+
+.theme-dark .permission-scope-badge {
+  border-color: #3a3a3f;
+  color: #c0c0c8;
+  background: #242428;
+}
+
+.theme-dark .permission-scope-badge.scope-own,
+.theme-dark .permission-scope-badge.scope-personal {
+  border-color: #33465f;
+  color: #b5c9e5;
+  background: #202a37;
+}
+
+.theme-dark .permission-row-unverified td {
+  color: #797980;
+  background: #19191c;
+}
+
+.theme-dark .permission-row-unverified .permission-scope-badge {
+  border-color: #303035;
+  color: #777780;
+  background: #202023;
+}
+
+.theme-dark .permission-row-unverified .check-cell.is-checked {
+  color: #73737c;
+  background: #29292d;
 }

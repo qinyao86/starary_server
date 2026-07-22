@@ -14,6 +14,12 @@ export function PermissionsPage({ t }: TranslatorContext) {
     { key: "editor", label: "libraryEditorRole" },
     { key: "viewer", label: "libraryViewerRole" }
   ] as const;
+  const scopeLabels = {
+    all: "permissionScopeAll",
+    create: "permissionScopeCreate",
+    own: "permissionScopeOwn",
+    personal: "permissionScopePersonal"
+  } as const;
   let currentCategory = "";
 
   return (
@@ -45,10 +51,11 @@ export function PermissionsPage({ t }: TranslatorContext) {
 
       <Panel title={t("clientPermissions")} icon={AppWindowMac} className="span-12">
         <div className="permission-plan-note">{t("clientPermissionsPlanNote")}</div>
-        <table className="matrix permission-matrix">
+        <table className="matrix permission-matrix permission-client-matrix">
           <thead>
             <tr>
               <th>{t("action")}</th>
+              <th className="permission-scope-column">{t("permissionScope")}</th>
               {clientRoles.map((role) => (
                 <th key={role.key}>{t(role.label)}</th>
               ))}
@@ -62,12 +69,24 @@ export function PermissionsPage({ t }: TranslatorContext) {
                 ...(categoryChanged
                   ? [
                       <tr className="permission-category-row" key={row.category}>
-                        <th colSpan={4}>{t(row.category)}</th>
+                        <th colSpan={5}>{t(row.category)}</th>
                       </tr>
                     ]
                   : []),
-                <tr key={row.action}>
-                  <td>{t(row.action)}</td>
+                <tr className={row.verified ? "" : "permission-row-unverified"} key={`${row.action}:${row.scope}`}>
+                  <td>
+                    <div className="permission-action-cell">
+                      <span
+                        aria-label={t(row.verified ? "permissionVerified" : "permissionPendingVerification")}
+                        className={`permission-verification-indicator ${row.verified ? "is-verified" : ""}`}
+                        title={t(row.verified ? "permissionVerified" : "permissionPendingVerification")}
+                      />
+                      <span>{t(row.action)}</span>
+                    </div>
+                  </td>
+                  <td className="permission-scope-column">
+                    <span className={`permission-scope-badge scope-${row.scope}`}>{t(scopeLabels[row.scope])}</span>
+                  </td>
                   <td><CheckCell checked={row.manager} /></td>
                   <td><CheckCell checked={row.editor} /></td>
                   <td><CheckCell checked={row.viewer} /></td>
