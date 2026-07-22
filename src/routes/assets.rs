@@ -38,9 +38,9 @@ mod text;
 
 pub use duplicates::merge_duplicate_assets;
 pub use mutations::{
-    delete_assets_permanently, restore_assets, set_asset_folders, set_asset_tags, trash_assets,
-    update_asset, update_asset_derived_files, update_assets_rating, update_assets_starred,
-    update_assets_viewer,
+    check_asset_mutation_access, delete_assets_permanently, restore_assets, set_asset_folders,
+    set_asset_tags, trash_assets, update_asset, update_asset_derived_files, update_assets_rating,
+    update_assets_starred, update_assets_viewer,
 };
 pub use query::{query_asset_ids, query_assets};
 pub use sequence::update_image_sequence_frame_numbers;

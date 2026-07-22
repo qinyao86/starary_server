@@ -14,6 +14,11 @@ pub enum AppError {
     Unauthorized,
     #[error("forbidden")]
     Forbidden,
+    #[error("one or more selected assets cannot be edited by this user")]
+    AssetMutationForbidden {
+        denied_count: usize,
+        total_count: usize,
+    },
     #[error("no permission to log in to the admin console")]
     ConsoleLoginForbidden,
     #[error("not found: {0}")]
@@ -41,6 +46,10 @@ struct ErrorBody {
     code: Option<&'static str>,
     #[serde(rename = "libraryId", skip_serializing_if = "Option::is_none")]
     library_id: Option<String>,
+    #[serde(rename = "deniedCount", skip_serializing_if = "Option::is_none")]
+    denied_count: Option<usize>,
+    #[serde(rename = "totalCount", skip_serializing_if = "Option::is_none")]
+    total_count: Option<usize>,
 }
 
 impl IntoResponse for AppError {
@@ -49,6 +58,7 @@ impl IntoResponse for AppError {
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::Forbidden => StatusCode::FORBIDDEN,
+            AppError::AssetMutationForbidden { .. } => StatusCode::FORBIDDEN,
             AppError::ConsoleLoginForbidden => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
@@ -64,16 +74,26 @@ impl IntoResponse for AppError {
             AppError::LibraryDisabled(_) => Some("library_disabled"),
             AppError::StorageLocationConflict(_) => Some("storage_location_conflict"),
             AppError::ConsoleLoginForbidden => Some("console_login_forbidden"),
+            AppError::AssetMutationForbidden { .. } => Some("asset_mutation_forbidden"),
             _ => None,
         };
         let library_id = match &self {
             AppError::LibraryDisabled(library_id) => Some(library_id.clone()),
             _ => None,
         };
+        let (denied_count, total_count) = match &self {
+            AppError::AssetMutationForbidden {
+                denied_count,
+                total_count,
+            } => (Some(*denied_count), Some(*total_count)),
+            _ => (None, None),
+        };
         let body = Json(ErrorBody {
             error: self.to_string(),
             code,
             library_id,
+            denied_count,
+            total_count,
         });
 
         (status, body).into_response()

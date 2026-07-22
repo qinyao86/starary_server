@@ -5,7 +5,7 @@ use super::{
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    routes::access::{ensure_library_access, ensure_library_write_access},
+    routes::access::{ensure_library_access, ensure_library_asset_mutation_access},
     state::AppState,
 };
 use axum::{
@@ -77,6 +77,22 @@ pub struct AssetIdsRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CheckAssetMutationAccessRequest {
+    #[serde(default)]
+    pub asset_ids: Vec<String>,
+    #[serde(default)]
+    pub folder_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckAssetMutationAccessResponse {
+    pub allowed: bool,
+    pub total_count: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateAssetDerivedFilesRequest {
     #[serde(default)]
     pub derived_files: Vec<super::ImportAssetDerivedFileRequest>,
@@ -99,13 +115,69 @@ struct RenamePlan {
     relative_path: String,
 }
 
+pub async fn check_asset_mutation_access(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+    Json(request): Json<CheckAssetMutationAccessRequest>,
+) -> AppResult<Json<CheckAssetMutationAccessResponse>> {
+    ensure_library_access(&state, &user, &library_id).await?;
+    let mut asset_ids = normalize_ids_unbounded(request.asset_ids);
+    let folder_ids = normalize_ids_unbounded(request.folder_ids);
+    if !folder_ids.is_empty() {
+        let folder_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM folders WHERE library_id = $1 AND id = ANY($2)",
+        )
+        .bind(&library_id)
+        .bind(&folder_ids)
+        .fetch_one(&state.pool)
+        .await?;
+        if folder_count != folder_ids.len() as i64 {
+            return Err(AppError::BadRequest(
+                "one or more folders were not found".to_string(),
+            ));
+        }
+
+        let folder_asset_ids: Vec<String> = sqlx::query_scalar(
+            r#"
+            WITH RECURSIVE folder_branch AS (
+                SELECT id
+                FROM folders
+                WHERE library_id = $1 AND id = ANY($2)
+                UNION
+                SELECT child.id
+                FROM folders child
+                INNER JOIN folder_branch parent ON child.parent_id = parent.id
+                WHERE child.library_id = $1
+            )
+            SELECT DISTINCT relation.asset_id
+            FROM asset_folders relation
+            INNER JOIN folder_branch folder ON folder.id = relation.folder_id
+            INNER JOIN assets asset ON asset.id = relation.asset_id
+            WHERE asset.library_id = $1 AND asset.deleted_at IS NULL
+            "#,
+        )
+        .bind(&library_id)
+        .bind(&folder_ids)
+        .fetch_all(&state.pool)
+        .await?;
+        asset_ids.extend(folder_asset_ids);
+        asset_ids = normalize_ids_unbounded(asset_ids);
+    }
+
+    ensure_library_asset_mutation_access(&state, &user, &library_id, &asset_ids).await?;
+    Ok(Json(CheckAssetMutationAccessResponse {
+        allowed: true,
+        total_count: asset_ids.len(),
+    }))
+}
+
 pub async fn update_asset(
     State(state): State<AppState>,
     user: AuthUser,
     Path((library_id, asset_id)): Path<(String, String)>,
     Json(request): Json<UpdateAssetRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
     if let Some(Some(rating)) = request.rating {
         validate_rating(rating)?;
     }
@@ -122,6 +194,13 @@ pub async fn update_asset(
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("asset not found".to_string()))?;
+    ensure_library_asset_mutation_access(
+        &state,
+        &user,
+        &library_id,
+        std::slice::from_ref(&asset_id),
+    )
+    .await?;
 
     let current_name: String = current.try_get("name")?;
     let asset_kind: String = current.try_get("asset_kind")?;
@@ -257,7 +336,6 @@ pub async fn update_asset_derived_files(
     Path((library_id, asset_id)): Path<(String, String)>,
     Json(request): Json<UpdateAssetDerivedFilesRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
     let metadata_patch = validate_derived_metadata_patch(request.metadata_patch, &asset_id)?;
     let storage_root_id: Option<Uuid> = sqlx::query_scalar(
         "SELECT storage_root_id FROM assets WHERE library_id = $1 AND id = $2 AND deleted_at IS NULL",
@@ -270,6 +348,13 @@ pub async fn update_asset_derived_files(
     let storage_root_id = storage_root_id.ok_or_else(|| {
         AppError::BadRequest("asset does not have an enabled workspace".to_string())
     })?;
+    ensure_library_asset_mutation_access(
+        &state,
+        &user,
+        &library_id,
+        std::slice::from_ref(&asset_id),
+    )
+    .await?;
     if !request.derived_files.is_empty() {
         super::write_asset_derived_files(&state, storage_root_id, &request.derived_files).await?;
     }
@@ -399,8 +484,8 @@ pub async fn set_asset_folders(
     Path(library_id): Path<String>,
     Json(request): Json<SetAssetFoldersRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
     let asset_ids = normalize_ids(request.asset_ids, "assets")?;
+    ensure_library_asset_mutation_access(&state, &user, &library_id, &asset_ids).await?;
     let folder_ids = normalize_ids_unbounded(request.folder_ids);
     let mut tx = state.pool.begin().await?;
     ensure_assets_in_library(&mut tx, &library_id, &asset_ids, false).await?;
@@ -485,8 +570,8 @@ pub async fn set_asset_tags(
     Path(library_id): Path<String>,
     Json(request): Json<SetAssetTagsRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
     let asset_ids = normalize_ids(request.asset_ids, "assets")?;
+    ensure_library_asset_mutation_access(&state, &user, &library_id, &asset_ids).await?;
     let tag_ids = normalize_ids_unbounded(request.tag_ids);
     let mut tx = state.pool.begin().await?;
     ensure_assets_in_library(&mut tx, &library_id, &asset_ids, false).await?;
@@ -559,7 +644,6 @@ pub async fn delete_assets_permanently(
     Path(library_id): Path<String>,
     Json(request): Json<AssetIdsRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
     let asset_ids = normalize_ids(request.asset_ids, "assets")?;
     let file_rows = sqlx::query(
         "SELECT storage_root_id, relative_path, metadata FROM assets WHERE library_id = $1 AND id = ANY($2) AND deleted_at IS NOT NULL",
@@ -573,6 +657,7 @@ pub async fn delete_assets_permanently(
             "only assets in the trash can be permanently deleted".to_string(),
         ));
     }
+    ensure_library_asset_mutation_access(&state, &user, &library_id, &asset_ids).await?;
 
     let mut files = Vec::new();
     for row in file_rows {
@@ -639,8 +724,8 @@ async fn mutate_metadata_field(
     value: Value,
     activity: &str,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(state, user, library_id).await?;
     let asset_ids = normalize_ids(asset_ids, "assets")?;
+    ensure_library_asset_mutation_access(state, user, library_id, &asset_ids).await?;
     let mut tx = state.pool.begin().await?;
     ensure_assets_in_library(&mut tx, library_id, &asset_ids, false).await?;
     sqlx::query(
@@ -667,8 +752,8 @@ async fn change_deleted_state(
     asset_ids: Vec<String>,
     deleted: bool,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(state, user, library_id).await?;
     let asset_ids = normalize_ids(asset_ids, "assets")?;
+    ensure_library_asset_mutation_access(state, user, library_id, &asset_ids).await?;
     let mut tx = state.pool.begin().await?;
     ensure_assets_in_library(&mut tx, library_id, &asset_ids, !deleted).await?;
     let action = if deleted {

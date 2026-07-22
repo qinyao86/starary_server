@@ -88,6 +88,53 @@ pub async fn ensure_library_asset_import_access(
     }
 }
 
+pub async fn ensure_library_asset_mutation_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+    asset_ids: &[String],
+) -> AppResult<Role> {
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_manage_all_assets() || asset_ids.is_empty() {
+        return Ok(role);
+    }
+
+    if !role.can_manage_own_assets() {
+        return Err(AppError::AssetMutationForbidden {
+            denied_count: asset_ids.len(),
+            total_count: asset_ids.len(),
+        });
+    }
+
+    let (found_count, owned_count): (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT COUNT(*), COUNT(*) FILTER (WHERE created_by_user_id = $3)
+        FROM assets
+        WHERE library_id = $1
+          AND id = ANY($2)
+        "#,
+    )
+    .bind(library_id)
+    .bind(asset_ids)
+    .bind(user.id)
+    .fetch_one(&state.pool)
+    .await?;
+    if found_count != asset_ids.len() as i64 {
+        return Err(AppError::BadRequest(
+            "one or more assets were not found".to_string(),
+        ));
+    }
+    let denied_count = asset_ids.len().saturating_sub(owned_count as usize);
+    if denied_count > 0 {
+        return Err(AppError::AssetMutationForbidden {
+            denied_count,
+            total_count: asset_ids.len(),
+        });
+    }
+
+    Ok(role)
+}
+
 pub async fn ensure_library_write_access(
     state: &AppState,
     user: &AuthUser,

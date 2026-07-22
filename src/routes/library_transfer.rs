@@ -3,7 +3,10 @@ use crate::{
     error::{AppError, AppResult},
     ids::generate_id,
     routes::{
-        access::{ensure_library_access, ensure_library_write_access},
+        access::{
+            ensure_library_access, ensure_library_asset_import_access,
+            ensure_library_asset_mutation_access,
+        },
         assets::{
             build_asset_file_url, build_asset_responses, join_safe_relative_path,
             query_assets_by_ids, storage_root_write_base_path, AssetResponse,
@@ -161,6 +164,13 @@ pub async fn transfer_asset(
     }
 
     let source = query_source_asset(&state, &request.source_library_id, &request.asset_id).await?;
+    ensure_library_asset_mutation_access(
+        &state,
+        &user,
+        &request.source_library_id,
+        std::slice::from_ref(&request.asset_id),
+    )
+    .await?;
     let target_root_id = require_target_storage_root(&state, &target_library_id).await?;
     let prepared = prepare_asset_copy(&state, source, target_root_id).await?;
     let copied_paths = prepared.copied_paths.clone();
@@ -255,6 +265,13 @@ pub async fn transfer_folder(
         .map(|folder| folder.id.clone())
         .collect::<Vec<_>>();
     let source_asset_ids = query_folder_asset_ids(&state, &source_folder_ids).await?;
+    ensure_library_asset_mutation_access(
+        &state,
+        &user,
+        &request.source_library_id,
+        &source_asset_ids,
+    )
+    .await?;
     let source_assets =
         query_source_assets(&state, &request.source_library_id, &source_asset_ids).await?;
     let source_links = query_folder_asset_links(&state, &source_folder_ids).await?;
@@ -525,7 +542,7 @@ async fn ensure_transfer_access(
         ));
     }
     ensure_library_access(state, user, source_library_id).await?;
-    ensure_library_write_access(state, user, target_library_id).await?;
+    ensure_library_asset_import_access(state, user, target_library_id).await?;
     Ok(())
 }
 

@@ -175,6 +175,10 @@ pub fn router(state: AppState) -> Router {
             post(assets::query_asset_ids),
         )
         .route(
+            "/api/v1/libraries/:library_id/assets/mutation-access/check",
+            post(assets::check_asset_mutation_access),
+        )
+        .route(
             "/api/v1/libraries/:library_id/transfer/asset",
             post(library_transfer::transfer_asset),
         )

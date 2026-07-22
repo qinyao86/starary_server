@@ -2,7 +2,7 @@ use super::{build_asset_responses, query_assets_by_ids, AssetResponse};
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    routes::access::ensure_library_write_access,
+    routes::access::ensure_library_manager,
     state::AppState,
 };
 use axum::{
@@ -63,7 +63,7 @@ pub async fn merge_duplicate_assets(
     Path(library_id): Path<String>,
     Json(request): Json<MergeDuplicateAssetsRequest>,
 ) -> AppResult<Json<MergeDuplicateAssetsResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_manager(&state, &user, &library_id).await?;
     if request.decisions.is_empty() {
         return Err(AppError::BadRequest(
             "at least one merge decision is required".to_string(),

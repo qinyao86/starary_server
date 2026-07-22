@@ -7,7 +7,7 @@ use super::{
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    routes::access::{ensure_library_access, ensure_library_write_access},
+    routes::access::{ensure_library_access, ensure_library_asset_mutation_access},
     state::AppState,
 };
 use axum::{
@@ -56,7 +56,6 @@ pub async fn update_asset_text(
     Path((library_id, asset_id)): Path<(String, String)>,
     Json(request): Json<UpdateAssetTextRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
     if request.text.len() as u64 > TEXT_VIEWER_MAX_BYTES {
         return Err(AppError::BadRequest(
             "text file is too large to edit in the app".to_string(),
@@ -64,6 +63,13 @@ pub async fn update_asset_text(
     }
 
     let path = resolve_text_asset_path(&state, &library_id, &asset_id).await?;
+    ensure_library_asset_mutation_access(
+        &state,
+        &user,
+        &library_id,
+        std::slice::from_ref(&asset_id),
+    )
+    .await?;
     let previous_bytes = read_text_asset_bytes(&path)?;
     write_text_file_atomic(&path, request.text.as_bytes())?;
 

@@ -49,6 +49,17 @@ impl Role {
             Role::Owner | Role::Admin | Role::LibraryManager | Role::Editor
         )
     }
+
+    pub fn can_manage_all_assets(self) -> bool {
+        matches!(self, Role::Owner | Role::Admin | Role::LibraryManager)
+    }
+
+    pub fn can_manage_own_assets(self) -> bool {
+        matches!(
+            self,
+            Role::Owner | Role::Admin | Role::LibraryManager | Role::Editor
+        )
+    }
 }
 
 impl fmt::Display for Role {
@@ -83,6 +94,18 @@ mod role_tests {
         assert!(Role::LibraryManager.can_import_assets());
         assert!(Role::Editor.can_import_assets());
         assert!(!Role::Viewer.can_import_assets());
+    }
+
+    #[test]
+    fn asset_mutations_are_scoped_by_role() {
+        assert!(Role::Owner.can_manage_all_assets());
+        assert!(Role::Admin.can_manage_all_assets());
+        assert!(Role::LibraryManager.can_manage_all_assets());
+        assert!(!Role::Editor.can_manage_all_assets());
+        assert!(!Role::Viewer.can_manage_all_assets());
+
+        assert!(Role::Editor.can_manage_own_assets());
+        assert!(!Role::Viewer.can_manage_own_assets());
     }
 }
 

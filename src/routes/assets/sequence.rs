@@ -7,7 +7,7 @@ use super::{
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    routes::access::ensure_library_write_access,
+    routes::access::ensure_library_asset_mutation_access,
     state::AppState,
 };
 use axum::{
@@ -51,7 +51,6 @@ pub async fn update_image_sequence_frame_numbers(
     Path((library_id, asset_id)): Path<(String, String)>,
     Json(request): Json<UpdateImageSequenceFrameNumbersRequest>,
 ) -> AppResult<Json<AssetMutationResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
     validate_request(&request)?;
 
     let row = sqlx::query(
@@ -62,6 +61,13 @@ pub async fn update_image_sequence_frame_numbers(
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("asset not found".to_string()))?;
+    ensure_library_asset_mutation_access(
+        &state,
+        &user,
+        &library_id,
+        std::slice::from_ref(&asset_id),
+    )
+    .await?;
     let storage_root_id: Option<Uuid> = row.try_get("storage_root_id")?;
     let mut metadata: Value = row.try_get("metadata")?;
     let storage_root_id = storage_root_id.ok_or_else(|| {
