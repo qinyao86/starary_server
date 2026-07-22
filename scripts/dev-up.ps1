@@ -5,6 +5,7 @@ $envPath = Join-Path $serverDir ".env"
 $devEnvPath = Join-Path $serverDir ".env.dev.example"
 $composePath = Join-Path $serverDir "docker-compose.dev.yml"
 $storageDir = Join-Path $serverDir ".dev\storage"
+$adminUiOutDir = Join-Path $serverDir "target\build-dev\frontend\admin-ui"
 
 if (-not (Test-Path $envPath)) {
   Copy-Item -LiteralPath $devEnvPath -Destination $envPath
@@ -43,8 +44,10 @@ if (-not $ready) {
 
 Push-Location (Join-Path $serverDir "admin-ui")
 try {
+  $env:MADLIBRARY_ADMIN_UI_OUT_DIR = $adminUiOutDir
   npm run build
 } finally {
+  Remove-Item Env:MADLIBRARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
   Pop-Location
 }
 
@@ -53,7 +56,9 @@ Write-Host "Open http://127.0.0.1:3789/admin after the server starts."
 
 Push-Location $serverDir
 try {
+  $env:MADLIBRARY_ADMIN_ASSETS_DIR = $adminUiOutDir
   cargo run --manifest-path .\Cargo.toml
 } finally {
+  Remove-Item Env:MADLIBRARY_ADMIN_ASSETS_DIR -ErrorAction SilentlyContinue
   Pop-Location
 }

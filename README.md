@@ -134,8 +134,12 @@ third-party files.
 
 - `.env` is read from the application root.
 - Relative paths in `.env`, such as `.dev/storage`, resolve from the application root.
-- `MADLIBRARY_ADMIN_ASSETS_DIR` defaults to `admin-ui/dist`.
-- `scripts/dev-up.ps1` builds `admin-ui` before starting the Rust server.
+- Admin UI builds are written under `target/build/` or `target/build-dev/`;
+  source directories must not contain generated `dist/` output.
+- `scripts/dev-up.ps1` builds the admin UI into
+  `target/build-dev/frontend/admin-ui/` and points the Rust server there.
+- Packaged runtimes copy the built UI into an `admin-ui/` deployment directory
+  next to the server executable. This runtime directory is not a build output.
 - Startup migrations are intentionally idempotent. Existing installed PostgreSQL databases are upgraded in place when columns are added.
 - An explicit `MADLIBRARY_DATABASE_URL` disables bundled PostgreSQL and keeps
   external-database development and deployment available.

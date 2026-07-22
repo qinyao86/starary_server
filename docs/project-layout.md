@@ -19,11 +19,13 @@ madlibrary-server/
 
 ```text
 vendor/postgresql/archives/     Original third-party PostgreSQL ZIP
-target/                         Disposable compiler and package caches
-  |- core/                      Server core build output for desktop packaging
-  `- desktop/                   Tauri desktop build output
+target/                         All generated build and release output
+  |- build/frontend/            Production frontend builds
+  |- build/desktop/             Production backend and desktop builds
+  |- build-dev/frontend/        Development frontend builds
+  |- build-dev/desktop/         Development backend and desktop builds
+  `- release/windows-x64/       Final distributable artifacts
 admin-ui/node_modules/          Installed frontend development dependencies
-target/build/frontend/admin-ui/   Vite production build output
 .dev/                           Local development data and storage
 target/release/windows-x64/      Final distributable artifacts only
   |- Mad-Library-Server_0.1.0_windows-x64-setup.exe

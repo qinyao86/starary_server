@@ -73,7 +73,7 @@ impl ServerConfig {
                 self.admin_assets_dir = Some(app_home.join(admin_assets_dir));
             }
         } else {
-            self.admin_assets_dir = Some(app_home.join("admin-ui").join("dist"));
+            self.admin_assets_dir = Some(app_home.join("admin-ui"));
         }
         self
     }
