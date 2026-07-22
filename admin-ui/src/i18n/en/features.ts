@@ -10,7 +10,7 @@ export const enFeatures = {
     libraryViewerRole: "Viewer",
     libraryManagerConsoleNote: "A standard server user can log in to the admin console after being assigned as a library manager for at least one library, but they can only manage those assigned libraries and do not receive server-level access to users, storage, backups, or settings.",
     clientPermissionsPlanNote: "This is the read-only baseline for client permissions. Standard rows are verified; muted rows are pending verification.",
-    permissionActionTarget: "Action and target",
+    permissionActionWithTarget: "{action} ({target})",
     permissionScopeOwn: "Own",
     permissionScopeAll: "All",
     permissionScopeCreate: "Create",

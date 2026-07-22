@@ -206,16 +206,6 @@
   text-overflow: ellipsis;
 }
 
-.permission-client-matrix th:first-child,
-.permission-client-matrix td:first-child {
-  width: 52%;
-}
-
-.permission-client-matrix th:not(:first-child),
-.permission-client-matrix td:not(:first-child) {
-  width: 16%;
-}
-
 .permission-action-cell {
   display: flex;
   align-items: center;
@@ -223,25 +213,11 @@
   min-width: 0;
 }
 
-.permission-action-copy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 0;
-}
-
-.permission-action-copy > span:first-child {
+.permission-action-cell > span:last-child {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.permission-action-target {
-  color: #687587;
-  font-size: 11px;
-  line-height: 16px;
 }
 
 .permission-verification-indicator {
@@ -259,10 +235,6 @@
 .permission-row-unverified td {
   color: #8994a3;
   background: #fafbfc;
-}
-
-.permission-row-unverified .permission-action-target {
-  color: #9ba4af;
 }
 
 .permission-row-unverified .check-cell {
@@ -336,14 +308,6 @@
 .theme-dark .permission-row-unverified td {
   color: #797980;
   background: #19191c;
-}
-
-.theme-dark .permission-action-target {
-  color: #a1a1aa;
-}
-
-.theme-dark .permission-row-unverified .permission-action-target {
-  color: #707078;
 }
 
 .theme-dark .permission-row-unverified .check-cell.is-checked {

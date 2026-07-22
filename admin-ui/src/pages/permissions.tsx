@@ -48,7 +48,7 @@ export function PermissionsPage({ t }: TranslatorContext) {
         <table className="matrix permission-matrix permission-client-matrix">
           <thead>
             <tr>
-              <th>{t("permissionActionTarget")}</th>
+              <th>{t("action")}</th>
               {clientRoles.map((role) => (
                 <th key={role.key}>{t(role.label)}</th>
               ))}
@@ -74,9 +74,12 @@ export function PermissionsPage({ t }: TranslatorContext) {
                         className={`permission-verification-indicator ${row.verified ? "is-verified" : ""}`}
                         title={t(row.verified ? "permissionVerified" : "permissionPendingVerification")}
                       />
-                      <span className="permission-action-copy">
-                        <span>{t(row.action)}</span>
-                        {"target" in row && <span className="permission-action-target">{t(row.target)}</span>}
+                      <span>
+                        {"target" in row
+                          ? t("permissionActionWithTarget")
+                              .replace("{action}", t(row.action))
+                              .replace("{target}", t(row.target))
+                          : t(row.action)}
                       </span>
                     </div>
                   </td>
