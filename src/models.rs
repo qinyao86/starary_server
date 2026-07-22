@@ -42,6 +42,13 @@ impl Role {
     pub fn can_manage_library(self) -> bool {
         matches!(self, Role::Owner | Role::Admin | Role::LibraryManager)
     }
+
+    pub fn can_import_assets(self) -> bool {
+        matches!(
+            self,
+            Role::Owner | Role::Admin | Role::LibraryManager | Role::Editor
+        )
+    }
 }
 
 impl fmt::Display for Role {
@@ -62,6 +69,20 @@ impl FromStr for Role {
             "viewer" => Ok(Role::Viewer),
             other => Err(format!("unknown role: {other}")),
         }
+    }
+}
+
+#[cfg(test)]
+mod role_tests {
+    use super::Role;
+
+    #[test]
+    fn import_assets_requires_editor_or_higher() {
+        assert!(Role::Owner.can_import_assets());
+        assert!(Role::Admin.can_import_assets());
+        assert!(Role::LibraryManager.can_import_assets());
+        assert!(Role::Editor.can_import_assets());
+        assert!(!Role::Viewer.can_import_assets());
     }
 }
 

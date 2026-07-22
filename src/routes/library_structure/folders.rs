@@ -2,7 +2,9 @@ use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
     routes::{
-        access::{ensure_library_access, ensure_library_write_access},
+        access::{
+            ensure_library_access, ensure_library_asset_import_access, ensure_library_write_access,
+        },
         library_structure::{
             common::{
                 ensure_asset_in_library, insert_activity, new_prefixed_id, normalize_optional_text,
@@ -105,7 +107,7 @@ pub async fn create_folder_import_plan(
     Path(library_id): Path<String>,
     Json(request): Json<CreateFolderImportPlanRequest>,
 ) -> AppResult<Json<CreateFolderImportPlanResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_asset_import_access(&state, &user, &library_id).await?;
     ensure_parent_folder(&state, &library_id, request.parent_id.as_deref()).await?;
 
     if request.folders.len() > MAX_IMPORT_PLAN_FOLDERS {

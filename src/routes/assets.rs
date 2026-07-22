@@ -3,7 +3,7 @@ use crate::{
     error::{AppError, AppResult},
     ids::generate_id,
     models::{AssetRecord, FolderRecord, StorageRootKind, TagRecord},
-    routes::access::{ensure_library_access, ensure_library_write_access},
+    routes::access::{ensure_library_access, ensure_library_asset_import_access},
     state::AppState,
 };
 use axum::{
@@ -237,7 +237,7 @@ pub async fn import_assets(
     Path(library_id): Path<String>,
     Json(request): Json<ImportAssetsRequest>,
 ) -> AppResult<Json<ImportAssetsResponse>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_asset_import_access(&state, &user, &library_id).await?;
 
     if request.assets.is_empty() {
         return Err(AppError::BadRequest(

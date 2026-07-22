@@ -75,6 +75,19 @@ pub async fn ensure_library_manager(
     }
 }
 
+pub async fn ensure_library_asset_import_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+) -> AppResult<Role> {
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_import_assets() {
+        Ok(role)
+    } else {
+        Err(AppError::Forbidden)
+    }
+}
+
 pub async fn ensure_library_write_access(
     state: &AppState,
     user: &AuthUser,
