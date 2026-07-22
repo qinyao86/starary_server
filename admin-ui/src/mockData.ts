@@ -78,8 +78,6 @@ export const libraryPermissions = [
   { category: "permissionCategoryPersonal", action: "managePersonalQuickAccess", manager: true, editor: true, viewer: true },
   { category: "permissionCategoryPersonal", action: "managePersonalFilterPresets", manager: true, editor: true, viewer: true },
   { category: "permissionCategoryAssets", action: "importAssets", manager: true, editor: true, viewer: false },
-  { category: "permissionCategoryAssets", action: "editOwnAssets", manager: true, editor: true, viewer: false },
-  { category: "permissionCategoryAssets", action: "editAllAssets", manager: true, editor: false, viewer: false },
   { category: "permissionCategoryAssets", action: "organizeAssets", manager: true, editor: true, viewer: false },
   { category: "permissionCategoryAssets", action: "manageAssetThumbnails", manager: true, editor: true, viewer: false },
   { category: "permissionCategoryAssets", action: "manageImageSequences", manager: true, editor: true, viewer: false },

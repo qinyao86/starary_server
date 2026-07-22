@@ -28,8 +28,6 @@ export const zhFeatures = {
     viewLibrary: "\u6d4f\u89c8\u8d44\u6e90\u5e93",
     previewAssets: "\u9884\u89c8\u8d44\u6e90",
     importAssets: "\u5bfc\u5165\u8d44\u6e90",
-    editOwnAssets: "\u7f16\u8f91\u81ea\u5df1\u7684\u8d44\u6e90",
-    editAllAssets: "\u7f16\u8f91\u5168\u90e8\u8d44\u6e90",
     organizeAssets: "\u8c03\u6574\u8d44\u6e90\u76ee\u5f55\u548c\u6807\u7b7e",
     manageAssetThumbnails: "\u4fee\u6539\u7f29\u7565\u56fe\u548c\u9884\u89c8\u8bbe\u7f6e",
     manageImageSequences: "\u7f16\u8f91\u56fe\u7247\u5e8f\u5217",

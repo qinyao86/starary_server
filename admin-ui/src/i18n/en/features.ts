@@ -28,8 +28,6 @@ export const enFeatures = {
     viewLibrary: "Browse library",
     previewAssets: "Preview assets",
     importAssets: "Import assets",
-    editOwnAssets: "Edit own assets",
-    editAllAssets: "Edit all assets",
     organizeAssets: "Change asset folders and tags",
     manageAssetThumbnails: "Change thumbnails and preview settings",
     manageImageSequences: "Edit image sequences",
