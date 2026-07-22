@@ -11,7 +11,6 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sqlx::{Postgres, QueryBuilder};
 use uuid::Uuid;
 
@@ -19,13 +18,38 @@ use uuid::Uuid;
 #[serde(default, rename_all = "camelCase")]
 pub struct WorkspaceAssetQueryRequest {
     scope: WorkspaceAssetQueryScope,
-    smart_folder: Option<Value>,
+    smart_folder: Option<WorkspaceAssetQuerySmartFolder>,
     filters: WorkspaceAssetQueryFilters,
     search: WorkspaceAssetQuerySearch,
     sort: WorkspaceAssetQuerySort,
     known_total: Option<i64>,
     limit: Option<i64>,
     offset: Option<i64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct WorkspaceAssetQuerySmartFolder {
+    id: String,
+    rule_groups: Vec<WorkspaceAssetQuerySmartFolderRuleGroup>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct WorkspaceAssetQuerySmartFolderRuleGroup {
+    id: String,
+    match_mode: String,
+    polarity: String,
+    conditions: Vec<WorkspaceAssetQuerySmartFolderCondition>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct WorkspaceAssetQuerySmartFolderCondition {
+    id: String,
+    field: String,
+    operator: String,
+    value: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -48,6 +72,9 @@ struct WorkspaceAssetQueryDateRange {
 #[serde(default, rename_all = "camelCase")]
 struct WorkspaceAssetQueryFilters {
     color_hex: String,
+    color_threshold: f64,
+    color_coverage: f64,
+    color_mode: String,
     kinds: Vec<String>,
     excluded_kinds: Vec<String>,
     tag_ids: Vec<String>,
@@ -86,6 +113,34 @@ struct WorkspaceAssetQueryFilters {
 #[serde(default, rename_all = "camelCase")]
 struct WorkspaceAssetQuerySearch {
     keyword: String,
+    scopes: WorkspaceAssetQuerySearchScopes,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct WorkspaceAssetQuerySearchScopes {
+    name: bool,
+    tag: bool,
+    folder_name: bool,
+    folder_description: bool,
+    #[serde(alias = "format")]
+    r#type: bool,
+    note: bool,
+    url: bool,
+}
+
+impl Default for WorkspaceAssetQuerySearchScopes {
+    fn default() -> Self {
+        Self {
+            name: true,
+            tag: true,
+            folder_name: true,
+            folder_description: true,
+            r#type: true,
+            note: true,
+            url: true,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,8 +176,6 @@ pub async fn query_assets(
     Json(request): Json<WorkspaceAssetQueryRequest>,
 ) -> AppResult<Json<AssetListResponse>> {
     ensure_library_access(&state, &user, &library_id).await?;
-    ensure_supported_query(&request)?;
-
     let limit = request.limit.unwrap_or(240).clamp(1, 500);
     let offset = request.offset.unwrap_or(0).max(0);
     let total = if let Some(known_total) = request.known_total.filter(|_| offset > 0) {
@@ -148,47 +201,14 @@ pub async fn query_asset_ids(
     Json(request): Json<WorkspaceAssetQueryRequest>,
 ) -> AppResult<Json<AssetIdListResponse>> {
     ensure_library_access(&state, &user, &library_id).await?;
-    ensure_supported_query(&request)?;
-
     let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
-    push_conditions(&mut query, &library_id, user.id, &request);
-    push_order(&mut query, &request.sort);
+    push_conditions(&mut query, &library_id, user.id, &request)?;
+    push_order(&mut query, &request);
     let ids = query
         .build_query_scalar::<String>()
         .fetch_all(&state.pool)
         .await?;
     Ok(Json(AssetIdListResponse { ids }))
-}
-
-fn ensure_supported_query(request: &WorkspaceAssetQueryRequest) -> AppResult<()> {
-    if request.smart_folder.is_some() {
-        return Err(AppError::BadRequest(
-            "smart-folder queries require compatibility mode".to_string(),
-        ));
-    }
-    if !request.filters.color_hex.trim().is_empty() {
-        return Err(AppError::BadRequest(
-            "color queries require compatibility mode".to_string(),
-        ));
-    }
-    if !request.search.keyword.trim().is_empty() {
-        return Err(AppError::BadRequest(
-            "text queries require compatibility mode".to_string(),
-        ));
-    }
-    if !request.filters.kinds.is_empty() || !request.filters.excluded_kinds.is_empty() {
-        return Err(AppError::BadRequest(
-            "semantic asset-kind queries require compatibility mode".to_string(),
-        ));
-    }
-    if request.sort.random
-        || ["name", "assetKind", "extension"].contains(&request.sort.field.as_str())
-    {
-        return Err(AppError::BadRequest(
-            "locale-sensitive sorting requires compatibility mode".to_string(),
-        ));
-    }
-    Ok(())
 }
 
 async fn query_total(
@@ -198,7 +218,7 @@ async fn query_total(
     request: &WorkspaceAssetQueryRequest,
 ) -> AppResult<i64> {
     let mut query = QueryBuilder::<Postgres>::new("SELECT COUNT(*) FROM assets a WHERE ");
-    push_conditions(&mut query, library_id, user_id, request);
+    push_conditions(&mut query, library_id, user_id, request)?;
     Ok(query
         .build_query_scalar::<i64>()
         .fetch_one(&state.pool)
@@ -222,8 +242,8 @@ async fn query_page(
             a.deleted_at, a.restored_at
         FROM assets a WHERE "#,
     );
-    push_conditions(&mut query, library_id, user_id, request);
-    push_order(&mut query, &request.sort);
+    push_conditions(&mut query, library_id, user_id, request)?;
+    push_order(&mut query, request);
     query
         .push(" LIMIT ")
         .push_bind(limit)
@@ -240,7 +260,7 @@ fn push_conditions(
     library_id: &str,
     user_id: Uuid,
     request: &WorkspaceAssetQueryRequest,
-) {
+) -> AppResult<()> {
     query
         .push("a.library_id = ")
         .push_bind(library_id.to_string());
@@ -282,6 +302,7 @@ fn push_conditions(
         _ => {}
     }
 
+    push_smart_folder_conditions(query, request.smart_folder.as_ref())?;
     push_kind_filter(query, &request.filters.kinds, false);
     push_kind_filter(query, &request.filters.excluded_kinds, true);
     push_text_list_filter(
@@ -391,6 +412,9 @@ fn push_conditions(
         &request.filters.url_keyword,
     );
     push_shape_filter(query, &request.filters);
+    push_color_filter(query, &request.filters);
+    push_search_filter(query, &request.search);
+    Ok(())
 }
 
 fn push_kind_filter(query: &mut QueryBuilder<'_, Postgres>, values: &[String], excluded: bool) {
@@ -400,10 +424,20 @@ fn push_kind_filter(query: &mut QueryBuilder<'_, Postgres>, values: &[String], e
     }
     let operator = if excluded { " != ALL(" } else { " = ANY(" };
     query
-        .push(" AND LOWER(a.asset_kind)")
+        .push(" AND ")
+        .push(semantic_kind_expression())
         .push(operator)
         .push_bind(values)
         .push(")");
+}
+
+fn semantic_kind_expression() -> &'static str {
+    r#"CASE
+        WHEN LOWER(a.asset_kind) = 'image' AND LOWER(COALESCE(a.metadata->>'subtype', a.metadata->>'assetSubType', '')) = 'sequence' THEN 'imagesequence'
+        WHEN LOWER(a.asset_kind) = 'package' AND LOWER(COALESCE(a.metadata->>'subtype', a.metadata->>'assetSubType', '')) = 'texture' THEN 'texture'
+        WHEN LOWER(a.asset_kind) = 'package' AND LOWER(COALESCE(a.metadata->>'subtype', a.metadata->>'assetSubType', '')) = 'model' THEN 'modelpackage'
+        ELSE LOWER(a.asset_kind)
+    END"#
 }
 
 fn push_text_list_filter(
@@ -628,8 +662,870 @@ fn push_shape_filter(query: &mut QueryBuilder<'_, Postgres>, filters: &Workspace
     }
 }
 
-fn push_order(query: &mut QueryBuilder<'_, Postgres>, sort: &WorkspaceAssetQuerySort) {
+fn smart_folder_error(message: impl Into<String>) -> AppError {
+    AppError::BadRequest(message.into())
+}
+
+fn smart_condition_is_candidate(condition: &WorkspaceAssetQuerySmartFolderCondition) -> bool {
+    matches!(
+        condition.operator.as_str(),
+        "none" | "notEmpty" | "monochrome"
+    ) || !condition.value.trim().is_empty()
+}
+
+fn push_smart_folder_conditions(
+    query: &mut QueryBuilder<'_, Postgres>,
+    smart_folder: Option<&WorkspaceAssetQuerySmartFolder>,
+) -> AppResult<()> {
+    let Some(smart_folder) = smart_folder else {
+        return Ok(());
+    };
+    let groups = smart_folder
+        .rule_groups
+        .iter()
+        .map(|group| {
+            let conditions = group
+                .conditions
+                .iter()
+                .filter(|condition| smart_condition_is_candidate(condition))
+                .collect::<Vec<_>>();
+            (group, conditions)
+        })
+        .filter(|(_, conditions)| !conditions.is_empty())
+        .collect::<Vec<_>>();
+    if groups.is_empty() {
+        return Ok(());
+    }
+
+    query.push(" AND (");
+    for (group_index, (group, conditions)) in groups.iter().enumerate() {
+        if group_index > 0 {
+            query.push(" AND ");
+        }
+        if group.polarity == "exclude" {
+            query.push("NOT ");
+        }
+        query.push("(");
+        let joiner = if group.match_mode == "any" {
+            " OR "
+        } else {
+            " AND "
+        };
+        for (condition_index, condition) in conditions.iter().enumerate() {
+            if condition_index > 0 {
+                query.push(joiner);
+            }
+            push_smart_folder_condition(query, condition)?;
+        }
+        query.push(")");
+    }
+    query.push(")");
+    Ok(())
+}
+
+fn push_smart_folder_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+) -> AppResult<()> {
+    match condition.field.as_str() {
+        "name" => push_smart_text_condition(query, condition, "a.name", "name"),
+        "note" => push_smart_text_condition(
+            query,
+            condition,
+            "COALESCE(a.metadata->>'description', '')",
+            "note",
+        ),
+        "url" => {
+            push_smart_text_condition(query, condition, "COALESCE(a.metadata->>'url', '')", "url")
+        }
+        "kind" => {
+            push_smart_enum_condition(query, condition, semantic_kind_expression(), "kind", false)
+        }
+        "subtype" => push_smart_enum_condition(
+            query,
+            condition,
+            "LOWER(COALESCE(a.metadata->>'subtype', a.metadata->>'assetSubType', ''))",
+            "subtype",
+            false,
+        ),
+        "importMode" => push_smart_enum_condition(
+            query,
+            condition,
+            "LOWER(a.import_mode)",
+            "import mode",
+            false,
+        ),
+        "extension" => push_smart_enum_condition(
+            query,
+            condition,
+            "LOWER(COALESCE(a.metadata->>'extension', ''))",
+            "extension",
+            true,
+        ),
+        "tag" => push_smart_relation_condition(query, condition, "asset_tags", "tag_id", "tag"),
+        "folder" => {
+            push_smart_relation_condition(query, condition, "asset_folders", "folder_id", "folder")
+        }
+        "width" => push_smart_number_condition(
+            query,
+            condition,
+            "NULLIF(a.metadata->>'width', '')::double precision",
+            true,
+        ),
+        "height" => push_smart_number_condition(
+            query,
+            condition,
+            "NULLIF(a.metadata->>'height', '')::double precision",
+            true,
+        ),
+        "size" => push_smart_number_condition(
+            query,
+            condition,
+            "NULLIF(a.metadata->>'sizeBytes', '')::double precision",
+            false,
+        ),
+        "duration" => push_smart_number_condition(
+            query,
+            condition,
+            "NULLIF(a.metadata->>'duration', '')::double precision",
+            false,
+        ),
+        "shape" => push_smart_shape_condition(query, condition),
+        "rating" => push_smart_rating_condition(query, condition),
+        "color" => push_smart_color_condition(query, condition),
+        "createdDate" | "updatedDate" | "importedDate" => {
+            push_smart_date_condition(query, condition)
+        }
+        field => Err(smart_folder_error(format!(
+            "unsupported smart-folder field: {field}"
+        ))),
+    }
+}
+
+fn push_smart_text_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+    expression: &str,
+    field_name: &str,
+) -> AppResult<()> {
+    match condition.operator.as_str() {
+        "none" => {
+            query.push("BTRIM(").push(expression).push(") = ''");
+        }
+        "notEmpty" => {
+            query.push("BTRIM(").push(expression).push(") != ''");
+        }
+        "contains" | "notContains" | "beginsWith" | "endsWith" | "equals" => {
+            let escaped = escape_like_pattern(condition.value.trim());
+            let pattern = match condition.operator.as_str() {
+                "contains" | "notContains" => format!("%{escaped}%"),
+                "beginsWith" => format!("{escaped}%"),
+                "endsWith" => format!("%{escaped}"),
+                _ => escaped,
+            };
+            query.push(expression);
+            if condition.operator == "notContains" {
+                query.push(" NOT");
+            }
+            query
+                .push(" ILIKE ")
+                .push_bind(pattern)
+                .push(" ESCAPE '\\'");
+        }
+        "regex" => {
+            query
+                .push(expression)
+                .push(" ~ ")
+                .push_bind(condition.value.trim().to_string());
+        }
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder {field_name} operator: {operator}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn push_smart_enum_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+    expression: &str,
+    field_name: &str,
+    trim_dot: bool,
+) -> AppResult<()> {
+    let value = if trim_dot {
+        condition.value.trim().trim_start_matches('.')
+    } else {
+        condition.value.trim()
+    }
+    .to_lowercase();
+    match condition.operator.as_str() {
+        "equals" => query.push(expression).push(" = ").push_bind(value),
+        "none" => query.push(expression).push(" != ").push_bind(value),
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder {field_name} operator: {operator}"
+            )));
+        }
+    };
+    Ok(())
+}
+
+fn smart_relation_ids(value: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    for id in value.split(',').map(str::trim).filter(|id| !id.is_empty()) {
+        if !ids.iter().any(|current| current == id) {
+            ids.push(id.to_string());
+        }
+    }
+    ids
+}
+
+fn push_smart_relation_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+    table: &str,
+    column: &str,
+    field_name: &str,
+) -> AppResult<()> {
+    let ids = smart_relation_ids(&condition.value);
+    match condition.operator.as_str() {
+        "none" => {
+            query
+                .push("NOT EXISTS (SELECT 1 FROM ")
+                .push(table)
+                .push(" rel WHERE rel.asset_id = a.id)");
+        }
+        "notEmpty" => {
+            query
+                .push("EXISTS (SELECT 1 FROM ")
+                .push(table)
+                .push(" rel WHERE rel.asset_id = a.id)");
+        }
+        "contains" if !ids.is_empty() => {
+            query
+                .push("EXISTS (SELECT 1 FROM ")
+                .push(table)
+                .push(" rel WHERE rel.asset_id = a.id AND rel.")
+                .push(column)
+                .push(" = ANY(")
+                .push_bind(ids)
+                .push("))");
+        }
+        "equals" if !ids.is_empty() => {
+            let expected = ids.len() as i64;
+            query
+                .push("(SELECT COUNT(DISTINCT rel.")
+                .push(column)
+                .push(") FROM ")
+                .push(table)
+                .push(" rel WHERE rel.asset_id = a.id AND rel.")
+                .push(column)
+                .push(" = ANY(")
+                .push_bind(ids)
+                .push(")) = ")
+                .push_bind(expected);
+        }
+        "has" if !ids.is_empty() => {
+            let expected = ids.len() as i64;
+            query
+                .push("((SELECT COUNT(DISTINCT rel.")
+                .push(column)
+                .push(") FROM ")
+                .push(table)
+                .push(" rel WHERE rel.asset_id = a.id AND rel.")
+                .push(column)
+                .push(" = ANY(")
+                .push_bind(ids)
+                .push(")) = ")
+                .push_bind(expected)
+                .push(" AND (SELECT COUNT(*) FROM ")
+                .push(table)
+                .push(" rel WHERE rel.asset_id = a.id) = ")
+                .push_bind(expected)
+                .push(")");
+        }
+        "notContains" if !ids.is_empty() => {
+            query
+                .push("NOT EXISTS (SELECT 1 FROM ")
+                .push(table)
+                .push(" rel WHERE rel.asset_id = a.id AND rel.")
+                .push(column)
+                .push(" = ANY(")
+                .push_bind(ids)
+                .push("))");
+        }
+        "contains" | "equals" | "has" | "notContains" => {
+            query.push("FALSE");
+        }
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder {field_name} operator: {operator}"
+            )));
+        }
+    };
+    Ok(())
+}
+
+fn parse_smart_number(value: &str, field: &str) -> (Option<f64>, Option<f64>) {
+    let mut value_parts = value.splitn(2, '|');
+    let range = value_parts.next().unwrap_or("").trim();
+    let unit = value_parts.next().map(str::trim);
+    let multiplier = match field {
+        "size" if unit == Some("MB") => 1024.0 * 1024.0,
+        "size" => 1024.0,
+        "duration" if unit == Some("minutes") => 60.0,
+        "duration" if unit == Some("hours") => 3600.0,
+        _ => 1.0,
+    };
+    let mut range_parts = range.splitn(2, "..");
+    let parse = |part: Option<&str>| {
+        part.and_then(|part| part.trim().parse::<f64>().ok())
+            .filter(|value| value.is_finite())
+            .map(|value| (value.max(0.0) * multiplier).round())
+    };
+    (parse(range_parts.next()), parse(range_parts.next()))
+}
+
+fn push_smart_number_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+    expression: &str,
+    require_positive: bool,
+) -> AppResult<()> {
+    let (start, end) = parse_smart_number(&condition.value, &condition.field);
+    let Some(start) = start else {
+        query.push("FALSE");
+        return Ok(());
+    };
+    query.push("(").push(expression).push(" IS NOT NULL");
+    if require_positive {
+        query.push(" AND ").push(expression).push(" > 0");
+    }
+    match condition.operator.as_str() {
+        "greaterThan" => query
+            .push(" AND ")
+            .push(expression)
+            .push(" > ")
+            .push_bind(start),
+        "greaterThanOrEqual" => query
+            .push(" AND ")
+            .push(expression)
+            .push(" >= ")
+            .push_bind(start),
+        "equals" => query
+            .push(" AND ")
+            .push(expression)
+            .push(" = ")
+            .push_bind(start),
+        "lessThan" => query
+            .push(" AND ")
+            .push(expression)
+            .push(" < ")
+            .push_bind(start),
+        "lessThanOrEqual" => query
+            .push(" AND ")
+            .push(expression)
+            .push(" <= ")
+            .push_bind(start),
+        "between" => {
+            let Some(end) = end else {
+                query.push(" AND FALSE)");
+                return Ok(());
+            };
+            query
+                .push(" AND ")
+                .push(expression)
+                .push(" >= ")
+                .push_bind(start)
+                .push(" AND ")
+                .push(expression)
+                .push(" <= ")
+                .push_bind(end)
+        }
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder number operator: {operator}"
+            )));
+        }
+    };
+    query.push(")");
+    Ok(())
+}
+
+fn smart_shape_expression(value: &str) -> Option<String> {
+    let mut parts = value.splitn(2, '|');
+    let shape = parts.next()?.trim();
+    let width = "NULLIF(a.metadata->>'width', '')::double precision";
+    let height = "NULLIF(a.metadata->>'height', '')::double precision";
+    match shape {
+        "horizontal" => Some(format!(
+            "({width} > 0 AND {height} > 0 AND {width} > {height})"
+        )),
+        "vertical" => Some(format!(
+            "({width} > 0 AND {height} > 0 AND {height} > {width})"
+        )),
+        "square" => Some(format!(
+            "({width} > 0 AND {height} > 0 AND ABS({width} - {height}) <= 2)"
+        )),
+        "panoramicHorizontal" => Some(format!(
+            "({width} > 0 AND {height} > 0 AND {width} >= {height} * 2)"
+        )),
+        "panoramicVertical" => Some(format!(
+            "({width} > 0 AND {height} > 0 AND {height} >= {width} * 2)"
+        )),
+        "custom" => {
+            let mut ratio = parts.next()?.splitn(2, ':');
+            let custom_width = ratio.next()?.trim().parse::<f64>().ok()?;
+            let custom_height = ratio.next()?.trim().parse::<f64>().ok()?;
+            if custom_width <= 0.0 || custom_height <= 0.0 {
+                return None;
+            }
+            let ratio = custom_width / custom_height;
+            Some(format!("({width} > 0 AND {height} > 0 AND {width} / NULLIF({height}, 0) BETWEEN {} AND {})", ratio * 0.96, ratio * 1.04))
+        }
+        _ => None,
+    }
+}
+
+fn push_smart_shape_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+) -> AppResult<()> {
+    let Some(expression) = smart_shape_expression(&condition.value) else {
+        query.push("FALSE");
+        return Ok(());
+    };
+    match condition.operator.as_str() {
+        "equals" => query.push(expression),
+        "none" => query.push("NOT ").push(expression),
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder shape operator: {operator}"
+            )));
+        }
+    };
+    Ok(())
+}
+
+fn push_smart_rating_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+) -> AppResult<()> {
+    let expression = "NULLIF(a.metadata->>'rating', '')::integer";
+    match condition.operator.as_str() {
+        "none" => {
+            query.push(expression).push(" IS NULL");
+        }
+        "notEmpty" => {
+            query.push(expression).push(" IS NOT NULL");
+        }
+        "equals" | "notContains" | "greaterThan" | "greaterThanOrEqual" | "lessThan"
+        | "lessThanOrEqual" => {
+            let Some(value) = condition
+                .value
+                .trim()
+                .parse::<i32>()
+                .ok()
+                .filter(|value| (1..=5).contains(value))
+            else {
+                query.push("FALSE");
+                return Ok(());
+            };
+            let operator = match condition.operator.as_str() {
+                "equals" => "=",
+                "notContains" => "!=",
+                "greaterThan" => ">",
+                "greaterThanOrEqual" => ">=",
+                "lessThan" => "<",
+                _ => "<=",
+            };
+            query
+                .push(expression)
+                .push(" ")
+                .push(operator)
+                .push(" ")
+                .push_bind(value);
+        }
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder rating operator: {operator}"
+            )))
+        }
+    };
+    Ok(())
+}
+
+fn push_smart_color_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+) -> AppResult<()> {
+    if condition.operator == "monochrome" {
+        let ratio = color_ratio_expression();
+        let mono = monochrome_color_predicate();
+        query.push(format!("COALESCE((SELECT SUM(CASE WHEN {mono} THEN {ratio} ELSE 0 END) FROM {}), 0) >= 0.97 AND COALESCE((SELECT SUM(CASE WHEN {mono} THEN {ratio} ELSE 0 END) / NULLIF(SUM({ratio}), 0) FROM {}), 0) >= 0.98", color_palette_rows(), color_palette_rows()));
+        return Ok(());
+    }
+    let threshold = match condition.operator.as_str() {
+        "similar" => 72.0,
+        "almostEqual" => 90.0,
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder color operator: {operator}"
+            )))
+        }
+    };
+    let Some((predicate, _)) = color_distance_predicate(&condition.value, threshold) else {
+        query.push("FALSE");
+        return Ok(());
+    };
+    query
+        .push("EXISTS (SELECT 1 FROM ")
+        .push(color_palette_rows())
+        .push(" WHERE ")
+        .push(color_ratio_expression())
+        .push(" >= 0.005 AND ")
+        .push(predicate)
+        .push(")");
+    Ok(())
+}
+
+fn valid_date(value: &str) -> bool {
+    let parts = value.split('-').collect::<Vec<_>>();
+    if parts.len() != 3
+        || parts[0].len() != 4
+        || parts[1].len() != 2
+        || parts[2].len() != 2
+        || !parts
+            .iter()
+            .all(|part| part.chars().all(|character| character.is_ascii_digit()))
+    {
+        return false;
+    }
+    let Ok(year) = parts[0].parse::<u32>() else {
+        return false;
+    };
+    let Ok(month) = parts[1].parse::<u32>() else {
+        return false;
+    };
+    let Ok(day) = parts[2].parse::<u32>() else {
+        return false;
+    };
+    let maximum_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 => 29,
+        2 => 28,
+        _ => return false,
+    };
+    year > 0 && day > 0 && day <= maximum_day
+}
+
+fn push_smart_date_condition(
+    query: &mut QueryBuilder<'_, Postgres>,
+    condition: &WorkspaceAssetQuerySmartFolderCondition,
+) -> AppResult<()> {
+    let column = match condition.field.as_str() {
+        "createdDate" => "a.created_at",
+        "updatedDate" => "a.updated_at",
+        _ => "COALESCE(a.imported_at, a.created_at)",
+    };
+    let value = condition.value.trim();
+    match condition.operator.as_str() {
+        "preset" => {
+            let (start, end) = match value {
+                "today" => ("CURRENT_DATE", "CURRENT_DATE + INTERVAL '1 day'"),
+                "yesterday" => ("CURRENT_DATE - INTERVAL '1 day'", "CURRENT_DATE"),
+                "last5" => (
+                    "CURRENT_DATE - INTERVAL '4 days'",
+                    "CURRENT_DATE + INTERVAL '1 day'",
+                ),
+                "last7" => (
+                    "CURRENT_DATE - INTERVAL '6 days'",
+                    "CURRENT_DATE + INTERVAL '1 day'",
+                ),
+                "last30" => (
+                    "CURRENT_DATE - INTERVAL '29 days'",
+                    "CURRENT_DATE + INTERVAL '1 day'",
+                ),
+                "last90" => (
+                    "CURRENT_DATE - INTERVAL '89 days'",
+                    "CURRENT_DATE + INTERVAL '1 day'",
+                ),
+                "last365" => (
+                    "CURRENT_DATE - INTERVAL '364 days'",
+                    "CURRENT_DATE + INTERVAL '1 day'",
+                ),
+                _ => {
+                    query.push("FALSE");
+                    return Ok(());
+                }
+            };
+            query
+                .push("(")
+                .push(column)
+                .push(" >= ")
+                .push(start)
+                .push(" AND ")
+                .push(column)
+                .push(" < ")
+                .push(end)
+                .push(")");
+        }
+        "before" | "after" | "equals" if valid_date(value) => match condition.operator.as_str() {
+            "before" => {
+                query
+                    .push(column)
+                    .push(" < ")
+                    .push_bind(value.to_string())
+                    .push("::date");
+            }
+            "after" => {
+                query
+                    .push(column)
+                    .push(" >= ")
+                    .push_bind(value.to_string())
+                    .push("::date + INTERVAL '1 day'");
+            }
+            _ => {
+                query
+                    .push("(")
+                    .push(column)
+                    .push(" >= ")
+                    .push_bind(value.to_string())
+                    .push("::date AND ")
+                    .push(column)
+                    .push(" < ")
+                    .push_bind(value.to_string())
+                    .push("::date + INTERVAL '1 day')");
+            }
+        },
+        "between" => {
+            let mut dates = value.splitn(2, "..");
+            let start = dates.next().unwrap_or("").trim();
+            let end = dates.next().unwrap_or("").trim();
+            if !valid_date(start) || !valid_date(end) {
+                query.push("FALSE");
+                return Ok(());
+            }
+            query
+                .push("(")
+                .push(column)
+                .push(" >= ")
+                .push_bind(start.to_string())
+                .push("::date AND ")
+                .push(column)
+                .push(" < ")
+                .push_bind(end.to_string())
+                .push("::date + INTERVAL '1 day')");
+        }
+        "before" | "after" | "equals" => {
+            query.push("FALSE");
+        }
+        operator => {
+            return Err(smart_folder_error(format!(
+                "unsupported smart-folder date operator: {operator}"
+            )))
+        }
+    }
+    Ok(())
+}
+
+fn push_search_filter(query: &mut QueryBuilder<'_, Postgres>, search: &WorkspaceAssetQuerySearch) {
+    let keyword = search.keyword.trim();
+    if keyword.is_empty() {
+        return;
+    }
+
+    let pattern = format!("%{}%", escape_like_pattern(keyword));
+    let mut condition_count = 0usize;
+    query.push(" AND (");
+    let mut push_text_match = |query: &mut QueryBuilder<'_, Postgres>, expression: &str| {
+        if condition_count > 0 {
+            query.push(" OR ");
+        }
+        query
+            .push(expression)
+            .push(" ILIKE ")
+            .push_bind(pattern.clone())
+            .push(" ESCAPE '\\'");
+        condition_count += 1;
+    };
+
+    if search.scopes.name {
+        push_text_match(query, "a.name");
+        push_text_match(query, "COALESCE(a.metadata->>'namePinyin', '')");
+        push_text_match(query, "COALESCE(a.metadata->>'namePinyinInitials', '')");
+    }
+    if search.scopes.r#type {
+        push_text_match(query, semantic_kind_expression());
+        push_text_match(query, "a.asset_kind");
+        push_text_match(
+            query,
+            "COALESCE(a.metadata->>'subtype', a.metadata->>'assetSubType', '')",
+        );
+        push_text_match(query, "COALESCE(a.metadata->>'extension', '')");
+    }
+    if search.scopes.note {
+        push_text_match(query, "COALESCE(a.metadata->>'description', '')");
+    }
+    if search.scopes.url {
+        push_text_match(query, "COALESCE(a.metadata->>'url', '')");
+        push_text_match(query, "COALESCE(a.metadata->>'sourcePath', '')");
+        push_text_match(query, "COALESCE(a.metadata->>'storedPath', '')");
+        push_text_match(query, "COALESCE(a.relative_path, '')");
+        push_text_match(query, "COALESCE(a.storage_key, '')");
+    }
+    if search.scopes.tag {
+        if condition_count > 0 {
+            query.push(" OR ");
+        }
+        query
+            .push("EXISTS (SELECT 1 FROM asset_tags rel JOIN tags t ON t.id = rel.tag_id WHERE rel.asset_id = a.id AND t.name ILIKE ")
+            .push_bind(pattern.clone())
+            .push(" ESCAPE '\\')");
+        condition_count += 1;
+    }
+    if search.scopes.folder_name {
+        if condition_count > 0 {
+            query.push(" OR ");
+        }
+        query
+            .push("EXISTS (SELECT 1 FROM asset_folders rel JOIN folders f ON f.id = rel.folder_id WHERE rel.asset_id = a.id AND f.name ILIKE ")
+            .push_bind(pattern.clone())
+            .push(" ESCAPE '\\')");
+        condition_count += 1;
+    }
+    if search.scopes.folder_description {
+        if condition_count > 0 {
+            query.push(" OR ");
+        }
+        query
+            .push("EXISTS (SELECT 1 FROM asset_folders rel JOIN folders f ON f.id = rel.folder_id WHERE rel.asset_id = a.id AND COALESCE(f.description, '') ILIKE ")
+            .push_bind(pattern)
+            .push(" ESCAPE '\\')");
+        condition_count += 1;
+    }
+    if condition_count == 0 {
+        query.push("FALSE");
+    }
+    query.push(")");
+}
+
+fn escape_like_pattern(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+fn normalize_hex_color(value: &str) -> Option<[u8; 3]> {
+    let value = value.trim().trim_start_matches('#');
+    if value.len() != 6 {
+        return None;
+    }
+    Some([
+        u8::from_str_radix(&value[0..2], 16).ok()?,
+        u8::from_str_radix(&value[2..4], 16).ok()?,
+        u8::from_str_radix(&value[4..6], 16).ok()?,
+    ])
+}
+
+fn color_palette_rows() -> &'static str {
+    "jsonb_array_elements(CASE WHEN jsonb_typeof(a.metadata->'colorPalette') = 'array' THEN a.metadata->'colorPalette' ELSE '[]'::jsonb END) AS color(value)"
+}
+
+fn color_ratio_expression() -> &'static str {
+    "COALESCE(NULLIF(color.value->>'ratio', '')::double precision, 0)"
+}
+
+fn color_rgb_expression(index: usize) -> String {
+    format!("COALESCE(NULLIF(color.value->'rgb'->>{index}, '')::double precision, 0)")
+}
+
+fn monochrome_color_predicate() -> String {
+    let red = color_rgb_expression(0);
+    let green = color_rgb_expression(1);
+    let blue = color_rgb_expression(2);
+    let maximum = format!("GREATEST({red}, {green}, {blue})");
+    let minimum = format!("LEAST({red}, {green}, {blue})");
+    format!(
+        "(({maximum} - {minimum}) <= 5 AND ({maximum} <= 0 OR ({maximum} - {minimum}) / NULLIF({maximum}, 0) <= 0.025))"
+    )
+}
+
+fn color_distance_predicate(color_hex: &str, threshold: f64) -> Option<(String, f64)> {
+    let [red, green, blue] = normalize_hex_color(color_hex)?;
+    let max_distance =
+        441.67295593_f64 * (1.0 - threshold.clamp(0.0, 100.0) / 100.0).clamp(0.05, 1.0);
+    let max_distance_sq = (max_distance * max_distance).max(1.0);
+    let red_value = color_rgb_expression(0);
+    let green_value = color_rgb_expression(1);
+    let blue_value = color_rgb_expression(2);
+    let distance = format!(
+        "((({red_value}) - {red}) * (({red_value}) - {red}) + (({green_value}) - {green}) * (({green_value}) - {green}) + (({blue_value}) - {blue}) * (({blue_value}) - {blue}))"
+    );
+    Some((format!("{distance} <= {max_distance_sq}"), max_distance_sq))
+}
+
+fn push_color_filter(query: &mut QueryBuilder<'_, Postgres>, filters: &WorkspaceAssetQueryFilters) {
+    if filters.color_mode == "mono" {
+        let ratio = color_ratio_expression();
+        let mono = monochrome_color_predicate();
+        query.push(format!(
+            " AND COALESCE((SELECT SUM(CASE WHEN {mono} THEN {ratio} ELSE 0 END) FROM {}), 0) >= 0.97 AND COALESCE((SELECT SUM(CASE WHEN {mono} THEN {ratio} ELSE 0 END) / NULLIF(SUM({ratio}), 0) FROM {}), 0) >= 0.98",
+            color_palette_rows(),
+            color_palette_rows(),
+        ));
+        return;
+    }
+
+    let Some((predicate, _)) =
+        color_distance_predicate(&filters.color_hex, filters.color_threshold)
+    else {
+        return;
+    };
+    let minimum_coverage = (filters.color_coverage.clamp(0.0, 100.0) / 100.0).max(0.0);
+    query.push(format!(
+        " AND COALESCE((SELECT SUM({}) FROM {} WHERE {} >= 0.005 AND {predicate}), 0) >= {minimum_coverage}",
+        color_ratio_expression(),
+        color_palette_rows(),
+        color_ratio_expression(),
+    ));
+}
+
+fn color_score_expression(filters: &WorkspaceAssetQueryFilters) -> Option<String> {
+    if filters.color_mode == "mono" {
+        let ratio = color_ratio_expression();
+        let mono = monochrome_color_predicate();
+        return Some(format!(
+            "COALESCE((SELECT SUM(CASE WHEN {mono} THEN {ratio} ELSE 0 END) FROM {}), 0)",
+            color_palette_rows(),
+        ));
+    }
+    let (predicate, max_distance_sq) =
+        color_distance_predicate(&filters.color_hex, filters.color_threshold)?;
+    let [red, green, blue] = normalize_hex_color(&filters.color_hex)?;
+    let red_value = color_rgb_expression(0);
+    let green_value = color_rgb_expression(1);
+    let blue_value = color_rgb_expression(2);
+    let distance = format!(
+        "((({red_value}) - {red}) * (({red_value}) - {red}) + (({green_value}) - {green}) * (({green_value}) - {green}) + (({blue_value}) - {blue}) * (({blue_value}) - {blue}))"
+    );
+    Some(format!(
+        "COALESCE((SELECT SUM({ratio} * (0.35 + 0.65 * (1.0 - ({distance} / {max_distance_sq})))) FROM {rows} WHERE {ratio} >= 0.005 AND {predicate}), 0)",
+        ratio = color_ratio_expression(),
+        rows = color_palette_rows(),
+    ))
+}
+
+fn push_order(query: &mut QueryBuilder<'_, Postgres>, request: &WorkspaceAssetQueryRequest) {
     query.push(" ORDER BY ");
+    if let Some(color_score) = color_score_expression(&request.filters) {
+        query.push(color_score).push(" DESC, ");
+    }
+    let sort = &request.sort;
     if sort.random {
         query
             .push("MD5(")
@@ -640,7 +1536,7 @@ fn push_order(query: &mut QueryBuilder<'_, Postgres>, sort: &WorkspaceAssetQuery
             "createdAt" => "a.created_at",
             "importedAt" => "COALESCE(a.imported_at, a.created_at)",
             "name" => "LOWER(a.name)",
-            "assetKind" => "LOWER(a.asset_kind)",
+            "assetKind" => semantic_kind_expression(),
             "extension" => "LOWER(COALESCE(a.metadata->>'extension', ''))",
             "dimensions" => "COALESCE(NULLIF(a.metadata->>'width', '')::double precision, 0) * COALESCE(NULLIF(a.metadata->>'height', '')::double precision, 0)",
             "sizeBytes" => "COALESCE(NULLIF(a.metadata->>'sizeBytes', '')::double precision, 0)",
@@ -682,20 +1578,72 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rejects_queries_that_require_compatibility_semantics() {
+    fn builds_advanced_queries_without_compatibility_fallback() {
         let mut request = WorkspaceAssetQueryRequest::default();
         request.search.keyword = "asset".to_string();
-        assert!(matches!(
-            ensure_supported_query(&request),
-            Err(AppError::BadRequest(_))
-        ));
+        request.filters.color_hex = "#336699".to_string();
+        request.filters.color_threshold = 72.0;
+        request.filters.color_coverage = 10.0;
+        request.filters.color_mode = "similar".to_string();
+        request.filters.kinds = vec!["imageSequence".to_string()];
+        request.smart_folder = Some(WorkspaceAssetQuerySmartFolder {
+            id: "smart-a".to_string(),
+            rule_groups: vec![WorkspaceAssetQuerySmartFolderRuleGroup {
+                id: "group-a".to_string(),
+                match_mode: "all".to_string(),
+                polarity: "include".to_string(),
+                conditions: vec![WorkspaceAssetQuerySmartFolderCondition {
+                    id: "condition-a".to_string(),
+                    field: "name".to_string(),
+                    operator: "contains".to_string(),
+                    value: "preview".to_string(),
+                }],
+            }],
+        });
 
-        request.search.keyword.clear();
-        request.filters.color_hex = "#ffffff".to_string();
+        let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
+        push_conditions(&mut query, "library-a", Uuid::nil(), &request).expect("conditions");
+        push_order(&mut query, &request);
+        let sql = query.sql();
+
+        assert!(sql.contains("colorPalette"));
+        assert!(sql.contains("ILIKE"));
+        assert!(sql.contains("imagesequence"));
+        assert!(sql.contains("a.name ILIKE"));
+        assert!(sql.contains("ORDER BY COALESCE((SELECT SUM"));
+    }
+
+    #[test]
+    fn rejects_unknown_smart_folder_operators() {
+        let mut request = WorkspaceAssetQueryRequest::default();
+        request.smart_folder = Some(WorkspaceAssetQuerySmartFolder {
+            id: "smart-a".to_string(),
+            rule_groups: vec![WorkspaceAssetQuerySmartFolderRuleGroup {
+                id: "group-a".to_string(),
+                match_mode: "all".to_string(),
+                polarity: "include".to_string(),
+                conditions: vec![WorkspaceAssetQuerySmartFolderCondition {
+                    id: "condition-a".to_string(),
+                    field: "name".to_string(),
+                    operator: "unsupported".to_string(),
+                    value: "preview".to_string(),
+                }],
+            }],
+        });
+
+        let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
         assert!(matches!(
-            ensure_supported_query(&request),
+            push_conditions(&mut query, "library-a", Uuid::nil(), &request),
             Err(AppError::BadRequest(_))
         ));
+    }
+
+    #[test]
+    fn validates_smart_folder_calendar_dates() {
+        assert!(valid_date("2024-02-29"));
+        assert!(!valid_date("2025-02-29"));
+        assert!(!valid_date("2026-13-01"));
+        assert!(!valid_date("2026-04-31"));
     }
 
     #[test]
@@ -707,8 +1655,8 @@ mod tests {
         request.sort.order = "desc".to_string();
 
         let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
-        push_conditions(&mut query, "library-a", Uuid::nil(), &request);
-        push_order(&mut query, &request.sort);
+        push_conditions(&mut query, "library-a", Uuid::nil(), &request).expect("conditions");
+        push_order(&mut query, &request);
         let sql = query.sql();
 
         assert!(sql.contains("asset_folders"));
