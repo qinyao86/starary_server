@@ -77,7 +77,7 @@ export const libraryPermissions = [
   { category: "permissionCategoryPersonal", action: "favoriteAssets", scope: "personal", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryPersonal", action: "managePersonalQuickAccess", scope: "personal", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryPersonal", action: "managePersonalFilterPresets", scope: "personal", manager: true, editor: true, viewer: true, verified: true },
-  { category: "permissionCategoryAssets", action: "importAssets", scope: "create", manager: true, editor: true, viewer: false, verified: false },
+  { category: "permissionCategoryAssets", action: "importAssets", scope: "create", manager: true, editor: true, viewer: false, verified: true },
   { category: "permissionCategoryAssets", action: "editAssetBasicInfo", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: false },
   { category: "permissionCategoryAssets", action: "editAssetBasicInfo", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: false },
   { category: "permissionCategoryAssets", action: "organizeAssetFolders", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: false },
