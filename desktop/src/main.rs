@@ -10,6 +10,18 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
+#[cfg(debug_assertions)]
+struct DevPidFile {
+    path: PathBuf,
+}
+
+#[cfg(debug_assertions)]
+impl Drop for DevPidFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -45,10 +57,15 @@ fn main() {
                 }
             }
             tray::MENU_TOGGLE_SERVICE => toggle_service_from_tray(app),
-            tray::MENU_EXIT => app.exit(0),
+            tray::MENU_EXIT => {
+                write_control_center_log("tray exit requested");
+                app.exit(0);
+            }
             _ => {}
         })
         .setup(|app| {
+            #[cfg(debug_assertions)]
+            install_dev_pid_file(app)?;
             let resources = runtime_resources(app.handle())?;
             let data_home = machine_data_home()?;
             let permissions_error =
@@ -85,6 +102,22 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("failed to run Mad Library Server control center");
+}
+
+#[cfg(debug_assertions)]
+fn install_dev_pid_file(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("target")
+        .join("build-dev")
+        .join("desktop")
+        .join("control-center.pid");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&path, std::process::id().to_string())?;
+    app.manage(DevPidFile { path });
+    Ok(())
 }
 
 #[tauri::command]

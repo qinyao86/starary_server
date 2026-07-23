@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "cn.madlibrary.server.desktop",
   "build": {
-    "beforeDevCommand": "..\\admin-ui\\node_modules\\.bin\\vite.cmd ..\\target\\build-dev\\frontend\\ui --host 127.0.0.1 --port 14310 --strictPort",
+    "beforeDevCommand": "node ../scripts/desktop-dev-server.mjs",
     "beforeBuildCommand": "powershell -ExecutionPolicy Bypass -File ../scripts/prepare-desktop-bundle.ps1",
     "devUrl": "http://127.0.0.1:14310",
     "frontendDist": "../target/build/frontend/ui"

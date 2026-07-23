@@ -47,6 +47,9 @@ npm run desktop:dev
 The server control-center shell uses `http://127.0.0.1:14310` in development.
 `tauri dev` starts that static Vite server through `beforeDevCommand`; do not run
 the debug executable directly because it will not have a development page to load.
+The `scripts/desktop-dev-server.mjs` wrapper owns the Vite child and watches the
+desktop PID marker. A full tray-menu exit must remove the marker and release
+port `14310`; closing the titlebar to the tray intentionally keeps both alive.
 
 That script builds `admin-ui`, prepares `target/build-dev/desktop/runtime/`,
 and starts Tauri. If the page still looks stale after the sync, refresh the
