@@ -201,7 +201,8 @@ pub async fn list_assets(
     Path(library_id): Path<String>,
     Query(query): Query<ListAssetsQuery>,
 ) -> AppResult<Json<AssetListResponse>> {
-    ensure_library_access(&state, &user, &library_id).await?;
+    let role = ensure_library_access(&state, &user, &library_id).await?;
+    let can_view_all_trash = role.can_manage_all_assets();
 
     let limit = query.limit.clamp(1, 500);
     let offset = query.offset.max(0);
@@ -210,6 +211,8 @@ pub async fn list_assets(
         &library_id,
         query.include_deleted,
         query.deleted_only,
+        user.id,
+        can_view_all_trash,
     )
     .await?;
     let records = query_assets_page(
@@ -217,6 +220,8 @@ pub async fn list_assets(
         &library_id,
         query.include_deleted,
         query.deleted_only,
+        user.id,
+        can_view_all_trash,
         limit,
         offset,
     )
@@ -237,7 +242,7 @@ pub async fn import_assets(
     Path(library_id): Path<String>,
     Json(request): Json<ImportAssetsRequest>,
 ) -> AppResult<Json<ImportAssetsResponse>> {
-    ensure_library_asset_import_access(&state, &user, &library_id).await?;
+    let role = ensure_library_asset_import_access(&state, &user, &library_id).await?;
 
     if request.assets.is_empty() {
         return Err(AppError::BadRequest(
@@ -249,6 +254,14 @@ pub async fn import_assets(
             "cannot import more than 500 assets at once".to_string(),
         ));
     }
+    ensure_import_tag_structure_access(
+        &state,
+        &library_id,
+        user.id,
+        role.can_manage_all_tags(),
+        &request.assets,
+    )
+    .await?;
 
     let default_storage_root_id = find_default_storage_root_id(&state, &library_id).await?;
     let mut tx = state.pool.begin().await?;
@@ -259,6 +272,7 @@ pub async fn import_assets(
         let derived_files = asset.derived_files;
         let additional_files = asset.additional_files;
         let source_file = asset.source_file;
+        let import_tags = asset.tags;
         let asset_id = normalize_asset_id(asset.id);
         let name = normalize_required_text(&asset.name, "asset name")?;
         let asset_kind = normalize_required_text(&asset.asset_kind, "asset kind")?;
@@ -303,6 +317,32 @@ pub async fn import_assets(
                 "reference imports require an enabled workspace".to_string(),
             ));
         }
+        let mut folder_ids = asset
+            .folder_ids
+            .into_iter()
+            .filter_map(|value| normalize_optional_text(Some(value)))
+            .collect::<Vec<_>>();
+        if let Some(folder_id) = normalize_optional_text(asset.folder_id) {
+            folder_ids.push(folder_id);
+        }
+        folder_ids.sort();
+        folder_ids.dedup();
+        for folder_id in &folder_ids {
+            ensure_folder_in_library(&mut tx, &library_id, folder_id).await?;
+        }
+        let mut tag_ids = Vec::with_capacity(import_tags.len());
+        for tag in import_tags {
+            tag_ids.push(
+                upsert_import_tag(
+                    &mut tx,
+                    &library_id,
+                    user.id,
+                    role.can_manage_all_tags(),
+                    tag,
+                )
+                .await?,
+            );
+        }
         if let Some(root_id) = storage_root_id {
             storage_was_used = true;
             ensure_storage_root_in_library(&mut tx, &library_id, root_id).await?;
@@ -321,20 +361,6 @@ pub async fn import_assets(
                 "asset files require an enabled workspace".to_string(),
             ));
         }
-        let mut folder_ids = asset
-            .folder_ids
-            .into_iter()
-            .filter_map(|value| normalize_optional_text(Some(value)))
-            .collect::<Vec<_>>();
-        if let Some(folder_id) = normalize_optional_text(asset.folder_id) {
-            folder_ids.push(folder_id);
-        }
-        folder_ids.sort();
-        folder_ids.dedup();
-        for folder_id in &folder_ids {
-            ensure_folder_in_library(&mut tx, &library_id, folder_id).await?;
-        }
-
         ensure_metadata_field(&mut metadata, "name", json!(name));
         ensure_metadata_field(&mut metadata, "assetKind", json!(asset_kind));
         ensure_metadata_field(&mut metadata, "importMode", json!(import_mode));
@@ -389,13 +415,12 @@ pub async fn import_assets(
             .await?;
         }
 
-        for tag in asset.tags {
-            let tag_id = upsert_import_tag(&mut tx, &library_id, user.id, tag).await?;
+        for tag_id in tag_ids {
             sqlx::query(
                 "INSERT INTO asset_tags (asset_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
             )
             .bind(&asset_id)
-            .bind(tag_id)
+            .bind(&tag_id)
             .execute(&mut *tx)
             .await?;
         }
@@ -440,7 +465,7 @@ pub async fn import_assets(
 
     let records = query_assets_by_ids(&state, &library_id, &imported_asset_ids).await?;
     let items = build_asset_responses(&state, &library_id, user.id, records).await?;
-    let total = count_assets(&state, &library_id, false, false).await?;
+    let total = count_assets(&state, &library_id, false, false, user.id, true).await?;
 
     Ok(Json(ImportAssetsResponse {
         imported_count: items.len(),
@@ -449,10 +474,54 @@ pub async fn import_assets(
     }))
 }
 
+async fn ensure_import_tag_structure_access(
+    state: &AppState,
+    library_id: &str,
+    user_id: Uuid,
+    can_manage_all_tags: bool,
+    assets: &[ImportAssetRequest],
+) -> AppResult<()> {
+    if can_manage_all_tags {
+        return Ok(());
+    }
+    for tag in assets.iter().flat_map(|asset| &asset.tags) {
+        let tag_name = normalize_required_text(&tag.name, "tag name")?;
+        let tag_exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM tags WHERE library_id = $1 AND LOWER(name) = LOWER($2))",
+        )
+        .bind(library_id)
+        .bind(tag_name)
+        .fetch_one(&state.pool)
+        .await?;
+        if tag_exists {
+            continue;
+        }
+        let Some(group) = tag.group.as_ref() else {
+            continue;
+        };
+        let group_name = normalize_required_text(&group.name, "tag group name")?;
+        let group_creator: Option<Option<Uuid>> = sqlx::query_scalar(
+            "SELECT created_by_user_id FROM tag_groups WHERE library_id = $1 AND LOWER(name) = LOWER($2) ORDER BY created_at ASC LIMIT 1",
+        )
+        .bind(library_id)
+        .bind(group_name)
+        .fetch_optional(&state.pool)
+        .await?;
+        if group_creator.is_some_and(|creator| creator != Some(user_id)) {
+            return Err(AppError::TagGroupMutationForbidden {
+                denied_count: 1,
+                total_count: 1,
+            });
+        }
+    }
+    Ok(())
+}
+
 async fn upsert_import_tag(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     library_id: &str,
     user_id: Uuid,
+    can_manage_all_tags: bool,
     tag: ImportAssetTagRequest,
 ) -> AppResult<String> {
     let name = normalize_required_text(&tag.name, "tag name")?;
@@ -469,14 +538,20 @@ async fn upsert_import_tag(
 
     let group_id = if let Some(group) = tag.group {
         let group_name = normalize_required_text(&group.name, "tag group name")?;
-        if let Some(group_id) = sqlx::query_scalar::<_, String>(
-            "SELECT id FROM tag_groups WHERE library_id = $1 AND LOWER(name) = LOWER($2) ORDER BY created_at ASC LIMIT 1",
+        if let Some((group_id, created_by_user_id)) = sqlx::query_as::<_, (String, Option<Uuid>)>(
+            "SELECT id, created_by_user_id FROM tag_groups WHERE library_id = $1 AND LOWER(name) = LOWER($2) ORDER BY created_at ASC LIMIT 1",
         )
         .bind(library_id)
         .bind(&group_name)
         .fetch_optional(&mut **tx)
         .await?
         {
+            if !can_manage_all_tags && created_by_user_id != Some(user_id) {
+                return Err(AppError::TagGroupMutationForbidden {
+                    denied_count: 1,
+                    total_count: 1,
+                });
+            }
             Some(group_id)
         } else {
             let group_id = generate_id("tag_group_");
@@ -660,6 +735,8 @@ async fn query_assets_page(
     library_id: &str,
     include_deleted: bool,
     deleted_only: bool,
+    user_id: Uuid,
+    can_view_all_trash: bool,
     limit: i64,
     offset: i64,
 ) -> AppResult<Vec<AssetRecord>> {
@@ -687,14 +764,25 @@ async fn query_assets_page(
             restored_at
         FROM assets
         WHERE library_id = $1
-          AND (($3 AND deleted_at IS NOT NULL) OR (NOT $3 AND ($2 OR deleted_at IS NULL)))
+          AND (
+              ($3 AND deleted_at IS NOT NULL AND ($5 OR created_by_user_id = $4))
+              OR (
+                  NOT $3
+                  AND (
+                      deleted_at IS NULL
+                      OR ($2 AND deleted_at IS NOT NULL AND ($5 OR created_by_user_id = $4))
+                  )
+              )
+          )
         ORDER BY created_at DESC, id DESC
-        LIMIT $4 OFFSET $5
+        LIMIT $6 OFFSET $7
         "#,
     )
     .bind(library_id)
     .bind(include_deleted)
     .bind(deleted_only)
+    .bind(user_id)
+    .bind(can_view_all_trash)
     .bind(limit)
     .bind(offset)
     .fetch_all(&state.pool)
@@ -1084,18 +1172,31 @@ async fn count_assets(
     library_id: &str,
     include_deleted: bool,
     deleted_only: bool,
+    user_id: Uuid,
+    can_view_all_trash: bool,
 ) -> AppResult<i64> {
     Ok(sqlx::query_scalar(
         r#"
         SELECT COUNT(*)
         FROM assets
         WHERE library_id = $1
-          AND (($3 AND deleted_at IS NOT NULL) OR (NOT $3 AND ($2 OR deleted_at IS NULL)))
+          AND (
+              ($3 AND deleted_at IS NOT NULL AND ($5 OR created_by_user_id = $4))
+              OR (
+                  NOT $3
+                  AND (
+                      deleted_at IS NULL
+                      OR ($2 AND deleted_at IS NOT NULL AND ($5 OR created_by_user_id = $4))
+                  )
+              )
+          )
         "#,
     )
     .bind(library_id)
     .bind(include_deleted)
     .bind(deleted_only)
+    .bind(user_id)
+    .bind(can_view_all_trash)
     .fetch_one(&state.pool)
     .await?)
 }

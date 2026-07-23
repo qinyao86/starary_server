@@ -49,6 +49,15 @@ asset_stats AS (
     FROM assets a
     GROUP BY a.library_id
 ),
+user_trash_stats AS (
+    SELECT
+        library_id,
+        COUNT(*)::BIGINT AS trash_asset_count
+    FROM assets
+    WHERE deleted_at IS NOT NULL
+      AND created_by_user_id = $1
+    GROUP BY library_id
+),
 favorite_stats AS (
     SELECT
         library_id,
@@ -104,7 +113,7 @@ SELECT
     COALESCE(lms.library_manager_avatar_keys, ARRAY[]::TEXT[]) AS library_manager_avatar_keys,
     COALESCE(ms.member_names, ARRAY[]::TEXT[]) AS member_names,
     COALESCE(ast.asset_count, 0) AS asset_count,
-    COALESCE(ast.trash_asset_count, 0) AS trash_asset_count,
+    {trash_count_expression} AS trash_asset_count,
     COALESCE(ast.untagged_asset_count, 0) AS untagged_asset_count,
     COALESCE(ast.uncategorized_asset_count, 0) AS uncategorized_asset_count,
     COALESCE(favs.favorite_asset_count, 0) AS favorite_asset_count,
@@ -136,12 +145,17 @@ pub async fn list_libraries_for_server_manager(
         LIBRARY_STATS_CTES,
         LIBRARY_SELECT_COLUMNS
             .replace("{role_expression}", "COALESCE(m.role, $2)")
-            .replace("{member_expression}", "m.user_id IS NOT NULL"),
+            .replace("{member_expression}", "m.user_id IS NOT NULL")
+            .replace(
+                "{trash_count_expression}",
+                "COALESCE(ast.trash_asset_count, 0)",
+            ),
         r#"
         LEFT JOIN library_memberships m ON m.library_id = l.id AND m.user_id = $1
         LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN user_trash_stats uts ON uts.library_id = l.id
         LEFT JOIN favorite_stats favs ON favs.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
@@ -167,12 +181,17 @@ pub async fn list_libraries_for_member(
         LIBRARY_STATS_CTES,
         LIBRARY_SELECT_COLUMNS
             .replace("{role_expression}", "m.role")
-            .replace("{member_expression}", "m.user_id IS NOT NULL"),
+            .replace("{member_expression}", "m.user_id IS NOT NULL")
+            .replace(
+                "{trash_count_expression}",
+                "CASE WHEN m.role IN ('owner', 'admin', 'library_manager') THEN COALESCE(ast.trash_asset_count, 0) ELSE COALESCE(uts.trash_asset_count, 0) END",
+            ),
         r#"
         LEFT JOIN library_memberships m ON m.library_id = l.id AND m.user_id = $1
         LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN user_trash_stats uts ON uts.library_id = l.id
         LEFT JOIN favorite_stats favs ON favs.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id
@@ -198,12 +217,17 @@ pub async fn list_libraries_for_library_manager(
         LIBRARY_STATS_CTES,
         LIBRARY_SELECT_COLUMNS
             .replace("{role_expression}", "m.role")
-            .replace("{member_expression}", "TRUE"),
+            .replace("{member_expression}", "TRUE")
+            .replace(
+                "{trash_count_expression}",
+                "COALESCE(ast.trash_asset_count, 0)",
+            ),
         r#"
         INNER JOIN library_memberships m ON m.library_id = l.id
         LEFT JOIN library_manager_stats lms ON lms.library_id = l.id
         LEFT JOIN member_stats ms ON ms.library_id = l.id
         LEFT JOIN asset_stats ast ON ast.library_id = l.id
+        LEFT JOIN user_trash_stats uts ON uts.library_id = l.id
         LEFT JOIN favorite_stats favs ON favs.library_id = l.id
         LEFT JOIN folder_stats fs ON fs.library_id = l.id
         LEFT JOIN tag_stats ts ON ts.library_id = l.id

@@ -175,15 +175,25 @@ pub async fn query_assets(
     Path(library_id): Path<String>,
     Json(request): Json<WorkspaceAssetQueryRequest>,
 ) -> AppResult<Json<AssetListResponse>> {
-    ensure_library_access(&state, &user, &library_id).await?;
+    let role = ensure_library_access(&state, &user, &library_id).await?;
+    let can_view_all_trash = role.can_manage_all_assets();
     let limit = request.limit.unwrap_or(240).clamp(1, 500);
     let offset = request.offset.unwrap_or(0).max(0);
     let total = if let Some(known_total) = request.known_total.filter(|_| offset > 0) {
         known_total.max(0)
     } else {
-        query_total(&state, &library_id, user.id, &request).await?
+        query_total(&state, &library_id, user.id, can_view_all_trash, &request).await?
     };
-    let records = query_page(&state, &library_id, user.id, &request, limit, offset).await?;
+    let records = query_page(
+        &state,
+        &library_id,
+        user.id,
+        can_view_all_trash,
+        &request,
+        limit,
+        offset,
+    )
+    .await?;
     let items = build_asset_responses(&state, &library_id, user.id, records).await?;
 
     Ok(Json(AssetListResponse {
@@ -200,9 +210,15 @@ pub async fn query_asset_ids(
     Path(library_id): Path<String>,
     Json(request): Json<WorkspaceAssetQueryRequest>,
 ) -> AppResult<Json<AssetIdListResponse>> {
-    ensure_library_access(&state, &user, &library_id).await?;
+    let role = ensure_library_access(&state, &user, &library_id).await?;
     let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
-    push_conditions(&mut query, &library_id, user.id, &request)?;
+    push_conditions(
+        &mut query,
+        &library_id,
+        user.id,
+        role.can_manage_all_assets(),
+        &request,
+    )?;
     push_order(&mut query, &request);
     let ids = query
         .build_query_scalar::<String>()
@@ -215,10 +231,11 @@ async fn query_total(
     state: &AppState,
     library_id: &str,
     user_id: Uuid,
+    can_view_all_trash: bool,
     request: &WorkspaceAssetQueryRequest,
 ) -> AppResult<i64> {
     let mut query = QueryBuilder::<Postgres>::new("SELECT COUNT(*) FROM assets a WHERE ");
-    push_conditions(&mut query, library_id, user_id, request)?;
+    push_conditions(&mut query, library_id, user_id, can_view_all_trash, request)?;
     Ok(query
         .build_query_scalar::<i64>()
         .fetch_one(&state.pool)
@@ -229,6 +246,7 @@ async fn query_page(
     state: &AppState,
     library_id: &str,
     user_id: Uuid,
+    can_view_all_trash: bool,
     request: &WorkspaceAssetQueryRequest,
     limit: i64,
     offset: i64,
@@ -242,7 +260,7 @@ async fn query_page(
             a.deleted_at, a.restored_at
         FROM assets a WHERE "#,
     );
-    push_conditions(&mut query, library_id, user_id, request)?;
+    push_conditions(&mut query, library_id, user_id, can_view_all_trash, request)?;
     push_order(&mut query, request);
     query
         .push(" LIMIT ")
@@ -259,6 +277,7 @@ fn push_conditions(
     query: &mut QueryBuilder<'_, Postgres>,
     library_id: &str,
     user_id: Uuid,
+    can_view_all_trash: bool,
     request: &WorkspaceAssetQueryRequest,
 ) -> AppResult<()> {
     query
@@ -266,6 +285,11 @@ fn push_conditions(
         .push_bind(library_id.to_string());
     if request.scope.trashed {
         query.push(" AND a.deleted_at IS NOT NULL");
+        if !can_view_all_trash {
+            query
+                .push(" AND a.created_by_user_id = ")
+                .push_bind(user_id);
+        }
     } else {
         query.push(" AND a.deleted_at IS NULL");
     }
@@ -1602,7 +1626,7 @@ mod tests {
         });
 
         let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
-        push_conditions(&mut query, "library-a", Uuid::nil(), &request).expect("conditions");
+        push_conditions(&mut query, "library-a", Uuid::nil(), false, &request).expect("conditions");
         push_order(&mut query, &request);
         let sql = query.sql();
 
@@ -1633,7 +1657,7 @@ mod tests {
 
         let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
         assert!(matches!(
-            push_conditions(&mut query, "library-a", Uuid::nil(), &request),
+            push_conditions(&mut query, "library-a", Uuid::nil(), false, &request),
             Err(AppError::BadRequest(_))
         ));
     }
@@ -1655,7 +1679,7 @@ mod tests {
         request.sort.order = "desc".to_string();
 
         let mut query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
-        push_conditions(&mut query, "library-a", Uuid::nil(), &request).expect("conditions");
+        push_conditions(&mut query, "library-a", Uuid::nil(), false, &request).expect("conditions");
         push_order(&mut query, &request);
         let sql = query.sql();
 
@@ -1663,5 +1687,27 @@ mod tests {
         assert!(sql.contains("rel.folder_id = ANY("));
         assert!(sql.contains("ORDER BY a.updated_at DESC"));
         assert!(sql.ends_with("a.id ASC"));
+    }
+
+    #[test]
+    fn scopes_trash_to_the_current_user_for_non_managers() {
+        let mut request = WorkspaceAssetQueryRequest::default();
+        request.scope.trashed = true;
+
+        let mut personal_query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
+        push_conditions(
+            &mut personal_query,
+            "library-a",
+            Uuid::nil(),
+            false,
+            &request,
+        )
+        .expect("personal trash conditions");
+        assert!(personal_query.sql().contains("a.created_by_user_id ="));
+
+        let mut manager_query = QueryBuilder::<Postgres>::new("SELECT a.id FROM assets a WHERE ");
+        push_conditions(&mut manager_query, "library-a", Uuid::nil(), true, &request)
+            .expect("manager trash conditions");
+        assert!(!manager_query.sql().contains("a.created_by_user_id ="));
     }
 }

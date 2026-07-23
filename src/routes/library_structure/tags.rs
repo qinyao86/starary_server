@@ -2,7 +2,10 @@ use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
     routes::{
-        access::{ensure_library_access, ensure_library_write_access},
+        access::{
+            ensure_library_access, ensure_library_tag_create_access,
+            ensure_library_tag_group_mutation_access, ensure_library_tag_mutation_access,
+        },
         library_structure::{
             common::{
                 insert_activity, new_prefixed_id, normalize_optional_text, normalize_required_name,
@@ -38,7 +41,8 @@ pub async fn create_tag(
     Path(library_id): Path<String>,
     Json(request): Json<CreateTagRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_tag_create_access(&state, &user, &library_id, request.group_id.as_deref())
+        .await?;
 
     let name = normalize_required_name(&request.name, "tag name")?;
     ensure_unique_tag_name(&state, &library_id, &name, None).await?;
@@ -86,7 +90,17 @@ pub async fn update_tag(
     Path((library_id, tag_id)): Path<(String, String)>,
     Json(request): Json<UpdateTagRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_tag_mutation_access(&state, &user, &library_id, std::slice::from_ref(&tag_id))
+        .await?;
+    if let Some(group_id) = request.group_id.as_ref() {
+        ensure_library_tag_group_mutation_access(
+            &state,
+            &user,
+            &library_id,
+            std::slice::from_ref(group_id),
+        )
+        .await?;
+    }
 
     let current = query_tag_edit_state(&state, &library_id, &tag_id).await?;
     let name = request
@@ -153,7 +167,8 @@ pub async fn delete_tag(
     user: AuthUser,
     Path((library_id, tag_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_tag_mutation_access(&state, &user, &library_id, std::slice::from_ref(&tag_id))
+        .await?;
     let tag_name = query_tag_name(&state, &library_id, &tag_id).await?;
 
     let deleted = sqlx::query("DELETE FROM tags WHERE library_id = $1 AND id = $2")
@@ -186,11 +201,19 @@ pub async fn move_tags(
     Path(library_id): Path<String>,
     Json(request): Json<MoveTagsRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
-
     let tag_ids = unique_ids(&request.tag_ids);
     if tag_ids.is_empty() {
         return Ok(Json(query_tags(&state, &library_id).await?));
+    }
+    ensure_library_tag_mutation_access(&state, &user, &library_id, &tag_ids).await?;
+    if let Some(group_id) = request.group_id.as_ref() {
+        ensure_library_tag_group_mutation_access(
+            &state,
+            &user,
+            &library_id,
+            std::slice::from_ref(group_id),
+        )
+        .await?;
     }
 
     let group_color = query_group_color(&state, &library_id, request.group_id.as_deref()).await?;

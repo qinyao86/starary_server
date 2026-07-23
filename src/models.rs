@@ -71,6 +71,17 @@ impl Role {
             Role::Owner | Role::Admin | Role::LibraryManager | Role::Editor
         )
     }
+
+    pub fn can_manage_all_tags(self) -> bool {
+        self.can_manage_library()
+    }
+
+    pub fn can_manage_own_tags(self) -> bool {
+        matches!(
+            self,
+            Role::Owner | Role::Admin | Role::LibraryManager | Role::Editor
+        )
+    }
 }
 
 impl fmt::Display for Role {
@@ -129,6 +140,18 @@ mod role_tests {
 
         assert!(Role::Editor.can_manage_own_folders());
         assert!(!Role::Viewer.can_manage_own_folders());
+    }
+
+    #[test]
+    fn tag_mutations_are_scoped_by_role() {
+        assert!(Role::Owner.can_manage_all_tags());
+        assert!(Role::Admin.can_manage_all_tags());
+        assert!(Role::LibraryManager.can_manage_all_tags());
+        assert!(!Role::Editor.can_manage_all_tags());
+        assert!(!Role::Viewer.can_manage_all_tags());
+
+        assert!(Role::Editor.can_manage_own_tags());
+        assert!(!Role::Viewer.can_manage_own_tags());
     }
 }
 

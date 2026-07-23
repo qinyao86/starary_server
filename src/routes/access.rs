@@ -203,12 +203,121 @@ pub async fn ensure_library_folder_mutation_access(
     Ok(role)
 }
 
-pub async fn ensure_library_write_access(
+pub async fn ensure_library_tag_create_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+    group_id: Option<&str>,
+) -> AppResult<Role> {
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_manage_all_tags() {
+        return Ok(role);
+    }
+    if !role.can_manage_own_tags() {
+        return Err(AppError::TagMutationForbidden {
+            denied_count: 1,
+            total_count: 1,
+        });
+    }
+    if let Some(group_id) = group_id {
+        ensure_library_tag_group_mutation_access(state, user, library_id, &[group_id.to_string()])
+            .await?;
+    }
+    Ok(role)
+}
+
+pub async fn ensure_library_tag_mutation_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+    tag_ids: &[String],
+) -> AppResult<Role> {
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_manage_all_tags() || tag_ids.is_empty() {
+        return Ok(role);
+    }
+    if !role.can_manage_own_tags() {
+        return Err(AppError::TagMutationForbidden {
+            denied_count: tag_ids.len().max(1),
+            total_count: tag_ids.len().max(1),
+        });
+    }
+
+    let (found_count, owned_count): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COUNT(*) FILTER (WHERE created_by_user_id = $3) FROM tags WHERE library_id = $1 AND id = ANY($2)",
+    )
+    .bind(library_id)
+    .bind(tag_ids)
+    .bind(user.id)
+    .fetch_one(&state.pool)
+    .await?;
+    if found_count != tag_ids.len() as i64 {
+        return Err(AppError::BadRequest(
+            "one or more tags were not found".to_string(),
+        ));
+    }
+    let denied_count = tag_ids.len().saturating_sub(owned_count as usize);
+    if denied_count > 0 {
+        return Err(AppError::TagMutationForbidden {
+            denied_count,
+            total_count: tag_ids.len(),
+        });
+    }
+    Ok(role)
+}
+
+pub async fn ensure_library_tag_group_create_access(
     state: &AppState,
     user: &AuthUser,
     library_id: &str,
 ) -> AppResult<Role> {
-    // The first team version keeps structure editing permissive for members.
-    // Tighten this single gate later when folder/tag permissions are finalized.
-    ensure_library_access(state, user, library_id).await
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_manage_own_tags() {
+        Ok(role)
+    } else {
+        Err(AppError::TagGroupMutationForbidden {
+            denied_count: 1,
+            total_count: 1,
+        })
+    }
+}
+
+pub async fn ensure_library_tag_group_mutation_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+    group_ids: &[String],
+) -> AppResult<Role> {
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_manage_all_tags() || group_ids.is_empty() {
+        return Ok(role);
+    }
+    if !role.can_manage_own_tags() {
+        return Err(AppError::TagGroupMutationForbidden {
+            denied_count: group_ids.len().max(1),
+            total_count: group_ids.len().max(1),
+        });
+    }
+
+    let (found_count, owned_count): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COUNT(*) FILTER (WHERE created_by_user_id = $3) FROM tag_groups WHERE library_id = $1 AND id = ANY($2)",
+    )
+    .bind(library_id)
+    .bind(group_ids)
+    .bind(user.id)
+    .fetch_one(&state.pool)
+    .await?;
+    if found_count != group_ids.len() as i64 {
+        return Err(AppError::BadRequest(
+            "one or more tag groups were not found".to_string(),
+        ));
+    }
+    let denied_count = group_ids.len().saturating_sub(owned_count as usize);
+    if denied_count > 0 {
+        return Err(AppError::TagGroupMutationForbidden {
+            denied_count,
+            total_count: group_ids.len(),
+        });
+    }
+    Ok(role)
 }

@@ -24,6 +24,16 @@ pub enum AppError {
         denied_count: usize,
         total_count: usize,
     },
+    #[error("one or more selected tags cannot be edited by this user")]
+    TagMutationForbidden {
+        denied_count: usize,
+        total_count: usize,
+    },
+    #[error("one or more selected tag groups cannot be edited by this user")]
+    TagGroupMutationForbidden {
+        denied_count: usize,
+        total_count: usize,
+    },
     #[error("no permission to log in to the admin console")]
     ConsoleLoginForbidden,
     #[error("not found: {0}")]
@@ -65,6 +75,8 @@ impl IntoResponse for AppError {
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::AssetMutationForbidden { .. } => StatusCode::FORBIDDEN,
             AppError::FolderMutationForbidden { .. } => StatusCode::FORBIDDEN,
+            AppError::TagMutationForbidden { .. } => StatusCode::FORBIDDEN,
+            AppError::TagGroupMutationForbidden { .. } => StatusCode::FORBIDDEN,
             AppError::ConsoleLoginForbidden => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
@@ -82,6 +94,8 @@ impl IntoResponse for AppError {
             AppError::ConsoleLoginForbidden => Some("console_login_forbidden"),
             AppError::AssetMutationForbidden { .. } => Some("asset_mutation_forbidden"),
             AppError::FolderMutationForbidden { .. } => Some("folder_mutation_forbidden"),
+            AppError::TagMutationForbidden { .. } => Some("tag_mutation_forbidden"),
+            AppError::TagGroupMutationForbidden { .. } => Some("tag_group_mutation_forbidden"),
             _ => None,
         };
         let library_id = match &self {
@@ -94,6 +108,14 @@ impl IntoResponse for AppError {
                 total_count,
             }
             | AppError::FolderMutationForbidden {
+                denied_count,
+                total_count,
+            }
+            | AppError::TagMutationForbidden {
+                denied_count,
+                total_count,
+            }
+            | AppError::TagGroupMutationForbidden {
                 denied_count,
                 total_count,
             } => (Some(*denied_count), Some(*total_count)),

@@ -2,7 +2,10 @@ use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
     routes::{
-        access::{ensure_library_access, ensure_library_write_access},
+        access::{
+            ensure_library_access, ensure_library_tag_group_create_access,
+            ensure_library_tag_group_mutation_access, ensure_library_tag_mutation_access,
+        },
         library_structure::{
             common::{
                 insert_activity, new_prefixed_id, normalize_required_name, normalize_required_text,
@@ -10,7 +13,7 @@ use crate::{
             requests::{CreateTagGroupRequest, UpdateTagGroupRequest},
             tag_group_queries::{
                 ensure_unique_group_name, next_group_sort_order, query_group_edit_state,
-                query_group_name, query_tag_groups,
+                query_group_name, query_group_tag_ids, query_tag_groups,
             },
         },
     },
@@ -37,7 +40,7 @@ pub async fn create_tag_group(
     Path(library_id): Path<String>,
     Json(request): Json<CreateTagGroupRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagGroupRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_tag_group_create_access(&state, &user, &library_id).await?;
 
     let name = normalize_required_name(&request.name, "tag group name")?;
     let color = normalize_required_text(request.color, "default");
@@ -83,7 +86,13 @@ pub async fn update_tag_group(
     Path((library_id, group_id)): Path<(String, String)>,
     Json(request): Json<UpdateTagGroupRequest>,
 ) -> AppResult<Json<Vec<crate::models::TagGroupRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_tag_group_mutation_access(
+        &state,
+        &user,
+        &library_id,
+        std::slice::from_ref(&group_id),
+    )
+    .await?;
 
     let current = query_group_edit_state(&state, &library_id, &group_id).await?;
     let name = request
@@ -152,7 +161,15 @@ pub async fn delete_tag_group(
     user: AuthUser,
     Path((library_id, group_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_tag_group_mutation_access(
+        &state,
+        &user,
+        &library_id,
+        std::slice::from_ref(&group_id),
+    )
+    .await?;
+    let group_tag_ids = query_group_tag_ids(&state, &library_id, &group_id).await?;
+    ensure_library_tag_mutation_access(&state, &user, &library_id, &group_tag_ids).await?;
     let name = query_group_name(&state, &library_id, &group_id).await?;
 
     let mut tx = state.pool.begin().await?;

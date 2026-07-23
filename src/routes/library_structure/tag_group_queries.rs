@@ -91,6 +91,20 @@ pub async fn query_group_name(
         .ok_or_else(|| AppError::NotFound("tag group not found".to_string()))
 }
 
+pub async fn query_group_tag_ids(
+    state: &AppState,
+    library_id: &str,
+    group_id: &str,
+) -> AppResult<Vec<String>> {
+    Ok(
+        sqlx::query_scalar("SELECT id FROM tags WHERE library_id = $1 AND group_id = $2")
+            .bind(library_id)
+            .bind(group_id)
+            .fetch_all(&state.pool)
+            .await?,
+    )
+}
+
 pub async fn query_group_edit_state(
     state: &AppState,
     library_id: &str,
