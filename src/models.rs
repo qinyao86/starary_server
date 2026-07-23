@@ -60,6 +60,17 @@ impl Role {
             Role::Owner | Role::Admin | Role::LibraryManager | Role::Editor
         )
     }
+
+    pub fn can_manage_all_folders(self) -> bool {
+        self.can_manage_library()
+    }
+
+    pub fn can_manage_own_folders(self) -> bool {
+        matches!(
+            self,
+            Role::Owner | Role::Admin | Role::LibraryManager | Role::Editor
+        )
+    }
 }
 
 impl fmt::Display for Role {
@@ -106,6 +117,18 @@ mod role_tests {
 
         assert!(Role::Editor.can_manage_own_assets());
         assert!(!Role::Viewer.can_manage_own_assets());
+    }
+
+    #[test]
+    fn folder_mutations_are_scoped_by_role() {
+        assert!(Role::Owner.can_manage_all_folders());
+        assert!(Role::Admin.can_manage_all_folders());
+        assert!(Role::LibraryManager.can_manage_all_folders());
+        assert!(!Role::Editor.can_manage_all_folders());
+        assert!(!Role::Viewer.can_manage_all_folders());
+
+        assert!(Role::Editor.can_manage_own_folders());
+        assert!(!Role::Viewer.can_manage_own_folders());
     }
 }
 

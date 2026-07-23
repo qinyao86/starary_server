@@ -19,6 +19,11 @@ pub enum AppError {
         denied_count: usize,
         total_count: usize,
     },
+    #[error("one or more selected folders cannot be edited by this user")]
+    FolderMutationForbidden {
+        denied_count: usize,
+        total_count: usize,
+    },
     #[error("no permission to log in to the admin console")]
     ConsoleLoginForbidden,
     #[error("not found: {0}")]
@@ -59,6 +64,7 @@ impl IntoResponse for AppError {
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::AssetMutationForbidden { .. } => StatusCode::FORBIDDEN,
+            AppError::FolderMutationForbidden { .. } => StatusCode::FORBIDDEN,
             AppError::ConsoleLoginForbidden => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
@@ -75,6 +81,7 @@ impl IntoResponse for AppError {
             AppError::StorageLocationConflict(_) => Some("storage_location_conflict"),
             AppError::ConsoleLoginForbidden => Some("console_login_forbidden"),
             AppError::AssetMutationForbidden { .. } => Some("asset_mutation_forbidden"),
+            AppError::FolderMutationForbidden { .. } => Some("folder_mutation_forbidden"),
             _ => None,
         };
         let library_id = match &self {
@@ -83,6 +90,10 @@ impl IntoResponse for AppError {
         };
         let (denied_count, total_count) = match &self {
             AppError::AssetMutationForbidden {
+                denied_count,
+                total_count,
+            }
+            | AppError::FolderMutationForbidden {
                 denied_count,
                 total_count,
             } => (Some(*denied_count), Some(*total_count)),

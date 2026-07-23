@@ -46,6 +46,7 @@ pub struct UpdateFolderRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ReorderFoldersRequest {
     pub folder_ids: Vec<String>,
+    pub moved_folder_ids: Option<Vec<String>>,
     pub parent_id: Option<String>,
 }
 

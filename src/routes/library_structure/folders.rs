@@ -3,7 +3,8 @@ use crate::{
     error::{AppError, AppResult},
     routes::{
         access::{
-            ensure_library_access, ensure_library_asset_import_access, ensure_library_write_access,
+            ensure_library_access, ensure_library_asset_import_access,
+            ensure_library_folder_create_access, ensure_library_folder_mutation_access,
         },
         library_structure::{
             common::{
@@ -12,8 +13,8 @@ use crate::{
             },
             folder_queries::{
                 ensure_folder_can_move, ensure_folder_exists_in_tx, ensure_parent_folder,
-                next_folder_sort_order, query_folder_edit_state, query_folder_name, query_folders,
-                query_sibling_folder_ids_in_tx,
+                next_folder_sort_order, query_folder_branch_ids, query_folder_edit_state,
+                query_folder_name, query_folders, query_sibling_folder_ids_in_tx,
             },
             requests::{
                 CreateFolderImportPlanRequest, CreateFolderRequest, ReorderFoldersRequest,
@@ -56,7 +57,8 @@ pub async fn create_folder(
     Path(library_id): Path<String>,
     Json(request): Json<CreateFolderRequest>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_folder_create_access(&state, &user, &library_id, request.parent_id.as_deref())
+        .await?;
 
     let name = normalize_required_name(&request.name, "folder name")?;
     let icon = normalize_required_text(request.icon, "folder");
@@ -108,6 +110,8 @@ pub async fn create_folder_import_plan(
     Json(request): Json<CreateFolderImportPlanRequest>,
 ) -> AppResult<Json<CreateFolderImportPlanResponse>> {
     ensure_library_asset_import_access(&state, &user, &library_id).await?;
+    ensure_library_folder_create_access(&state, &user, &library_id, request.parent_id.as_deref())
+        .await?;
     ensure_parent_folder(&state, &library_id, request.parent_id.as_deref()).await?;
 
     if request.folders.len() > MAX_IMPORT_PLAN_FOLDERS {
@@ -247,7 +251,21 @@ pub async fn update_folder(
     Path((library_id, folder_id)): Path<(String, String)>,
     Json(request): Json<UpdateFolderRequest>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    let role = ensure_library_folder_mutation_access(
+        &state,
+        &user,
+        &library_id,
+        std::slice::from_ref(&folder_id),
+    )
+    .await?;
+    if (request.smart_import_id.is_some() || request.clear_smart_import_id.unwrap_or(false))
+        && !role.can_manage_library()
+    {
+        return Err(AppError::FolderMutationForbidden {
+            denied_count: 1,
+            total_count: 1,
+        });
+    }
 
     let current = query_folder_edit_state(&state, &library_id, &folder_id).await?;
     let name = request
@@ -323,26 +341,67 @@ pub async fn reorder_folders(
     Path(library_id): Path<String>,
     Json(request): Json<ReorderFoldersRequest>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    ensure_library_folder_create_access(&state, &user, &library_id, request.parent_id.as_deref())
+        .await?;
     ensure_parent_folder(&state, &library_id, request.parent_id.as_deref()).await?;
 
     let requested_folder_ids = unique_ids(&request.folder_ids);
     if requested_folder_ids.is_empty() {
         return Ok(Json(query_folders(&state, &library_id).await?));
     }
+    let moved_folder_ids = request
+        .moved_folder_ids
+        .as_deref()
+        .map(unique_ids)
+        .filter(|folder_ids| !folder_ids.is_empty())
+        .unwrap_or_else(|| requested_folder_ids.clone());
+    let requested_folder_id_set = requested_folder_ids.iter().collect::<HashSet<_>>();
+    if moved_folder_ids
+        .iter()
+        .any(|folder_id| !requested_folder_id_set.contains(folder_id))
+    {
+        return Err(AppError::BadRequest(
+            "moved folders must be included in the requested folder order".to_string(),
+        ));
+    }
 
     let mut tx = state.pool.begin().await?;
     let existing_sibling_ids =
         query_sibling_folder_ids_in_tx(&mut tx, &library_id, request.parent_id.as_deref()).await?;
+    let existing_sibling_id_set = existing_sibling_ids.iter().collect::<HashSet<_>>();
+    let moved_folder_id_set = moved_folder_ids.iter().collect::<HashSet<_>>();
+    if requested_folder_ids.iter().any(|folder_id| {
+        !existing_sibling_id_set.contains(folder_id) && !moved_folder_id_set.contains(folder_id)
+    }) {
+        return Err(AppError::BadRequest(
+            "only explicitly moved folders may change parent".to_string(),
+        ));
+    }
     let mut ordered_folder_ids = requested_folder_ids;
-    for sibling_id in existing_sibling_ids {
+    for sibling_id in &existing_sibling_ids {
         if !ordered_folder_ids
             .iter()
-            .any(|folder_id| folder_id == &sibling_id)
+            .any(|folder_id| folder_id == sibling_id)
         {
-            ordered_folder_ids.push(sibling_id);
+            ordered_folder_ids.push(sibling_id.clone());
         }
     }
+    let existing_unmoved_order = existing_sibling_ids
+        .iter()
+        .filter(|folder_id| !moved_folder_id_set.contains(folder_id))
+        .collect::<Vec<_>>();
+    let requested_unmoved_order = ordered_folder_ids
+        .iter()
+        .filter(|folder_id| {
+            existing_sibling_id_set.contains(folder_id) && !moved_folder_id_set.contains(folder_id)
+        })
+        .collect::<Vec<_>>();
+    if requested_unmoved_order != existing_unmoved_order {
+        return Err(AppError::BadRequest(
+            "unmoved sibling folders must retain their relative order".to_string(),
+        ));
+    }
+    ensure_library_folder_mutation_access(&state, &user, &library_id, &moved_folder_ids).await?;
 
     for (index, folder_id) in ordered_folder_ids.iter().enumerate() {
         ensure_folder_exists_in_tx(&mut tx, &library_id, folder_id).await?;
@@ -381,7 +440,8 @@ pub async fn delete_folder(
     user: AuthUser,
     Path((library_id, folder_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
-    ensure_library_write_access(&state, &user, &library_id).await?;
+    let branch_ids = query_folder_branch_ids(&state, &library_id, &folder_id).await?;
+    ensure_library_folder_mutation_access(&state, &user, &library_id, &branch_ids).await?;
     let folder_name = query_folder_name(&state, &library_id, &folder_id).await?;
 
     let deleted = sqlx::query("DELETE FROM folders WHERE library_id = $1 AND id = $2")

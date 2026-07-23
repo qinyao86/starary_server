@@ -104,6 +104,32 @@ pub async fn query_folder_name(
         .ok_or_else(|| AppError::NotFound("folder not found".to_string()))
 }
 
+pub async fn query_folder_branch_ids(
+    state: &AppState,
+    library_id: &str,
+    folder_id: &str,
+) -> AppResult<Vec<String>> {
+    Ok(sqlx::query_scalar(
+        r#"
+        WITH RECURSIVE folder_branch AS (
+            SELECT id
+            FROM folders
+            WHERE library_id = $1 AND id = $2
+            UNION ALL
+            SELECT child.id
+            FROM folders child
+            INNER JOIN folder_branch parent ON child.parent_id = parent.id
+            WHERE child.library_id = $1
+        )
+        SELECT id FROM folder_branch
+        "#,
+    )
+    .bind(library_id)
+    .bind(folder_id)
+    .fetch_all(&state.pool)
+    .await?)
+}
+
 pub async fn query_folder_edit_state(
     state: &AppState,
     library_id: &str,

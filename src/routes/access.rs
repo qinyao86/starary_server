@@ -135,6 +135,74 @@ pub async fn ensure_library_asset_mutation_access(
     Ok(role)
 }
 
+pub async fn ensure_library_folder_create_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+    parent_id: Option<&str>,
+) -> AppResult<Role> {
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_manage_all_folders() {
+        return Ok(role);
+    }
+    if !role.can_manage_own_folders() {
+        return Err(AppError::FolderMutationForbidden {
+            denied_count: 1,
+            total_count: 1,
+        });
+    }
+    if let Some(parent_id) = parent_id {
+        let parent_ids = [parent_id.to_string()];
+        ensure_library_folder_mutation_access(state, user, library_id, &parent_ids).await?;
+    }
+    Ok(role)
+}
+
+pub async fn ensure_library_folder_mutation_access(
+    state: &AppState,
+    user: &AuthUser,
+    library_id: &str,
+    folder_ids: &[String],
+) -> AppResult<Role> {
+    let role = ensure_library_access(state, user, library_id).await?;
+    if role.can_manage_all_folders() || folder_ids.is_empty() {
+        return Ok(role);
+    }
+    if !role.can_manage_own_folders() {
+        return Err(AppError::FolderMutationForbidden {
+            denied_count: folder_ids.len().max(1),
+            total_count: folder_ids.len().max(1),
+        });
+    }
+
+    let (found_count, owned_count): (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT COUNT(*), COUNT(*) FILTER (WHERE created_by_user_id = $3)
+        FROM folders
+        WHERE library_id = $1
+          AND id = ANY($2)
+        "#,
+    )
+    .bind(library_id)
+    .bind(folder_ids)
+    .bind(user.id)
+    .fetch_one(&state.pool)
+    .await?;
+    if found_count != folder_ids.len() as i64 {
+        return Err(AppError::BadRequest(
+            "one or more folders were not found".to_string(),
+        ));
+    }
+    let denied_count = folder_ids.len().saturating_sub(owned_count as usize);
+    if denied_count > 0 {
+        return Err(AppError::FolderMutationForbidden {
+            denied_count,
+            total_count: folder_ids.len(),
+        });
+    }
+    Ok(role)
+}
+
 pub async fn ensure_library_write_access(
     state: &AppState,
     user: &AuthUser,
