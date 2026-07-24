@@ -232,6 +232,15 @@
   background: #2563eb;
 }
 
+.permission-condition {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  color: #526071;
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .permission-row-unverified td {
   color: #8994a3;
   background: #fafbfc;
@@ -303,6 +312,10 @@
 
 .theme-dark .permission-plan-note {
   color: #a1a1aa;
+}
+
+.theme-dark .permission-condition {
+  color: #c7c7cc;
 }
 
 .theme-dark .permission-row-unverified td {

@@ -31,11 +31,16 @@ The desktop development runtime serves a copied bundle from:
 target/build-dev/desktop/runtime/admin-ui/
 ```
 
-After every frontend build that should be visible in the desktop/admin server
-runtime, run the shared prep script:
+For a frontend change that must be visible in the running development desktop
+and admin server, build directly into the development frontend directory and
+run the shared prep script in development mode:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\prepare-desktop-bundle.ps1
+$env:MADLIBRARY_ADMIN_UI_OUT_DIR = "$PWD\target\build-dev\frontend\admin-ui"
+Push-Location .\admin-ui
+npm run build
+Pop-Location
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare-desktop-bundle.ps1 -Development
 ```
 
 Alternatively, run the full desktop development flow:

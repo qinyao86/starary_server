@@ -36,7 +36,11 @@ export function PermissionsPage({ t }: TranslatorContext) {
                 <td>{t(row.action)}</td>
                 <td><CheckCell checked={row.owner} /></td>
                 <td><CheckCell checked={row.admin} /></td>
-                <td><CheckCell checked={row.user} /></td>
+                <td>
+                  {row.user === "libraryRole"
+                    ? <span className="permission-condition">{t("permissionByLibraryRole")}</span>
+                    : <CheckCell checked={row.user} />}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -75,7 +79,7 @@ export function PermissionsPage({ t }: TranslatorContext) {
                         title={t(row.verified ? "permissionVerified" : "permissionPendingVerification")}
                       />
                       <span>
-                        {"target" in row
+                        {row.target
                           ? t("permissionActionWithTarget")
                               .replace("{action}", t(row.action))
                               .replace("{target}", t(row.target))

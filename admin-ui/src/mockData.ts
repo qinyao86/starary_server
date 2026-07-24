@@ -61,61 +61,123 @@ export const activity = [
 ] as const;
 
 export const serverPermissions = [
-  { action: "loginConsole", owner: true, admin: true, user: false },
+  { action: "connectDesktopClient", owner: true, admin: true, user: true },
+  { action: "loginConsole", owner: true, admin: true, user: "libraryRole" },
+  { action: "manageOwnProfile", owner: true, admin: true, user: true },
   { action: "createLibrary", owner: true, admin: true, user: false },
   { action: "manageAllLibraries", owner: true, admin: true, user: false },
   { action: "manageStorage", owner: true, admin: true, user: false },
   { action: "manageUsers", owner: true, admin: true, user: false },
+  { action: "viewServerStatistics", owner: true, admin: true, user: false },
+  { action: "reviewPermissions", owner: true, admin: true, user: false },
   { action: "manageBackups", owner: true, admin: false, user: false },
-  { action: "manageRuntime", owner: true, admin: true, user: false }
+  { action: "manageRuntime", owner: true, admin: true, user: false },
+  { action: "initializeServer", owner: true, admin: false, user: false }
 ] as const;
+
+type LibraryPermissionRow = {
+  action: TranslationKey;
+  category: TranslationKey;
+  editor: boolean;
+  manager: boolean;
+  scope: "all" | "create" | "own" | "personal";
+  target?: TranslationKey;
+  verified: boolean;
+  viewer: boolean;
+};
+
+function scopedRows(
+  category: TranslationKey,
+  action: TranslationKey,
+  ownTarget: TranslationKey,
+  allTarget: TranslationKey,
+  verified: boolean,
+): LibraryPermissionRow[] {
+  return [
+    { category, action, scope: "own", target: ownTarget, manager: true, editor: true, viewer: false, verified },
+    { category, action, scope: "all", target: allTarget, manager: true, editor: false, viewer: false, verified },
+  ];
+}
 
 export const libraryPermissions = [
   { category: "permissionCategoryAccess", action: "viewLibrary", scope: "all", manager: true, editor: true, viewer: true, verified: true },
+  { category: "permissionCategoryAccess", action: "browseLibraryContent", scope: "all", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryAccess", action: "previewAssets", scope: "all", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryAccess", action: "downloadAssets", scope: "all", manager: true, editor: true, viewer: true, verified: true },
+  { category: "permissionCategoryAccess", action: "copyAssetReferences", scope: "all", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryPersonal", action: "favoriteAssets", scope: "personal", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryPersonal", action: "managePersonalQuickAccess", scope: "personal", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryPersonal", action: "managePersonalFilterPresets", scope: "personal", manager: true, editor: true, viewer: true, verified: true },
-  { category: "permissionCategoryAssets", action: "importAssets", scope: "create", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "editAssetBasicInfo", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "editAssetBasicInfo", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "organizeAssetFolders", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "organizeAssetFolders", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "organizeAssetTags", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "organizeAssetTags", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "manageAssetThumbnails", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "manageAssetThumbnails", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "manageImageSequences", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "manageImageSequences", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "moveAssetsToTrash", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "moveAssetsToTrash", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "restoreAssets", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "restoreAssets", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "deleteAssetsPermanently", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "deleteAssetsPermanently", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryAssets", action: "mergeDuplicateAssets", scope: "all", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryStructure", action: "createFolders", scope: "create", manager: true, editor: true, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "manageFolders", scope: "own", target: "permissionTargetOwnFolders", manager: true, editor: true, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "manageFolders", scope: "all", target: "permissionTargetAllFolders", manager: true, editor: false, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "createTags", scope: "create", manager: true, editor: true, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "manageTags", scope: "own", target: "permissionTargetOwnTags", manager: true, editor: true, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "manageTags", scope: "all", target: "permissionTargetAllTags", manager: true, editor: false, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "createTagGroups", scope: "create", manager: true, editor: true, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "manageTagGroups", scope: "own", target: "permissionTargetOwnTagGroups", manager: true, editor: true, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "manageTagGroups", scope: "all", target: "permissionTargetAllTagGroups", manager: true, editor: false, viewer: false, verified: false },
-  { category: "permissionCategoryStructure", action: "manageSharedPresets", scope: "all", manager: true, editor: false, viewer: false, verified: false },
+  { category: "permissionCategoryImportTasks", action: "importAssets", scope: "create", manager: true, editor: true, viewer: false, verified: true },
+  { category: "permissionCategoryImportTasks", action: "importImageSequences", scope: "create", manager: true, editor: true, viewer: false, verified: true },
+  { category: "permissionCategoryImportTasks", action: "useSmartImportRules", scope: "create", manager: true, editor: true, viewer: false, verified: true },
+  { category: "permissionCategoryImportTasks", action: "viewOwnTasks", scope: "personal", manager: true, editor: true, viewer: true, verified: false },
+  { category: "permissionCategoryImportTasks", action: "controlOwnTasks", scope: "personal", manager: true, editor: true, viewer: true, verified: false },
+  ...scopedRows("permissionCategoryAssetDetails", "renameAssets", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetDetails", "editAssetDescriptions", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetDetails", "editAssetLinks", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetDetails", "rateAssets", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetDetails", "editAssetViewerSettings", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetDetails", "editTextAssetContent", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "rebuildAssetThumbnails", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "setCustomAssetThumbnails", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "editImageSequences", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "addAssetsToFolders", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "removeAssetsFromFolders", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "moveAssetFolders", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "clearAssetFolders", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "addAssetTags", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "removeAssetTags", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetOrganization", "replaceAssetTags", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryTrashDuplicates", "moveAssetsToTrash", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  { category: "permissionCategoryTrashDuplicates", action: "viewTrashAssets", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: true, verified: false },
+  { category: "permissionCategoryTrashDuplicates", action: "viewTrashAssets", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: false },
+  ...scopedRows("permissionCategoryTrashDuplicates", "restoreAssets", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryTrashDuplicates", "deleteAssetsPermanently", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryTrashDuplicates", "emptyTrash", "permissionTargetOwnAssets", "permissionTargetAllAssets", false),
+  { category: "permissionCategoryTrashDuplicates", action: "viewDuplicateAssets", scope: "all", manager: true, editor: true, viewer: true, verified: false },
+  { category: "permissionCategoryTrashDuplicates", action: "mergeDuplicateAssets", scope: "all", manager: true, editor: false, viewer: false, verified: true },
   { category: "permissionCategoryTransfer", action: "copyAssetsAcrossLibraries", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
   { category: "permissionCategoryTransfer", action: "copyAssetsAcrossLibraries", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
+  { category: "permissionCategoryTransfer", action: "copyFoldersAcrossLibraries", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
+  { category: "permissionCategoryTransfer", action: "copyFoldersAcrossLibraries", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
+  { category: "permissionCategoryTransfer", action: "copyBetweenPersonalAndTeam", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
+  { category: "permissionCategoryTransfer", action: "copyBetweenPersonalAndTeam", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
   { category: "permissionCategoryTransfer", action: "exportAssets", scope: "all", manager: true, editor: true, viewer: true, verified: false },
+  { category: "permissionCategoryFolders", action: "createRootFolders", scope: "create", manager: true, editor: true, viewer: false, verified: false },
+  { category: "permissionCategoryFolders", action: "createChildFolders", scope: "own", target: "permissionTargetOwnFolders", manager: true, editor: true, viewer: false, verified: false },
+  { category: "permissionCategoryFolders", action: "createChildFolders", scope: "all", target: "permissionTargetAllFolders", manager: true, editor: false, viewer: false, verified: false },
+  ...scopedRows("permissionCategoryFolders", "renameFolders", "permissionTargetOwnFolders", "permissionTargetAllFolders", false),
+  ...scopedRows("permissionCategoryFolders", "moveFolders", "permissionTargetOwnFolders", "permissionTargetAllFolders", false),
+  ...scopedRows("permissionCategoryFolders", "deleteFolders", "permissionTargetOwnFolderBranches", "permissionTargetAllFolders", false),
+  ...scopedRows("permissionCategoryFolders", "editFolderDescriptions", "permissionTargetOwnFolders", "permissionTargetAllFolders", false),
+  ...scopedRows("permissionCategoryFolders", "editFolderColors", "permissionTargetOwnFolders", "permissionTargetAllFolders", false),
+  ...scopedRows("permissionCategoryFolders", "editFolderIcons", "permissionTargetOwnFolders", "permissionTargetAllFolders", false),
+  ...scopedRows("permissionCategoryFolders", "editFolderCovers", "permissionTargetOwnFolders", "permissionTargetAllFolders", false),
+  ...scopedRows("permissionCategoryFolders", "assignFolderSmartImport", "permissionTargetOwnFolders", "permissionTargetAllFolders", false),
+  { category: "permissionCategoryTags", action: "createTags", scope: "create", manager: true, editor: true, viewer: false, verified: false },
+  ...scopedRows("permissionCategoryTags", "renameTags", "permissionTargetOwnTags", "permissionTargetAllTags", false),
+  ...scopedRows("permissionCategoryTags", "moveTags", "permissionTargetOwnTags", "permissionTargetAllTags", false),
+  ...scopedRows("permissionCategoryTags", "deleteTags", "permissionTargetOwnTags", "permissionTargetAllTags", false),
+  ...scopedRows("permissionCategoryTags", "editTagColors", "permissionTargetOwnTags", "permissionTargetAllTags", false),
+  ...scopedRows("permissionCategoryTags", "starTags", "permissionTargetOwnTags", "permissionTargetAllTags", false),
+  { category: "permissionCategoryTags", action: "createTagGroups", scope: "create", manager: true, editor: true, viewer: false, verified: false },
+  ...scopedRows("permissionCategoryTags", "renameTagGroups", "permissionTargetOwnTagGroups", "permissionTargetAllTagGroups", false),
+  ...scopedRows("permissionCategoryTags", "moveTagGroups", "permissionTargetOwnTagGroups", "permissionTargetAllTagGroups", false),
+  ...scopedRows("permissionCategoryTags", "editTagGroupColors", "permissionTargetOwnTagGroups", "permissionTargetAllTagGroups", false),
+  ...scopedRows("permissionCategoryTags", "deleteTagGroups", "permissionTargetOwnTagGroups", "permissionTargetAllTagGroups", false),
+  { category: "permissionCategorySharedPresets", action: "manageSmartFolders", scope: "all", manager: true, editor: false, viewer: false, verified: false },
+  { category: "permissionCategorySharedPresets", action: "manageSmartImportRules", scope: "all", manager: true, editor: false, viewer: false, verified: false },
   { category: "permissionCategoryManagement", action: "viewMembers", scope: "all", manager: true, editor: true, viewer: true, verified: false },
   { category: "permissionCategoryManagement", action: "viewLibraryActivity", scope: "all", manager: true, editor: true, viewer: true, verified: false },
-  { category: "permissionCategoryManagement", action: "manageMembers", scope: "all", manager: true, editor: false, viewer: false, verified: false },
+  { category: "permissionCategoryManagement", action: "addMembers", scope: "all", manager: true, editor: false, viewer: false, verified: false },
+  { category: "permissionCategoryManagement", action: "removeMembers", scope: "all", manager: true, editor: false, viewer: false, verified: false },
+  { category: "permissionCategoryManagement", action: "changeMemberRoles", scope: "all", manager: true, editor: false, viewer: false, verified: false },
   { category: "permissionCategoryManagement", action: "manageLibraryDetails", scope: "all", manager: true, editor: false, viewer: false, verified: false },
   { category: "permissionCategoryManagement", action: "manageLibraryIcon", scope: "all", manager: true, editor: false, viewer: false, verified: false },
   { category: "permissionCategoryManagement", action: "manageLibraryStorage", scope: "all", manager: true, editor: false, viewer: false, verified: false },
   { category: "permissionCategoryManagement", action: "deleteLibrary", scope: "all", manager: true, editor: false, viewer: false, verified: false }
-] as const;
+] satisfies ReadonlyArray<LibraryPermissionRow>;
 
 export const assetBreakdown = [
   { label: "images", value: 38 },
