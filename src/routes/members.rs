@@ -41,6 +41,14 @@ pub async fn list_contributors(
             SELECT created_by_user_id AS user_id
             FROM folders
             WHERE library_id = $1 AND created_by_user_id IS NOT NULL
+            UNION
+            SELECT created_by_user_id AS user_id
+            FROM tags
+            WHERE library_id = $1 AND created_by_user_id IS NOT NULL
+            UNION
+            SELECT created_by_user_id AS user_id
+            FROM tag_groups
+            WHERE library_id = $1 AND created_by_user_id IS NOT NULL
         ) contributor_ids ON contributor_ids.user_id = u.id
         ORDER BY u.display_name ASC, u.email ASC
         "#,
