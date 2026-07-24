@@ -251,21 +251,13 @@ pub async fn update_folder(
     Path((library_id, folder_id)): Path<(String, String)>,
     Json(request): Json<UpdateFolderRequest>,
 ) -> AppResult<Json<Vec<crate::models::FolderRecord>>> {
-    let role = ensure_library_folder_mutation_access(
+    ensure_library_folder_mutation_access(
         &state,
         &user,
         &library_id,
         std::slice::from_ref(&folder_id),
     )
     .await?;
-    if (request.smart_import_id.is_some() || request.clear_smart_import_id.unwrap_or(false))
-        && !role.can_manage_library()
-    {
-        return Err(AppError::FolderMutationForbidden {
-            denied_count: 1,
-            total_count: 1,
-        });
-    }
 
     let current = query_folder_edit_state(&state, &library_id, &folder_id).await?;
     let name = request
