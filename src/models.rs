@@ -395,9 +395,10 @@ pub struct LibraryMemberRecord {
 #[serde(rename_all = "camelCase")]
 pub struct LibraryContributorRecord {
     pub user_id: Uuid,
-    pub email: String,
+    pub email: Option<String>,
     pub display_name: String,
     pub avatar_key: Option<String>,
+    pub is_deleted: bool,
 }
 
 #[derive(Debug, FromRow, Serialize)]

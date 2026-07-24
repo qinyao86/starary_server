@@ -21,7 +21,7 @@ mod requests;
 use guards::{ensure_another_active_owner, ensure_unique_display_name};
 use requests::{CreateUserRequest, UpdateUserRequest, UserLibraryMembershipInput};
 
-fn deleted_user_id() -> Uuid {
+pub(crate) fn deleted_user_id() -> Uuid {
     Uuid::from_u128(1)
 }
 

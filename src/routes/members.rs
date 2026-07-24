@@ -3,6 +3,7 @@ use crate::{
     error::{AppError, AppResult},
     models::{LibraryContributorRecord, LibraryMemberRecord, Role},
     routes::access::{ensure_library_access, ensure_library_manager},
+    routes::users::deleted_user_id,
     state::AppState,
 };
 use axum::{
@@ -29,9 +30,10 @@ pub async fn list_contributors(
         r#"
         SELECT
             u.id AS user_id,
-            u.email,
+            CASE WHEN u.id = $2 THEN NULL ELSE u.email END AS email,
             u.display_name,
-            u.avatar_key
+            u.avatar_key,
+            u.id = $2 AS is_deleted
         FROM users u
         INNER JOIN (
             SELECT COALESCE(imported_by_user_id, created_by_user_id) AS user_id
@@ -54,6 +56,7 @@ pub async fn list_contributors(
         "#,
     )
     .bind(&library_id)
+    .bind(deleted_user_id())
     .fetch_all(&state.pool)
     .await?;
 
