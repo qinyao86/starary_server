@@ -28,14 +28,14 @@ target/                         All generated build and release output
 admin-ui/node_modules/          Installed frontend development dependencies
 .dev/                           Local development data and storage
 target/release/windows-x64/      Final distributable artifacts only
-  |- Mad-Library-Server_0.1.0_windows-x64-setup.exe
-  |- Mad-Library-Server_0.1.0_windows-x64-portable.zip
+  |- Starary-Server_0.1.0_windows-x64-setup.exe
+  |- Starary-Server_0.1.0_windows-x64-portable.zip
   `- SHA256SUMS.txt
 ```
 
 All directories in the second list are ignored by Git. Never run the server
 from `artifacts/` and never put initialized data directories there. Installed
-desktop builds keep mutable data in `%ProgramData%\Mad Library Server`; program
+desktop builds currently keep mutable data in the legacy `%ProgramData%\Mad Library Server`; program
 files and the bundled PostgreSQL runtime remain read-only in the install folder.
 
 ## Common commands

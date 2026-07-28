@@ -51,7 +51,7 @@ try {
   Pop-Location
 }
 
-Write-Host "Starting Mad Library Team Server..."
+Write-Host "Starting Starary Server..."
 Write-Host "Open http://127.0.0.1:3789/admin after the server starts."
 
 Push-Location $serverDir

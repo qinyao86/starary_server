@@ -1,4 +1,4 @@
-Mad Library Team Server - Windows x64 portable package
+Starary Server - Windows x64 portable package
 
 START
   Double-click start-server.cmd.

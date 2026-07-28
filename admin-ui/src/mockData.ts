@@ -20,7 +20,7 @@ export const libraries = [
 ] as const;
 
 export const users = [
-  { name: "Qin Yao", email: "owner@madlibrary.local", role: "owner", status: "enabled", lastActive: "minutesAgo" },
+  { name: "Qin Yao", email: "owner@starary.local", role: "owner", status: "enabled", lastActive: "minutesAgo" },
   { name: "Lena Wu", email: "lena@studio.local", role: "manager", status: "enabled", lastActive: "eighteenMinutesAgo" },
   { name: "Marco Lee", email: "marco@studio.local", role: "editor", status: "enabled", lastActive: "oneHourAgo" },
   { name: "Iris Chen", email: "iris@studio.local", role: "viewer", status: "pending", lastActive: "invitePending" }
@@ -39,14 +39,14 @@ export const sharedRoots = [
     name: "Server Storage",
     provider: "Filesystem",
     canonicalUri: "server://storage/assets",
-    windowsHint: "D:\\MadLibraryTeamStorage",
+    windowsHint: "D:\\StararyTeamStorage",
     macosHint: "N/A",
     mode: "copy"
   },
   {
     name: "Cloud Bucket",
     provider: "S3",
-    canonicalUri: "s3://madlibrary-team-assets",
+    canonicalUri: "s3://starary-team-assets",
     windowsHint: "N/A",
     macosHint: "N/A",
     mode: "copy"

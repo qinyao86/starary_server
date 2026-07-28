@@ -1,10 +1,10 @@
-# Mad Library Server 浜ゆ帴鏂囨。
+# Starary Server 浜ゆ帴鏂囨。
 
 鏈€鍚庢洿鏂帮細2026-07-15
 
 ## 1. 椤圭洰瀹氫綅
 
-鏈粨搴撳悓鏃跺寘鍚?Mad Library 鍥㈤槦鏈嶅姟绔€佹祻瑙堝櫒绠＄悊鍚庡彴鍜?Windows Tauri 妗岄潰澹炽€?
+鏈粨搴撳悓鏃跺寘鍚?Starary 鍥㈤槦鏈嶅姟绔€佹祻瑙堝櫒绠＄悊鍚庡彴鍜?Windows Tauri 妗岄潰澹炽€?
 
 - Rust 鏈嶅姟绔彁渚?HTTP API銆佺鐞嗗悗鍙伴潤鎬佹枃浠躲€侀壌鏉冦€佽祫婧愬簱銆佹垚鍛樸€佸偍瀛樸€佸浠藉拰杩愯鎺у埗銆?
 - React 绠＄悊鍚庡彴鍚屾椂杩愯鍦ㄦ闈?WebView 鍜屾櫘閫氭祻瑙堝櫒涓€?
@@ -144,7 +144,7 @@ npm run release:windows
 
 ```text
 target/release/windows-x64/
-|- Mad-Library-Server_0.1.0_windows-x64-setup.exe
+|- Starary-Server_0.1.0_windows-x64-setup.exe
 `- SHA256SUMS.txt
 ```
 

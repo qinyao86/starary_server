@@ -101,7 +101,7 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("failed to run Mad Library Server control center");
+        .expect("failed to run Starary Server control center");
 }
 
 #[cfg(debug_assertions)]
@@ -417,9 +417,9 @@ mod tests {
     fn normalizes_extended_drive_path() {
         assert_eq!(
             normalize_windows_path(PathBuf::from(
-                r"\\?\C:\Program Files\Mad Library Server\runtime"
+                r"\\?\C:\Program Files\Starary Server\runtime"
             )),
-            PathBuf::from(r"C:\Program Files\Mad Library Server\runtime")
+            PathBuf::from(r"C:\Program Files\Starary Server\runtime")
         );
     }
 

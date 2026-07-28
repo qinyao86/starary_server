@@ -47,7 +47,7 @@ export function buildPreviewUsers(): TeamUser[] {
 
 export const previewCurrentUser: CurrentUser = {
   id: "preview-owner",
-  email: "owner@madlibrary.local",
+  email: "owner@starary.local",
   displayName: "Qin Yao",
   avatarKey: "male-01",
   role: "owner"

@@ -1,7 +1,7 @@
 # Bundled runtimes
 
 This directory contains minimized third-party runtimes used directly by release
-packaging. Its layout follows the main Mad Library desktop repository:
+packaging. Its layout follows the main Starary desktop repository:
 
 ```text
 binaries/<platform>/<component>/

@@ -10,7 +10,7 @@ $outputDir = Join-Path $serverDir "target\release\windows-x64"
 $packageWorkDir = Join-Path $serverDir "target\build\package"
 $stagingDir = Join-Path $packageWorkDir "windows-x64"
 $packageDir = Join-Path $stagingDir "madlibrary-server-windows-x64"
-$packageZip = Join-Path $outputDir "Mad-Library-Server_0.1.0_windows-x64-portable.zip"
+$packageZip = Join-Path $outputDir "Starary-Server_0.1.0_windows-x64-portable.zip"
 
 function Assert-WorkspacePath([string]$Path) {
   $fullPath = [System.IO.Path]::GetFullPath($Path)

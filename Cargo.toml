@@ -2,7 +2,7 @@
 name = "madlibrary-server"
 version = "0.1.0"
 edition = "2021"
-description = "Mad Library Team Server core"
+description = "Starary Server core"
 publish = false
 
 [[bin]]

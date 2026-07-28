@@ -1,5 +1,5 @@
 export const enCore = {
-    appName: "Mad Library Server",
+    appName: "Starary Server",
     admin: "Console",
     local: "Local",
     cloud: "Cloud",

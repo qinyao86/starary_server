@@ -1,5 +1,5 @@
 export const zhCore = {
-    appName: "Mad Library \u670d\u52a1\u7aef",
+    appName: "Starary \u670d\u52a1\u7aef",
     admin: "\u63a7\u5236\u53f0",
     local: "\u672c\u5730",
     cloud: "\u7ebf\u4e0a",

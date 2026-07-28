@@ -18,7 +18,7 @@ try {
 
 $setup = Get-ChildItem -LiteralPath $bundle -Filter "*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $setup) { throw "Tauri did not create an NSIS installer." }
-$destination = Join-Path $releaseDir "Mad-Library-Server_0.1.0_windows-x64-setup.exe"
+$destination = Join-Path $releaseDir "Starary-Server_0.1.0_windows-x64-setup.exe"
 Move-Item -LiteralPath $setup.FullName -Destination $destination -Force
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $destination
 Set-Content -LiteralPath (Join-Path $releaseDir "SHA256SUMS.txt") -Value ("{0}  {1}" -f $hash.Hash, (Split-Path $destination -Leaf)) -Encoding ascii

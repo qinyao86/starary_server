@@ -51,7 +51,7 @@ pub fn install(app: &AppHandle, status: &ServiceStatus) -> tauri::Result<()> {
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("Mad Library Server 控制中心");
+        .tooltip("Starary Server 控制中心");
     if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
@@ -133,9 +133,9 @@ pub fn set_language(app: &AppHandle, language: &str, status: &ServiceStatus) -> 
     sync_service_action(app, status);
     if let Some(tray) = app.tray_by_id("main-tray") {
         tray.set_tooltip(Some(if english {
-            "Mad Library Server Control Center"
+            "Starary Server Control Center"
         } else {
-            "Mad Library Server 控制中心"
+            "Starary Server 控制中心"
         }))
         .map_err(|error| error.to_string())?;
     }

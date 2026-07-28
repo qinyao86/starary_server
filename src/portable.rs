@@ -183,7 +183,7 @@ fn acquire_instance_lock(app_home: &Path) -> anyhow::Result<File> {
         .with_context(|| format!("failed to open {}", lock_path.display()))?;
     lock.try_lock_exclusive().map_err(|_| {
         anyhow::anyhow!(
-            "Mad Library Server is already running for {}",
+            "Starary Server is already running for {}",
             app_home.display()
         )
     })?;
@@ -447,7 +447,7 @@ impl ManagedPostgres {
             .arg(DATABASE_NAME)
             .env("PGPASSWORD", database_password)
             .output()
-            .context("failed to create the Mad Library database")?;
+            .context("failed to create the Starary database")?;
         if output.status.success() {
             return Ok(());
         }
@@ -456,7 +456,7 @@ impl ManagedPostgres {
         if error.to_ascii_lowercase().contains("already exists") {
             return Ok(());
         }
-        bail!("failed to create the Mad Library database: {error}")
+        bail!("failed to create the Starary database: {error}")
     }
 
     fn stop(&mut self) {

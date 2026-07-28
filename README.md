@@ -1,6 +1,6 @@
-# Mad Library Team Server
+# Starary Server
 
-`E:\AI\codex\madlibrary_server` is the standalone Mad Library team server repository. It is extracted from `E:\AI\codex\madlibrary\server` so the server can be maintained separately from the desktop client.
+`E:\AI\codex\madlibrary_server` is the standalone Starary server repository. It is maintained separately from the desktop client.
 
 ## What Is Included
 
@@ -91,7 +91,7 @@ npm run release:windows
 ```
 
 The installer and SHA-256 checksum are written to
-`artifacts/windows-x64/`. Mutable server data lives in
+`target/release/windows-x64/`. Mutable server data currently remains in the legacy
 `%ProgramData%\Mad Library Server`, outside the application install directory.
 
 ## Windows Portable Release
@@ -110,7 +110,7 @@ Normal builds do not download or extract PostgreSQL. The original archive is
 only required when intentionally regenerating the tracked runtime with
 `scripts/prepare-postgresql-runtime.ps1`.
 
-The output is `artifacts/windows-x64/Mad-Library-Server_0.1.0_windows-x64-portable.zip`. Extract it and
+The output is `target/release/windows-x64/Starary-Server_0.1.0_windows-x64-portable.zip`. Extract it and
 double-click `start-server.cmd`. On first startup the server generates private
 local credentials, initializes PostgreSQL, creates the application database,
 runs schema migrations, and opens the admin console.

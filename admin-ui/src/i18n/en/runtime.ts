@@ -35,7 +35,7 @@ export const enRuntime = {
     darkTheme: "Dark theme",
     loginHint: "Use your account to connect to this server.",
     setupOnServerTitle: "Initialize the server first",
-    setupOnServerHint: "Open the desktop app on the computer running Mad Library Server and create the Owner account before accessing it over the LAN.",
+    setupOnServerHint: "Open the desktop app on the computer running Starary Server and create the Owner account before accessing it over the LAN.",
     lanAddressUnavailable: "No LAN address detected",
     submit: "Submit",
     cancel: "Cancel",

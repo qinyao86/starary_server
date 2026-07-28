@@ -7,6 +7,6 @@ start "" /min powershell.exe -NoProfile -WindowStyle Hidden -Command "$port=3789
 madlibrary-server.exe
 if errorlevel 1 (
   echo.
-  echo Mad Library Server failed to start. See data\logs for details.
+  echo Starary Server failed to start. See data\logs for details.
   pause
 )

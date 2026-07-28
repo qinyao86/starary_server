@@ -150,7 +150,7 @@ impl ManagedService {
             }
             Err(ProbeError::Foreign) => self.foreign_status(
                 port,
-                "检测到另一套或非受管的 Mad Library 服务，控制中心不会接管它。",
+                "检测到另一套或非受管的 Starary 服务，控制中心不会接管它。",
             ),
         }
     }

@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("failed to bind {bind_addr}"))?;
 
-    tracing::info!("Mad Library Team Server listening on http://{bind_addr}");
+    tracing::info!("Starary Server listening on http://{bind_addr}");
 
     let scheduler_shutdown = shutdown_rx.clone();
     let scheduler = tokio::spawn(async move {

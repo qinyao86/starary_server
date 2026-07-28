@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Mad Library Server",
+  "productName": "Starary Server",
   "version": "0.1.0",
   "identifier": "cn.madlibrary.server.desktop",
   "build": {
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Mad Library Server",
+        "title": "Starary Server",
         "url": "index.html",
         "width": 800,
         "height": 520,

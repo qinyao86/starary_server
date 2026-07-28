@@ -1,7 +1,7 @@
 [package]
 name = "madlibrary-server-desktop"
 version = "0.1.0"
-description = "Mad Library Team Server desktop shell"
+description = "Starary Server desktop shell"
 authors = ["Qin Yao"]
 edition = "2021"
 publish = false

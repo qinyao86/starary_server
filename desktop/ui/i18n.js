@@ -32,7 +32,7 @@ export const translations = {
     minimize: "最小化",
     closeToTray: "关闭到系统托盘",
     controlCenter: "服务控制中心",
-    teamService: "Mad Library 团队服务",
+    teamService: "Starary 团队服务",
     switchToEnglish: "切换至 English",
     startService: "启动服务",
     startServiceHint: "启动本机服务",
@@ -120,7 +120,7 @@ export const translations = {
     minimize: "Minimize",
     closeToTray: "Close to system tray",
     controlCenter: "Service Control Center",
-    teamService: "Mad Library Team Server",
+    teamService: "Starary Server",
     switchToChinese: "切换至中文",
     startService: "Start service",
     startServiceHint: "Start the local service",
@@ -181,7 +181,7 @@ export const translations = {
 
 const englishBackendMessages = new Map([
   ["该端口已被其他程序占用，控制中心不会接管或停止它。", "This port is in use by another program. The control center will not manage or stop it."],
-  ["检测到另一套或非受管的 Mad Library 服务，控制中心不会接管它。", "Another or unmanaged Mad Library service was detected. The control center will not take it over."],
+  ["检测到另一套或非受管的 Starary 服务，控制中心不会接管它。", "Another or unmanaged Starary service was detected. The control center will not take it over."],
   ["服务端口冲突", "Service port conflict."],
   ["当前端口上的进程不属于此控制中心，已拒绝停止。", "The process on this port is not managed by this control center and was not stopped."],
   ["服务拒绝了停止请求。", "The service rejected the stop request."],

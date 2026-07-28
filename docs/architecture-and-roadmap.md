@@ -1,8 +1,8 @@
-# Mad Library Server Architecture and Roadmap
+# Starary Server Architecture and Roadmap
 
 ## Product Direction
 
-Mad Library Server is proprietary commercial software licensed by team seats.
+Starary Server is proprietary commercial software licensed by team seats.
 The same Rust server core supports two deployment forms without exposing its
 database directly to clients.
 
