@@ -1,21 +1,21 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: madlibrary-team-postgres-dev
+    container_name: starary-team-postgres-dev
     restart: unless-stopped
     environment:
-      POSTGRES_DB: madlibrary_team
-      POSTGRES_USER: madlibrary
-      POSTGRES_PASSWORD: madlibrary
+      POSTGRES_DB: starary_team
+      POSTGRES_USER: starary
+      POSTGRES_PASSWORD: starary
     ports:
       - "54329:5432"
     volumes:
-      - madlibrary_team_pgdata:/var/lib/postgresql/data
+      - starary_team_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U madlibrary -d madlibrary_team"]
+      test: ["CMD-SHELL", "pg_isready -U starary -d starary_team"]
       interval: 5s
       timeout: 5s
       retries: 20
 
 volumes:
-  madlibrary_team_pgdata:
+  starary_team_pgdata:

@@ -24,9 +24,9 @@ REQUIREMENTS
 
 DATABASE MODE
   The default mode is automatic: packaged PostgreSQL starts unless an external
-  MADLIBRARY_DATABASE_URL is configured in a .env file beside the executable.
+  STARARY_DATABASE_URL is configured in a .env file beside the executable.
 
   Optional .env setting:
-    MADLIBRARY_POSTGRES_MODE=auto      Default behavior
-    MADLIBRARY_POSTGRES_MODE=bundled   Require packaged PostgreSQL
-    MADLIBRARY_POSTGRES_MODE=external  Require MADLIBRARY_DATABASE_URL
+    STARARY_POSTGRES_MODE=auto      Default behavior
+    STARARY_POSTGRES_MODE=bundled   Require packaged PostgreSQL
+    STARARY_POSTGRES_MODE=external  Require STARARY_DATABASE_URL

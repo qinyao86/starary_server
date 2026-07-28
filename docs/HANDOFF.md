@@ -25,7 +25,7 @@
 ## 3. 閲嶈鐩綍
 
 ```text
-madlibrary-server/
+starary-server/
 |- src/                         Rust 鏈嶅姟绔笌鏁版嵁搴撹縼绉?
 |- admin-ui/src/                绠＄悊鍚庡彴婧愮爜
 |- desktop/                     Tauri 妗岄潰澹虫簮鐮佸拰瀹夎閰嶇疆
@@ -84,7 +84,7 @@ Vite 榛樿鍦?`http://127.0.0.1:5179/admin/`锛屽苟灏?API 浠ｇ悊鍒?`h
 妗岄潰瀹夎鐗堢殑鍙墽琛屾枃浠跺拰 PostgreSQL 绋嬪簭鏂囦欢浣嶄簬瀹夎鐩綍锛屽彧璇昏繍琛屾暟鎹粺涓€浣嶄簬锛?
 
 ```text
-C:\ProgramData\Mad Library Server\
+C:\ProgramData\Starary Server\
 |- data\config\runtime.json     鏈嶅姟绔彛銆佹暟鎹簱闅忔満瀵嗙爜鍜?JWT 瀵嗛挜
 |- data\config\backup.json      鑷姩澶囦唤璁剧疆
 |- data\postgresql\             PostgreSQL 鏁版嵁绨?
@@ -96,17 +96,17 @@ C:\ProgramData\Mad Library Server\
 
 杩欐槸鏈哄櫒绾ф暟鎹洰褰曪紝鍥犳妗岄潰澹冲拰鏈嶅姟鏍稿績閮介€氳繃瀹炰緥閿佷繚璇佸悓涓€鏁版嵁鐩綍鍙湁涓€涓湇鍔″疄渚嬨€傚嵏杞芥垨鍗囩骇绋嬪簭鏃朵笉寰楄嚜鍔ㄥ垹闄よ鐩綍銆?
 
-寮€鍙戠増鐢?`MADLIBRARY_HOME` 鍐冲畾鏁版嵁鐩綍锛涙闈㈠紑鍙戣剼鏈娇鐢?`target/build-dev/desktop/runtime` 浣滀负绋嬪簭杩愯鏃讹紝浣嗘寔涔呮暟鎹竟鐣屼粛鐢辨湇鍔￠厤缃喅瀹氥€傛帓闅滄椂鍏堢湅瀹為檯杩涚▼鐜鍜屾棩蹇楋紝涓嶈鎶?`target/` 褰撲綔鍙戝竷鐗┿€?
+寮€鍙戠増鐢?`STARARY_HOME` 鍐冲畾鏁版嵁鐩綍锛涙闈㈠紑鍙戣剼鏈娇鐢?`target/build-dev/desktop/runtime` 浣滀负绋嬪簭杩愯鏃讹紝浣嗘寔涔呮暟鎹竟鐣屼粛鐢辨湇鍔￠厤缃喅瀹氥€傛帓闅滄椂鍏堢湅瀹為檯杩涚▼鐜鍜屾棩蹇楋紝涓嶈鎶?`target/` 褰撲綔鍙戝竷鐗┿€?
 
 ## 6. PostgreSQL 妯″紡
 
-`MADLIBRARY_POSTGRES_MODE` 鏀寔锛?
+`STARARY_POSTGRES_MODE` 鏀寔锛?
 
-- `auto`锛氶粯璁ゆā寮忥紱璁剧疆浜?`MADLIBRARY_DATABASE_URL` 鏃朵娇鐢ㄥ閮ㄦ暟鎹簱锛屽惁鍒欏惎鍔ㄩ殢绋嬪簭闄勫甫鐨?PostgreSQL銆?
+- `auto`锛氶粯璁ゆā寮忥紱璁剧疆浜?`STARARY_DATABASE_URL` 鏃朵娇鐢ㄥ閮ㄦ暟鎹簱锛屽惁鍒欏惎鍔ㄩ殢绋嬪簭闄勫甫鐨?PostgreSQL銆?
 - `bundled`锛氬繀椤诲惎鍔ㄩ檮甯︾殑 PostgreSQL銆?
-- `external`锛氫笉鍚姩闄勫甫鏁版嵁搴擄紝蹇呴』鎻愪緵 `MADLIBRARY_DATABASE_URL`銆?
+- `external`锛氫笉鍚姩闄勫甫鏁版嵁搴擄紝蹇呴』鎻愪緵 `STARARY_DATABASE_URL`銆?
 
-`MADLIBRARY_SERVER_PORT` 鍙复鏃惰鐩栫鍙ｃ€傚畨瑁呯増鍦ㄨ缃〉淇敼绔彛鍚庡啓鍏?`data/config/runtime.json`锛岄噸鍚敓鏁堛€傚眬鍩熺綉閮ㄧ讲杩橀渶鍦?Windows 绉佹湁/鍩熺綉缁滈槻鐏涓斁琛岄€夊畾 HTTP 绔彛锛岀粷涓嶈兘鏀捐 `54329`銆?
+`STARARY_SERVER_PORT` 鍙复鏃惰鐩栫鍙ｃ€傚畨瑁呯増鍦ㄨ缃〉淇敼绔彛鍚庡啓鍏?`data/config/runtime.json`锛岄噸鍚敓鏁堛€傚眬鍩熺綉閮ㄧ讲杩橀渶鍦?Windows 绉佹湁/鍩熺綉缁滈槻鐏涓斁琛岄€夊畾 HTTP 绔彛锛岀粷涓嶈兘鏀捐 `54329`銆?
 
 ## 7. 褰撳墠涓氬姟绾︽潫
 

@@ -3,7 +3,7 @@ import { detectLanguage, localizeBackendMessage, persistLanguage, translate } fr
 const invoke = window.__TAURI__.core.invoke;
 const appWindow = window.__TAURI__.window.getCurrentWindow();
 const elements = Object.fromEntries(Array.from(document.querySelectorAll("[id]")).map((node) => [node.id, node]));
-const themeStorageKey = "madlibrary_server_desktop_theme";
+const themeStorageKey = "starary_server_desktop_theme";
 let language = detectLanguage();
 let theme = detectTheme();
 let status = null;

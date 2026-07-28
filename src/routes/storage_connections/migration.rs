@@ -96,7 +96,7 @@ pub async fn migrate_storage_connection(
         ));
     }
 
-    let lock_name = format!("madlibrary.storage-migration.{id}");
+    let lock_name = format!("starary.storage-migration.{id}");
     let mut migration_lock = state.pool.acquire().await?;
     let acquired: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock(hashtext($1))")
         .bind(&lock_name)

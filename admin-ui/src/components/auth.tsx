@@ -251,8 +251,8 @@ export function LoginForm({
   return (
     <form autoComplete={rememberDevice ? "on" : "off"} className="auth-form" onSubmit={submit}>
       <p>{t("loginHint")}</p>
-      <TextField autoComplete={rememberDevice ? "username" : "off"} label={t("email")} name="madlibrary-admin-email" value={email} onChange={setEmail} />
-      <TextField autoComplete={rememberDevice ? "current-password" : "off"} label={t("password")} name="madlibrary-admin-password" value={password} onChange={setPassword} type="password" />
+      <TextField autoComplete={rememberDevice ? "username" : "off"} label={t("email")} name="starary-admin-email" value={email} onChange={setEmail} />
+      <TextField autoComplete={rememberDevice ? "current-password" : "off"} label={t("password")} name="starary-admin-password" value={password} onChange={setPassword} type="password" />
       <label className="auth-trust-device">
         <input checked={rememberDevice} type="checkbox" onChange={(event) => setRememberDevice(event.target.checked)} />
         <span>

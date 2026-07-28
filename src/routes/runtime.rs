@@ -100,7 +100,7 @@ pub async fn desktop_identity(
         .ok_or_else(|| AppError::NotFound("desktop control is unavailable".to_string()))?;
 
     Ok(Json(DesktopIdentityResponse {
-        product: "Mad Library Team Server",
+        product: "Starary Server",
         instance_id,
         process_id: std::process::id(),
         port: state.config.port,
@@ -150,7 +150,7 @@ fn ensure_local_desktop_control(
         .as_deref()
         .ok_or_else(|| AppError::NotFound("desktop control is unavailable".to_string()))?;
     let provided = headers
-        .get("x-madlibrary-control-token")
+        .get("x-starary-control-token")
         .and_then(|value| value.to_str().ok())
         .unwrap_or_default();
     if provided != expected {

@@ -3,7 +3,7 @@
 ## Tracked source and packaging definitions
 
 ```text
-madlibrary-server/
+starary-server/
 |- src/                         Rust server source
 |- admin-ui/src/                React administration source
 |- desktop/                     Tauri desktop shell source and NSIS config
@@ -35,7 +35,7 @@ target/release/windows-x64/      Final distributable artifacts only
 
 All directories in the second list are ignored by Git. Never run the server
 from `artifacts/` and never put initialized data directories there. Installed
-desktop builds currently keep mutable data in the legacy `%ProgramData%\Mad Library Server`; program
+desktop builds keep mutable data in `%ProgramData%\Starary Server`; program
 files and the bundled PostgreSQL runtime remain read-only in the install folder.
 
 ## Common commands

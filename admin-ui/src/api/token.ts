@@ -1,4 +1,4 @@
-const tokenKey = "madlibrary_server_admin_token";
+const tokenKey = "starary_server_admin_token";
 
 export function getStoredToken() {
   return localStorage.getItem(tokenKey) ?? sessionStorage.getItem(tokenKey);

@@ -11,7 +11,7 @@ database directly to clients.
 ### Windows LAN appliance
 
 - One Windows x64 installer with a small local control center.
-- `madlibrary-server.exe` serves the API and built React administration UI.
+- `starary-server.exe` serves the API and built React administration UI.
 - A minimal PostgreSQL 16 runtime is bundled and managed by the server process.
 - Local disks and SMB shares are available as filesystem storage roots.
 - Persistent data is isolated under `data/` so application upgrades do not
@@ -51,16 +51,22 @@ deployment mechanism and remains useful for local development.
 
 ## PostgreSQL Modes
 
-`MADLIBRARY_POSTGRES_MODE` controls database startup:
+`STARARY_POSTGRES_MODE` controls database startup:
 
-- `auto` (default): use `MADLIBRARY_DATABASE_URL` when set; otherwise start the
+- `auto` (default): use `STARARY_DATABASE_URL` when set; otherwise start the
   bundled runtime.
 - `bundled`: require and start the PostgreSQL runtime beside the executable.
-- `external`: never start PostgreSQL; require `MADLIBRARY_DATABASE_URL`.
+- `external`: never start PostgreSQL; require `STARARY_DATABASE_URL`.
 
 PostgreSQL listens only on `127.0.0.1` in bundled mode. The server generates a
 random database password and JWT secret on first startup and stores them under
 `data/config/`. Application schema migrations remain automatic and idempotent.
+
+The bundled runtime creates database `starary_team` with database user
+`starary`. Windows machine data is rooted at `%ProgramData%\Starary Server`,
+and team-library derived media is stored under each library's `.starary/`
+directory. Legacy Mad Library storage is not read by the runtime; any future
+data transfer must be implemented as a standalone removable migration tool.
 
 The HTTP service listens on `0.0.0.0` by default and exposes both the client API
 and browser administration UI on the configured server port. The desktop

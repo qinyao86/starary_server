@@ -419,7 +419,7 @@ fn build_moves(
             )));
         }
         let temporary_path = sequence_dir.join(format!(
-            ".{}.{}.madlibrary-sequence-tmp",
+            ".{}.{}.starary-sequence-tmp",
             frame.file_name, token
         ));
         if temporary_path.exists() {
@@ -584,7 +584,7 @@ mod tests {
                 .expect("system time should be after the Unix epoch")
                 .as_nanos();
             let path = std::env::temp_dir().join(format!(
-                "madlibrary-sequence-{test_name}-{}-{nonce}",
+                "starary-sequence-{test_name}-{}-{nonce}",
                 std::process::id()
             ));
             fs::create_dir_all(&path).expect("test directory should be created");

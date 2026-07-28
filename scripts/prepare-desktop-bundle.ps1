@@ -8,7 +8,7 @@ $frontendOut = Join-Path $buildModeRoot "frontend\admin-ui"
 $desktopFrontendOut = Join-Path $buildModeRoot "frontend\ui"
 $desktopRuntime = Join-Path $buildModeRoot "desktop\runtime"
 $coreTarget = Join-Path $buildModeRoot "desktop"
-$serverExe = if ($Development) { Join-Path $coreTarget "debug\madlibrary-server.exe" } else { Join-Path $coreTarget "release\madlibrary-server.exe" }
+$serverExe = if ($Development) { Join-Path $coreTarget "debug\starary-server.exe" } else { Join-Path $coreTarget "release\starary-server.exe" }
 $env:CARGO_TARGET_DIR = $coreTarget
 $postgresManifest = Get-Content -Raw -Path (Join-Path $root "packaging\postgresql-windows-x64.json") | ConvertFrom-Json
 
@@ -17,10 +17,10 @@ if ($Development) {
 } else {
   Push-Location (Join-Path $root "admin-ui")
   try {
-    $env:MADLIBRARY_ADMIN_UI_OUT_DIR = $frontendOut
+    $env:STARARY_ADMIN_UI_OUT_DIR = $frontendOut
     npm run build
   } finally {
-    Remove-Item Env:MADLIBRARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
+    Remove-Item Env:STARARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
     Pop-Location
   }
   cargo build --release --locked --manifest-path (Join-Path $root "Cargo.toml")
@@ -42,7 +42,7 @@ if (Test-Path -LiteralPath $desktopRuntime) {
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $desktopRuntime "admin-ui") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $desktopRuntime "postgresql") | Out-Null
-$serverTarget = Join-Path $desktopRuntime "madlibrary-server.exe"
+$serverTarget = Join-Path $desktopRuntime "starary-server.exe"
 try {
   Copy-Item -LiteralPath $serverExe -Destination $serverTarget -Force -ErrorAction Stop
 } catch {

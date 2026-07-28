@@ -55,7 +55,7 @@ pub async fn server_info(
     let lan_admin_url = lan_url.as_ref().map(|url| format!("{url}/admin/"));
 
     Ok(Json(ServerInfoResponse {
-        product: "Mad Library Team Server",
+        product: "Starary Server",
         version: env!("CARGO_PKG_VERSION"),
         api_version: "v1",
         deployment_mode: state.config.deployment_mode.clone(),
@@ -114,7 +114,7 @@ fn primary_lan_ipv4() -> Option<std::net::Ipv4Addr> {
 }
 
 fn storage_is_writable(path: &std::path::Path) -> bool {
-    let probe = path.join(".madlibrary-server-write-test");
+    let probe = path.join(".starary-server-write-test");
     let opened = OpenOptions::new()
         .create(true)
         .write(true)

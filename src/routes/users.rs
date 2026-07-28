@@ -459,7 +459,7 @@ pub async fn delete_user(
         INSERT INTO users (
             id, email, display_name, password_hash, avatar_key, global_role, is_active
         )
-        VALUES ($1, '__deleted_user__@madlibrary.system.invalid', 'Deleted User', 'disabled', NULL, 'viewer', FALSE)
+        VALUES ($1, '__deleted_user__@starary.system.invalid', 'Deleted User', 'disabled', NULL, 'viewer', FALSE)
         ON CONFLICT (id) DO NOTHING
         "#,
     )

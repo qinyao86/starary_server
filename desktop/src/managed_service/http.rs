@@ -65,7 +65,7 @@ pub(super) fn request(
 }
 
 pub(super) fn request_shutdown(port: u16, token: &str) -> std::io::Result<()> {
-    let header = format!("X-MadLibrary-Control-Token: {token}");
+    let header = format!("X-Starary-Control-Token: {token}");
     let response = request(port, "POST", "/api/v1/server/desktop/shutdown", &[header])?;
     if (200..300).contains(&response.status) {
         Ok(())

@@ -14,7 +14,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 #[cfg(windows)]
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 #[cfg(windows)]
-const RUN_VALUE_NAME: &str = "Mad Library Server";
+const RUN_VALUE_NAME: &str = "Starary Server";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,7 +98,7 @@ impl DesktopSettings {
         };
         fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
 
-        let probe = directory.join(".madlibrary-write-test");
+        let probe = directory.join(".starary-write-test");
         OpenOptions::new()
             .create(true)
             .truncate(true)

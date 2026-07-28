@@ -44,10 +44,10 @@ if (-not $ready) {
 
 Push-Location (Join-Path $serverDir "admin-ui")
 try {
-  $env:MADLIBRARY_ADMIN_UI_OUT_DIR = $adminUiOutDir
+  $env:STARARY_ADMIN_UI_OUT_DIR = $adminUiOutDir
   npm run build
 } finally {
-  Remove-Item Env:MADLIBRARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
+  Remove-Item Env:STARARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
   Pop-Location
 }
 
@@ -56,9 +56,9 @@ Write-Host "Open http://127.0.0.1:3789/admin after the server starts."
 
 Push-Location $serverDir
 try {
-  $env:MADLIBRARY_ADMIN_ASSETS_DIR = $adminUiOutDir
+  $env:STARARY_ADMIN_ASSETS_DIR = $adminUiOutDir
   cargo run --manifest-path .\Cargo.toml
 } finally {
-  Remove-Item Env:MADLIBRARY_ADMIN_ASSETS_DIR -ErrorAction SilentlyContinue
+  Remove-Item Env:STARARY_ADMIN_ASSETS_DIR -ErrorAction SilentlyContinue
   Pop-Location
 }

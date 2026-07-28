@@ -345,7 +345,7 @@ fn schedule_automatic_service_start(
 }
 
 fn runtime_resources(_app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    if let Ok(override_path) = env::var("MADLIBRARY_DESKTOP_RUNTIME") {
+    if let Ok(override_path) = env::var("STARARY_DESKTOP_RUNTIME") {
         return Ok(normalize_windows_path(PathBuf::from(override_path)));
     }
     #[cfg(debug_assertions)]
@@ -378,7 +378,7 @@ fn normalize_windows_path(path: PathBuf) -> PathBuf {
 }
 
 fn machine_data_home() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    if let Ok(override_path) = env::var("MADLIBRARY_HOME") {
+    if let Ok(override_path) = env::var("STARARY_HOME") {
         return Ok(PathBuf::from(override_path));
     }
     #[cfg(windows)]
@@ -386,10 +386,10 @@ fn machine_data_home() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let base = env::var_os("PROGRAMDATA")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"));
-        return Ok(base.join("Mad Library Server"));
+        return Ok(base.join("Starary Server"));
     }
     #[allow(unreachable_code)]
-    Ok(env::current_dir()?.join(".madlibrary-server"))
+    Ok(env::current_dir()?.join(".starary-server"))
 }
 
 fn write_control_center_log(message: &str) {

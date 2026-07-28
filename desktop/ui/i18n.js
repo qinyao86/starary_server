@@ -1,4 +1,4 @@
-const languageStorageKey = "madlibrary_server_desktop_language";
+const languageStorageKey = "starary_server_desktop_language";
 
 export const translations = {
   zh: {

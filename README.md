@@ -17,7 +17,7 @@ Recommended path with installed PostgreSQL:
 
 1. Create a PostgreSQL database with your local installed PostgreSQL.
 2. Copy `.env.example` to `.env`.
-3. Update `MADLIBRARY_DATABASE_URL` in `.env`.
+3. Update `STARARY_DATABASE_URL` in `.env`.
 4. Install and build the admin UI:
 
 ```powershell
@@ -91,8 +91,8 @@ npm run release:windows
 ```
 
 The installer and SHA-256 checksum are written to
-`target/release/windows-x64/`. Mutable server data currently remains in the legacy
-`%ProgramData%\Mad Library Server`, outside the application install directory.
+`target/release/windows-x64/`. Mutable server data lives under
+`%ProgramData%\Starary Server`, outside the application install directory.
 
 ## Windows Portable Release
 
@@ -119,9 +119,9 @@ Persistent files live under the package's `data/` directory. Replacing the
 application and PostgreSQL runtime during an upgrade must not replace `data/`.
 PostgreSQL only listens on `127.0.0.1:54329`.
 
-Database startup is controlled by `MADLIBRARY_POSTGRES_MODE=auto|bundled|external`.
+Database startup is controlled by `STARARY_POSTGRES_MODE=auto|bundled|external`.
 The default `auto` mode starts packaged PostgreSQL only when
-`MADLIBRARY_DATABASE_URL` is not set.
+`STARARY_DATABASE_URL` is not set.
 
 ## Repository Layout
 
@@ -141,7 +141,7 @@ third-party files.
 - Packaged runtimes copy the built UI into an `admin-ui/` deployment directory
   next to the server executable. This runtime directory is not a build output.
 - Startup migrations are intentionally idempotent. Existing installed PostgreSQL databases are upgraded in place when columns are added.
-- An explicit `MADLIBRARY_DATABASE_URL` disables bundled PostgreSQL and keeps
+- An explicit `STARARY_DATABASE_URL` disables bundled PostgreSQL and keeps
   external-database development and deployment available.
 
 ## Current First-Version Scope

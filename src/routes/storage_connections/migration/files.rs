@@ -227,13 +227,13 @@ mod tests {
 
     #[test]
     fn copies_and_mirrors_a_library_directory() {
-        let base = std::env::temp_dir().join(format!("madlibrary-migration-{}", Uuid::new_v4()));
+        let base = std::env::temp_dir().join(format!("starary-migration-{}", Uuid::new_v4()));
         let source = base.join("source");
         let destination = base.join("destination");
-        fs::create_dir_all(source.join(".madlibrary/thumbs")).unwrap();
+        fs::create_dir_all(source.join(".starary/thumbs")).unwrap();
         fs::create_dir_all(source.join("assets")).unwrap();
         fs::write(source.join("assets/item.bin"), b"source").unwrap();
-        fs::write(source.join(".madlibrary/thumbs/item.webp"), b"thumb").unwrap();
+        fs::write(source.join(".starary/thumbs/item.webp"), b"thumb").unwrap();
 
         let plan = FileMigrationPlan {
             source: source.clone(),

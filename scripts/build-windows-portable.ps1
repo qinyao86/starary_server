@@ -9,7 +9,7 @@ $coreTarget = Join-Path $serverDir "target\build\desktop"
 $outputDir = Join-Path $serverDir "target\release\windows-x64"
 $packageWorkDir = Join-Path $serverDir "target\build\package"
 $stagingDir = Join-Path $packageWorkDir "windows-x64"
-$packageDir = Join-Path $stagingDir "madlibrary-server-windows-x64"
+$packageDir = Join-Path $stagingDir "starary-server-windows-x64"
 $packageZip = Join-Path $outputDir "Starary-Server_0.1.0_windows-x64-portable.zip"
 
 function Assert-WorkspacePath([string]$Path) {
@@ -35,11 +35,11 @@ if (Test-Path -LiteralPath $packageZip) {
 Write-Host "Building admin UI..."
 Push-Location (Join-Path $serverDir "admin-ui")
 try {
-  $env:MADLIBRARY_ADMIN_UI_OUT_DIR = Join-Path $serverDir "target\build\frontend\admin-ui"
+  $env:STARARY_ADMIN_UI_OUT_DIR = Join-Path $serverDir "target\build\frontend\admin-ui"
   npm ci
   npm run build
 } finally {
-  Remove-Item Env:MADLIBRARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
+  Remove-Item Env:STARARY_ADMIN_UI_OUT_DIR -ErrorAction SilentlyContinue
   Pop-Location
 }
 
@@ -58,7 +58,7 @@ $postgresDestination = Join-Path $packageDir "postgresql"
 New-Item -ItemType Directory -Force -Path $postgresDestination | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $packageDir "admin-ui") | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $coreTarget "release\madlibrary-server.exe") -Destination $packageDir
+Copy-Item -LiteralPath (Join-Path $coreTarget "release\starary-server.exe") -Destination $packageDir
 Copy-Item -Path (Join-Path $serverDir "target\build\frontend\admin-ui\*") -Destination (Join-Path $packageDir "admin-ui") -Recurse
 Copy-Item -LiteralPath (Join-Path $serverDir "packaging\windows\start-server.cmd") -Destination $packageDir
 Copy-Item -LiteralPath (Join-Path $serverDir "packaging\windows\README.txt") -Destination $packageDir

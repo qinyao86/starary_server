@@ -156,8 +156,8 @@ fn write_text_file_atomic(path: &StdPath, bytes: &[u8]) -> AppResult<()> {
         .extension()
         .and_then(|extension| extension.to_str())
         .unwrap_or("txt");
-    let temporary_path = path.with_extension(format!("{extension}.{token}.madlibrary-tmp"));
-    let backup_path = path.with_extension(format!("{extension}.{token}.madlibrary-backup"));
+    let temporary_path = path.with_extension(format!("{extension}.{token}.starary-tmp"));
+    let backup_path = path.with_extension(format!("{extension}.{token}.starary-backup"));
     fs::write(&temporary_path, bytes)
         .map_err(|error| AppError::BadRequest(format!("could not write text asset: {error}")))?;
     fs::rename(path, &backup_path).map_err(|error| {

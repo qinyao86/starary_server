@@ -782,9 +782,9 @@ fn target_derived_path(key: &str, source_path: &str, target_id: &str) -> Option<
         .map(|extension| format!("{target_id}-{kind_suffix}.{extension}"))
         .unwrap_or_else(|| format!("{target_id}-{kind_suffix}"));
     match key {
-        "thumbnailPath" => Some(format!(".madlibrary/thumbs/{file_name}")),
+        "thumbnailPath" => Some(format!(".starary/thumbs/{file_name}")),
         "previewImagePath" | "previewVideoPath" | "waveformPath" => {
-            Some(format!(".madlibrary/previews/{target_id}/{file_name}"))
+            Some(format!(".starary/previews/{target_id}/{file_name}"))
         }
         _ => None,
     }

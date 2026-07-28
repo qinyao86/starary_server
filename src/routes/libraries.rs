@@ -47,7 +47,7 @@ use requests::{
     UpdateLibraryRequest, UploadLibraryIconRequest,
 };
 
-const LIBRARY_COVER_RELATIVE_PATH: &str = ".madlibrary/cover.webp";
+const LIBRARY_COVER_RELATIVE_PATH: &str = ".starary/cover.webp";
 const MAX_LIBRARY_COVER_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(FromRow)]
@@ -262,7 +262,7 @@ pub async fn create_library(
         ensure_storage_location_exists(default_storage_root.kind, &root_location)?;
         let connection_id = Uuid::new_v4();
         let connection_name = unique_connection_name(&mut tx, display_name).await?;
-        sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtext('starary.default-storage'))")
             .execute(&mut *tx)
             .await?;
         let should_be_default: bool = sqlx::query_scalar(
@@ -653,7 +653,7 @@ async fn bind_library_storage(
     binding: StorageBindingRequest,
     workspace_name: &str,
 ) -> AppResult<()> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.storage-bindings'))")
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('starary.storage-bindings'))")
         .execute(&mut **tx)
         .await?;
     let connection = get_enabled_connection(tx, binding.connection_id).await?;

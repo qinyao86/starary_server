@@ -87,7 +87,7 @@ pub async fn create_storage_connection(
         None => format!("storage-{id}"),
     };
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('starary.default-storage'))")
         .execute(&mut *tx)
         .await?;
     let should_be_default: bool = sqlx::query_scalar(
@@ -162,7 +162,7 @@ pub async fn update_storage_connection(
     }
 
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('starary.default-storage'))")
         .execute(&mut *tx)
         .await?;
     sqlx::query(
@@ -207,7 +207,7 @@ pub async fn set_default_storage_connection(
 ) -> AppResult<Json<StorageConnectionRecord>> {
     require_server_manager(&user)?;
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('starary.default-storage'))")
         .execute(&mut *tx)
         .await?;
     let enabled: Option<bool> =
@@ -255,7 +255,7 @@ pub async fn delete_storage_connection(
         ));
     }
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('madlibrary.default-storage'))")
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('starary.default-storage'))")
         .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM storage_connections WHERE id = $1")

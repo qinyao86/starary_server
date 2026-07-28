@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn requires_existing_server_filesystem_location() {
         let missing_path = std::env::temp_dir()
-            .join(format!("madlibrary-missing-{}", uuid::Uuid::new_v4()))
+            .join(format!("starary-missing-{}", uuid::Uuid::new_v4()))
             .to_string_lossy()
             .to_string();
         let location = ResolvedStorageLocation {
@@ -820,8 +820,8 @@ mod tests {
     #[test]
     fn detects_overlapping_storage_locations_at_path_boundaries() {
         assert!(storage_locations_overlap(
-            r"C:\MadLibrary\LibraryA",
-            "c:/madlibrary/librarya"
+            r"C:\Starary\LibraryA",
+            "c:/starary/librarya"
         ));
         assert!(storage_locations_overlap(
             "smb://nas/libraries/team-a",
@@ -836,8 +836,8 @@ mod tests {
             "smb://nas/libraries/team-a-old"
         ));
         assert!(!storage_locations_overlap(
-            r"C:\MadLibrary\LibraryA",
-            r"C:\MadLibrary\LibraryB"
+            r"C:\Starary\LibraryA",
+            r"C:\Starary\LibraryB"
         ));
     }
 }

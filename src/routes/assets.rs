@@ -1434,12 +1434,10 @@ fn normalize_source_file_relative_path(value: &str, asset_id: &str) -> AppResult
 
 pub(super) fn normalize_derived_file_relative_path(value: &str) -> AppResult<String> {
     let normalized = normalize_safe_relative_path(value)?;
-    if !normalized.starts_with(".madlibrary/thumbs/")
-        && !normalized.starts_with(".madlibrary/previews/")
+    if !normalized.starts_with(".starary/thumbs/") && !normalized.starts_with(".starary/previews/")
     {
         return Err(AppError::BadRequest(
-            "derived files must be stored under .madlibrary/thumbs or .madlibrary/previews"
-                .to_string(),
+            "derived files must be stored under .starary/thumbs or .starary/previews".to_string(),
         ));
     }
 
@@ -1449,9 +1447,9 @@ pub(super) fn normalize_derived_file_relative_path(value: &str) -> AppResult<Str
 pub(super) fn normalize_readable_storage_file_relative_path(value: &str) -> AppResult<String> {
     let normalized = normalize_safe_relative_path(value)?;
     if normalized.starts_with("assets/")
-        || normalized.starts_with(".madlibrary/thumbs/")
-        || normalized.starts_with(".madlibrary/previews/")
-        || normalized == ".madlibrary/cover.webp"
+        || normalized.starts_with(".starary/thumbs/")
+        || normalized.starts_with(".starary/previews/")
+        || normalized == ".starary/cover.webp"
     {
         return Ok(normalized);
     }

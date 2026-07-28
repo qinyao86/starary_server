@@ -1,12 +1,12 @@
 [package]
-name = "madlibrary-server"
+name = "starary-server"
 version = "0.1.0"
 edition = "2021"
 description = "Starary Server core"
 publish = false
 
 [[bin]]
-name = "madlibrary-server"
+name = "starary-server"
 path = "src/main.rs"
 
 [dependencies]

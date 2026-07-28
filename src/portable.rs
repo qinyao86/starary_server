@@ -9,8 +9,8 @@ use std::{
     process::{Command, Output},
 };
 
-const DATABASE_NAME: &str = "madlibrary_team";
-const DATABASE_USER: &str = "madlibrary";
+const DATABASE_NAME: &str = "starary_team";
+const DATABASE_USER: &str = "starary";
 const DEFAULT_POSTGRES_PORT: u16 = 54329;
 const DEFAULT_SERVER_PORT: u16 = 3789;
 
@@ -31,10 +31,10 @@ impl PortableRuntime {
         dotenvy::from_path(app_home.join(".env")).ok();
 
         let postgres_mode = PostgresMode::from_env()?;
-        let database_url_is_set = env::var("MADLIBRARY_DATABASE_URL")
+        let database_url_is_set = env::var("STARARY_DATABASE_URL")
             .map(|value| !value.trim().is_empty())
             .unwrap_or(false);
-        let server_port_is_explicit = env::var_os("MADLIBRARY_SERVER_PORT").is_some();
+        let server_port_is_explicit = env::var_os("STARARY_SERVER_PORT").is_some();
         let (managed_postgres, runtime_config_path) = match postgres_mode {
             PostgresMode::Auto if database_url_is_set => (None, None),
             PostgresMode::Auto | PostgresMode::Bundled => {
@@ -44,7 +44,7 @@ impl PortableRuntime {
             }
             PostgresMode::External if database_url_is_set => (None, None),
             PostgresMode::External => {
-                bail!("MADLIBRARY_POSTGRES_MODE=external requires MADLIBRARY_DATABASE_URL")
+                bail!("STARARY_POSTGRES_MODE=external requires STARARY_DATABASE_URL")
             }
         };
 
@@ -80,18 +80,18 @@ enum PostgresMode {
 
 impl PostgresMode {
     fn from_env() -> anyhow::Result<Self> {
-        let value = env::var("MADLIBRARY_POSTGRES_MODE").unwrap_or_else(|_| "auto".to_string());
+        let value = env::var("STARARY_POSTGRES_MODE").unwrap_or_else(|_| "auto".to_string());
         match value.trim().to_ascii_lowercase().as_str() {
             "auto" => Ok(Self::Auto),
             "bundled" => Ok(Self::Bundled),
             "external" => Ok(Self::External),
-            _ => bail!("MADLIBRARY_POSTGRES_MODE must be auto, bundled, or external"),
+            _ => bail!("STARARY_POSTGRES_MODE must be auto, bundled, or external"),
         }
     }
 }
 
 fn resolve_app_home() -> anyhow::Result<PathBuf> {
-    if let Some(value) = env::var_os("MADLIBRARY_HOME") {
+    if let Some(value) = env::var_os("STARARY_HOME") {
         return absolute_path(PathBuf::from(value));
     }
 
@@ -120,13 +120,13 @@ fn prepare_bundled_postgres(
     app_home: &Path,
     apply_stored_server_port: bool,
 ) -> anyhow::Result<(ManagedPostgres, PathBuf)> {
-    let postgres_home = env::var_os("MADLIBRARY_POSTGRES_HOME")
+    let postgres_home = env::var_os("STARARY_POSTGRES_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| app_home.join("postgresql"));
     let postgres_executable = postgres_home.join("bin").join(executable_name("postgres"));
     if !postgres_executable.is_file() {
         bail!(
-            "bundled PostgreSQL was requested but {} is missing; set MADLIBRARY_POSTGRES_MODE=external and MADLIBRARY_DATABASE_URL to use an external database",
+            "bundled PostgreSQL was requested but {} is missing; set STARARY_POSTGRES_MODE=external and STARARY_DATABASE_URL to use an external database",
             postgres_executable.display()
         );
     }
@@ -148,16 +148,16 @@ fn prepare_bundled_postgres(
         runtime_config.database_password, runtime_config.postgres_port
     );
 
-    env::set_var("MADLIBRARY_DATABASE_URL", database_url);
-    env::set_var("MADLIBRARY_STORAGE_DIR", &storage_dir);
-    if env::var_os("MADLIBRARY_ADMIN_ASSETS_DIR").is_none() {
-        env::set_var("MADLIBRARY_ADMIN_ASSETS_DIR", app_home.join("admin-ui"));
+    env::set_var("STARARY_DATABASE_URL", database_url);
+    env::set_var("STARARY_STORAGE_DIR", &storage_dir);
+    if env::var_os("STARARY_ADMIN_ASSETS_DIR").is_none() {
+        env::set_var("STARARY_ADMIN_ASSETS_DIR", app_home.join("admin-ui"));
     }
-    env::set_var("MADLIBRARY_DEPLOYMENT_MODE", "portable");
-    env::set_var("MADLIBRARY_JWT_SECRET", &runtime_config.jwt_secret);
+    env::set_var("STARARY_DEPLOYMENT_MODE", "portable");
+    env::set_var("STARARY_JWT_SECRET", &runtime_config.jwt_secret);
     if apply_stored_server_port {
         env::set_var(
-            "MADLIBRARY_SERVER_PORT",
+            "STARARY_SERVER_PORT",
             runtime_config.server_port.to_string(),
         );
     }
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn persists_server_port_in_runtime_config() {
-        let test_dir = env::temp_dir().join(format!("madlibrary-port-test-{}", nanoid!()));
+        let test_dir = env::temp_dir().join(format!("starary-port-test-{}", nanoid!()));
         fs::create_dir_all(&test_dir).unwrap();
         let config_path = test_dir.join("runtime.json");
         PortableConfig::load_or_create(&config_path).unwrap();
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn rejects_privileged_server_ports() {
-        let test_dir = env::temp_dir().join(format!("madlibrary-port-test-{}", nanoid!()));
+        let test_dir = env::temp_dir().join(format!("starary-port-test-{}", nanoid!()));
         fs::create_dir_all(&test_dir).unwrap();
         let config_path = test_dir.join("runtime.json");
         PortableConfig::load_or_create(&config_path).unwrap();

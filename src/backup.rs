@@ -193,7 +193,7 @@ impl BackupService {
     pub fn uploaded_restore_paths(&self) -> anyhow::Result<(PathBuf, PathBuf)> {
         fs::create_dir_all(&self.inner.backup_dir)?;
         let id = format!(
-            "madlibrary-upload-restore-{}.dump",
+            "starary-upload-restore-{}.dump",
             Local::now().format("%Y%m%d-%H%M%S-%3f")
         );
         let destination = self.inner.backup_dir.join(id);
@@ -241,7 +241,7 @@ impl BackupService {
             serde_json::from_slice(&fs::read(&self.inner.pending_restore_path)?)?;
         let (source, cleanup_source) = self.pending_restore_source(&pending)?;
         let recovery_id = format!(
-            "madlibrary-pre-restore-{}.dump",
+            "starary-pre-restore-{}.dump",
             Local::now().format("%Y%m%d-%H%M%S-%3f")
         );
         let recovery = self.inner.backup_dir.join(&recovery_id);
@@ -297,7 +297,7 @@ impl BackupService {
             BackupKind::PreInitialize => "pre-initialize",
         };
         let id = format!(
-            "madlibrary-{prefix}-{}.dump",
+            "starary-{prefix}-{}.dump",
             Local::now().format("%Y%m%d-%H%M%S-%3f")
         );
         let destination = self.inner.backup_dir.join(&id);
@@ -401,7 +401,7 @@ impl BackupService {
     fn has_automatic_for_date(&self, date: &str) -> anyhow::Result<bool> {
         Ok(self.list()?.iter().any(|record| {
             matches!(record.kind, BackupKind::Automatic)
-                && record.id.starts_with(&format!("madlibrary-auto-{date}-"))
+                && record.id.starts_with(&format!("starary-auto-{date}-"))
         }))
     }
 
@@ -483,7 +483,7 @@ impl DatabaseCommandEnv {
 }
 
 fn backup_bin_dir(app_home: &Path) -> PathBuf {
-    if let Some(value) = env::var_os("MADLIBRARY_POSTGRES_BIN_DIR") {
+    if let Some(value) = env::var_os("STARARY_POSTGRES_BIN_DIR") {
         return PathBuf::from(value);
     }
     let portable = app_home.join("postgresql").join("bin");
@@ -503,13 +503,13 @@ fn backup_file_identity(path: &Path) -> Option<(String, BackupKind)> {
     if !id.ends_with(".dump") {
         return None;
     }
-    let kind = if id.starts_with("madlibrary-auto-") {
+    let kind = if id.starts_with("starary-auto-") {
         BackupKind::Automatic
-    } else if id.starts_with("madlibrary-manual-") {
+    } else if id.starts_with("starary-manual-") {
         BackupKind::Manual
-    } else if id.starts_with("madlibrary-pre-restore-") {
+    } else if id.starts_with("starary-pre-restore-") {
         BackupKind::PreRestore
-    } else if id.starts_with("madlibrary-pre-initialize-") {
+    } else if id.starts_with("starary-pre-initialize-") {
         BackupKind::PreInitialize
     } else {
         return None;
@@ -584,16 +584,14 @@ mod tests {
     use super::*;
 
     fn test_service(test_name: &str) -> (BackupService, PathBuf) {
-        let root = env::temp_dir().join(format!(
-            "madlibrary-backup-{test_name}-{}",
-            nanoid::nanoid!()
-        ));
+        let root =
+            env::temp_dir().join(format!("starary-backup-{test_name}-{}", nanoid::nanoid!()));
         let storage = root.join("data").join("storage");
         fs::create_dir_all(&storage).unwrap();
         let service = BackupService::new(
             &root,
             &storage,
-            "postgresql://madlibrary:password@127.0.0.1:5432/madlibrary_team",
+            "postgresql://starary:password@127.0.0.1:5432/starary_team",
         )
         .unwrap();
         (service, root)
@@ -603,10 +601,10 @@ mod tests {
     fn retention_prunes_only_old_automatic_backups() {
         let (service, root) = test_service("retention");
         for name in [
-            "madlibrary-auto-20260710-020000.dump",
-            "madlibrary-auto-20260711-020000.dump",
-            "madlibrary-auto-20260712-020000.dump",
-            "madlibrary-manual-20260701-120000.dump",
+            "starary-auto-20260710-020000.dump",
+            "starary-auto-20260711-020000.dump",
+            "starary-auto-20260712-020000.dump",
+            "starary-manual-20260701-120000.dump",
         ] {
             fs::write(service.inner.backup_dir.join(name), name).unwrap();
             std::thread::sleep(Duration::from_millis(5));
@@ -621,13 +619,11 @@ mod tests {
             .map(|record| record.id)
             .collect::<Vec<_>>();
         assert_eq!(remaining.len(), 3);
-        assert!(remaining
-            .iter()
-            .any(|id| id.starts_with("madlibrary-manual-")));
+        assert!(remaining.iter().any(|id| id.starts_with("starary-manual-")));
         assert_eq!(
             remaining
                 .iter()
-                .filter(|id| id.starts_with("madlibrary-auto-"))
+                .filter(|id| id.starts_with("starary-auto-"))
                 .count(),
             2
         );
@@ -638,6 +634,6 @@ mod tests {
     fn backup_ids_cannot_escape_the_backup_directory() {
         assert!(validate_backup_id("../runtime.json").is_err());
         assert!(validate_backup_id("folder\\backup.dump").is_err());
-        assert!(validate_backup_id("madlibrary-manual-20260712-120000.dump").is_ok());
+        assert!(validate_backup_id("starary-manual-20260712-120000.dump").is_ok());
     }
 }

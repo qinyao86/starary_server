@@ -264,7 +264,7 @@ impl ManagedService {
     }
 
     fn spawn_server(&self) -> Result<Child, String> {
-        let server = self.resources.join("madlibrary-server.exe");
+        let server = self.resources.join("starary-server.exe");
         if !server.is_file() {
             return Err(format!("服务程序不存在：{}", server.display()));
         }
@@ -279,15 +279,15 @@ impl ManagedService {
 
         let mut command = Command::new(server);
         command
-            .env("MADLIBRARY_HOME", &self.data_home)
-            .env("MADLIBRARY_POSTGRES_HOME", &postgres)
-            .env("MADLIBRARY_POSTGRES_BIN_DIR", postgres.join("bin"))
-            .env("MADLIBRARY_ADMIN_ASSETS_DIR", admin_ui)
+            .env("STARARY_HOME", &self.data_home)
+            .env("STARARY_POSTGRES_HOME", &postgres)
+            .env("STARARY_POSTGRES_BIN_DIR", postgres.join("bin"))
+            .env("STARARY_ADMIN_ASSETS_DIR", admin_ui)
             .env(
-                "MADLIBRARY_DESKTOP_CONTROL_TOKEN",
+                "STARARY_DESKTOP_CONTROL_TOKEN",
                 &self.identity.control_token,
             )
-            .env("MADLIBRARY_DESKTOP_INSTANCE_ID", &self.identity.instance_id)
+            .env("STARARY_DESKTOP_INSTANCE_ID", &self.identity.instance_id)
             .stdin(Stdio::null())
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr));
@@ -297,10 +297,7 @@ impl ManagedService {
     }
 
     fn probe_identity(&self, port: u16) -> Result<IdentityResponse, ProbeError> {
-        let header = format!(
-            "X-MadLibrary-Control-Token: {}",
-            self.identity.control_token
-        );
+        let header = format!("X-Starary-Control-Token: {}", self.identity.control_token);
         let response = http::request(port, "GET", "/api/v1/server/desktop/identity", &[header])
             .map_err(|_| ProbeError::Unavailable)?;
         if response.status != 200 {
@@ -308,7 +305,7 @@ impl ManagedService {
         }
         let identity: IdentityResponse =
             serde_json::from_str(&response.body).map_err(|_| ProbeError::Foreign)?;
-        if identity.product != "Mad Library Team Server"
+        if identity.product != "Starary Server"
             || identity.instance_id != self.identity.instance_id
             || identity.port != port
         {
