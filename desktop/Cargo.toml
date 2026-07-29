@@ -2,7 +2,7 @@
 name = "starary-server-desktop"
 version = "1.0.0"
 description = "Starary Server desktop shell"
-authors = ["北京魔帧影画文化科技有限公司"]
+authors = ["Starary"]
 edition = "2021"
 publish = false
 
