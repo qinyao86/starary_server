@@ -1,6 +1,7 @@
 use crate::managed_service::ServiceStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
+    image::Image,
     menu::{MenuBuilder, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager,
@@ -52,7 +53,9 @@ pub fn install(app: &AppHandle, status: &ServiceStatus) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("Starary Server 控制中心");
-    if let Some(icon) = app.default_window_icon() {
+    if let Ok(icon) = Image::from_bytes(include_bytes!("../icons/tray-icon.png")) {
+        builder = builder.icon(icon);
+    } else if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
     builder
