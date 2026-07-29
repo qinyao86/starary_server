@@ -4,6 +4,7 @@ version = "1.0.0"
 edition = "2021"
 description = "Starary Server core"
 publish = false
+build = "build.rs"
 
 [[bin]]
 name = "starary-server"
@@ -37,3 +38,6 @@ uuid = { version = "1.0", features = ["serde", "v4"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_NetworkManagement_WNet"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
