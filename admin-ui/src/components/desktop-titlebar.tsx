@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
-import logoImage from "../assets/logo.png";
+import logoImage from "../assets/logo-titlebar.png";
 import type { TranslatorContext } from "../types";
 
 function isTauriRuntime() {
