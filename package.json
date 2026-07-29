@@ -1,7 +1,7 @@
 {
   "name": "starary-server",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "scripts": {
     "desktop:dev": "powershell -ExecutionPolicy Bypass -File ./scripts/desktop-dev.ps1",
     "desktop:build": "npm run release:windows",
