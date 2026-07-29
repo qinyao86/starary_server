@@ -35,6 +35,8 @@
   },
   "bundle": {
     "active": true,
+    "publisher": "北京魔帧影画文化科技有限公司",
+    "copyright": "Copyright © 2026 北京魔帧影画文化科技有限公司",
     "targets": ["nsis"],
     "icon": ["icons/icon.ico"],
     "resources": {
@@ -43,6 +45,8 @@
     "windows": {
       "nsis": {
         "installMode": "both",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
         "installerHooks": "installer-hooks.nsh"
       }
     }
