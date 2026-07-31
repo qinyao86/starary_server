@@ -17,7 +17,7 @@ export function PermissionsPage({ t }: TranslatorContext) {
   let currentCategory = "";
 
   return (
-    <PageFrame title={t("permissions")} description={t("permissionsPageHint")}>
+    <PageFrame title={t("permissions")} description={t("permissionsPageHint")} className="permissions-page-frame">
       <div className="permission-note">{t("libraryManagerConsoleNote")}</div>
 
       <Panel title={t("serverPermissions")} icon={Server} className="span-12">

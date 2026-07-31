@@ -305,6 +305,40 @@
   line-height: 20px;
 }
 
+.permissions-page-frame {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 100%;
+}
+
+.permissions-page-frame .panel {
+  overflow: visible;
+}
+
+.permissions-page-frame .permission-matrix th:first-child,
+.permissions-page-frame .permission-matrix td:first-child {
+  width: 55%;
+}
+
+.permissions-page-frame .permission-matrix th:not(:first-child),
+.permissions-page-frame .permission-matrix td:not(:first-child) {
+  width: 15%;
+}
+
+.permissions-page-frame .permission-matrix th,
+.permissions-page-frame .permission-matrix td {
+  height: auto;
+  min-height: 42px;
+  padding-block: 10px;
+  white-space: normal;
+}
+
+.permissions-page-frame .permission-action-cell > span:last-child {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .theme-dark .permission-note {
   border-color: #2f2f33;
   color: #d4d4d8;
