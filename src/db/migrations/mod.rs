@@ -8,6 +8,7 @@ mod library_structure;
 mod library_transfer;
 mod personalization;
 mod presets;
+mod tasks;
 
 pub(super) type MigrationTx<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
 
@@ -19,6 +20,7 @@ pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
     library_transfer::create_library_transfer_schema(&mut tx).await?;
     presets::create_presets_schema(&mut tx).await?;
     personalization::create_personalization_schema(&mut tx).await?;
+    tasks::create_task_schema(&mut tx).await?;
     compatibility::upgrade_existing_schema(&mut tx).await?;
     indexes::create_indexes(&mut tx).await?;
 

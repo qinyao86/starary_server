@@ -244,3 +244,33 @@ export type ActivityListResponse = {
   limit: number;
   offset: number;
 };
+
+export type ServerTask = {
+  id: string;
+  libraryId?: string | null;
+  libraryName?: string | null;
+  userId?: string | null;
+  userDisplayName?: string | null;
+  userEmail?: string | null;
+  userAvatarKey?: string | null;
+  clientId: string;
+  jobType: string;
+  title: string;
+  status: string;
+  totalCount: number;
+  processedCount: number;
+  failedCount: number;
+  progress: number;
+  message?: string | null;
+  deleteRequestedAt?: string | null;
+  deletedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastHeartbeatAt: string;
+};
+
+export type ServerTaskListResponse = {
+  items: ServerTask[];
+  limit: number;
+  offset: number;
+};

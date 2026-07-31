@@ -16,6 +16,8 @@ export type {
   LoginResponse,
   RuntimeSettings,
   ServerInfo,
+  ServerTask,
+  ServerTaskListResponse,
   SetupStatus,
   StorageConnection,
   StorageConnectionInput,

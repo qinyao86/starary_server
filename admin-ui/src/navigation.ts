@@ -1,4 +1,4 @@
-import { BarChart3, DatabaseBackup, HardDrive, Library, Settings, ShieldCheck, Users } from "lucide-react";
+import { BarChart3, DatabaseBackup, HardDrive, Library, ListChecks, Settings, ShieldCheck, Users } from "lucide-react";
 import { sectionStorageKey } from "./constants";
 import type { NavItem, Section } from "./types";
 
@@ -7,6 +7,7 @@ export const navItems: NavItem[] = [
   { id: "storage", icon: HardDrive, label: "storage" },
   { id: "users", icon: Users, label: "users" },
   { id: "permissions", icon: ShieldCheck, label: "permissions" },
+  { id: "tasks", icon: ListChecks, label: "tasks" },
   { id: "statistics", icon: BarChart3, label: "statistics" },
   { id: "backups", icon: DatabaseBackup, label: "data" },
   { id: "settings", icon: Settings, label: "settings" }

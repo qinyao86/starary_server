@@ -13,6 +13,8 @@ import type {
   LoginResponse,
   RuntimeSettings,
   ServerInfo,
+  ServerTask,
+  ServerTaskListResponse,
   SetupStatus,
   StorageConnection,
   StorageConnectionInput,
@@ -115,6 +117,12 @@ export const api = {
       token
     }),
   listMyLibraries: (token: string) => request<TeamLibrary[]>("/api/v1/me/libraries", { token }),
+  listTasks: (token: string) => request<ServerTaskListResponse>("/api/v1/tasks", { token }),
+  deleteTask: (token: string, taskId: string) =>
+    request<ServerTask>(`/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+      method: "DELETE",
+      token
+    }),
   listMyLibraryStatuses: (token: string) => request<LibraryStatusResponse>("/api/v1/me/library-status", { token }),
   updatePresence: (token: string, payload: { libraryId?: string | null } = {}) =>
     request<void>("/api/v1/me/presence", {

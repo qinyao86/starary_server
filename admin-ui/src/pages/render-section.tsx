@@ -6,6 +6,7 @@ import {
   SettingsPage,
   StatisticsPage,
   StoragePage,
+  TasksPage,
   UsersPage
 } from ".";
 
@@ -17,6 +18,8 @@ export function renderSection(section: Section, context: PageContext) {
       return <UsersPage {...context} />;
     case "permissions":
       return <PermissionsPage {...context} />;
+    case "tasks":
+      return <TasksPage {...context} />;
     case "storage":
       return <StoragePage {...context} />;
     case "statistics":

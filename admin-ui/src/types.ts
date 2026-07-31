@@ -6,6 +6,7 @@ export type Section =
   | "libraries"
   | "users"
   | "permissions"
+  | "tasks"
   | "storage"
   | "statistics"
   | "backups"

@@ -16,6 +16,7 @@ mod runtime;
 mod setup;
 mod storage_connections;
 mod storage_roots;
+mod tasks;
 pub(crate) mod users;
 
 use crate::state::AppState;
@@ -331,6 +332,11 @@ pub fn router(state: AppState) -> Router {
             get(activity::list_activity),
         )
         .route("/api/v1/activity", get(activity::list_server_activity))
+        .route("/api/v1/tasks", get(tasks::list_tasks))
+        .route(
+            "/api/v1/tasks/:task_id",
+            put(tasks::report_task).delete(tasks::delete_task),
+        )
         .route(
             "/api/v1/storage-connections",
             get(storage_connections::list_storage_connections)

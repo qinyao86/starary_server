@@ -1,0 +1,89 @@
+.tasks-auto-refresh {
+  color: #697586;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.tasks-table th:first-child,
+.tasks-table td:first-child {
+  width: 30%;
+}
+
+.task-name-cell,
+.task-progress-cell,
+.task-user-cell {
+  display: flex;
+  min-width: 0;
+}
+
+.task-name-cell {
+  flex-direction: column;
+  gap: 3px;
+}
+
+.task-name-cell strong,
+.task-user-cell strong {
+  color: #18212f;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.task-name-cell span,
+.task-name-cell em,
+.task-user-cell span {
+  overflow: hidden;
+  color: #697586;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-progress-cell {
+  flex-direction: column;
+  gap: 6px;
+  min-width: 150px;
+}
+
+.task-progress-bar {
+  overflow: hidden;
+  width: 150px;
+  height: 6px;
+  border-radius: 999px;
+  background: #edf1f6;
+}
+
+.task-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+}
+
+.task-user-cell {
+  align-items: center;
+  gap: 9px;
+}
+
+.task-user-cell > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.theme-dark .tasks-auto-refresh,
+.theme-dark .task-name-cell span,
+.theme-dark .task-name-cell em,
+.theme-dark .task-user-cell span {
+  color: #a1a1aa;
+}
+
+.theme-dark .task-name-cell strong,
+.theme-dark .task-user-cell strong {
+  color: #f4f4f5;
+}
+
+.theme-dark .task-progress-bar {
+  background: #27272a;
+}
