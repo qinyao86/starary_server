@@ -46,7 +46,8 @@
 }
 
 .library-list-page-frame > .library-page {
-  flex: 1;
+  flex: 0 0 auto;
+  height: calc(100% - 44px - 18px);
   min-height: 360px;
 }
 

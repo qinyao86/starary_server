@@ -50,15 +50,21 @@
 }
 
 .content-inner {
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
+  height: 100%;
   min-height: 100%;
   padding: var(--page-content-padding-y) var(--page-content-padding-x) 28px;
 }
 
 .page-frame {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 18px;
+  height: 100%;
+  min-height: 100%;
 }
 
 .page-intro {
