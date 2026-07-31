@@ -21,6 +21,7 @@ export const zhRuntime = {
     removeCustomAvatar: "\u79fb\u9664\u81ea\u5b9a\u4e49\u5934\u50cf",
     systemAvatar: "\u7cfb\u7edf\u5934\u50cf",
     uploadAvatar: "\u4e0a\u4f20",
+    avatarAuthorCredit: "\u5934\u50cf\u4f5c\u8005\uff1a\u55f7\u82f1\u4fca",
     pageNavigation: "\u9875\u9762\u5bfc\u822a",
     collapseSidebar: "\u6536\u8d77\u4fa7\u680f",
     expandSidebar: "\u5c55\u5f00\u4fa7\u680f",

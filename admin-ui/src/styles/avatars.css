@@ -198,6 +198,20 @@
   flex: 1;
 }
 
+.avatar-author-link {
+  min-width: 0;
+  color: #697586;
+  font-size: 12px;
+  line-height: 18px;
+  text-decoration: none;
+}
+
+.avatar-author-link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .avatar-dialog .dialog-actions button {
   min-width: 66px;
 }
@@ -221,6 +235,14 @@
 
 .theme-dark .avatar-system-heading {
   border-color: #2f2f33;
+}
+
+.theme-dark .avatar-author-link {
+  color: #a1a1aa;
+}
+
+.theme-dark .avatar-author-link:hover {
+  color: #93c5fd;
 }
 
 .theme-dark .avatar-picker-option:hover {

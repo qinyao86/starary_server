@@ -6,6 +6,8 @@ import type { TranslatorContext } from "../../types";
 import { UserAvatar } from "../common";
 import { DialogShell } from "./dialog-shell";
 
+const AVATAR_AUTHOR_URL = "https://www.iconfont.cn/user/detail?spm=a313x.collections_detail.i1.d9bd4f23f.31a03a81lo3uYS&uid=14278&nid=Dl8y7W8raO8r";
+
 export function AvatarDialog({
   avatars,
   busy,
@@ -92,6 +94,14 @@ export function AvatarDialog({
         ))}
       </div>
       <div className="dialog-actions">
+        <a
+          className="avatar-author-link"
+          href={AVATAR_AUTHOR_URL}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {t("avatarAuthorCredit")}
+        </a>
         <span className="avatar-dialog-action-spacer" />
         <Button type="button" variant="outline" onClick={onClose}>{t("cancel")}</Button>
       </div>

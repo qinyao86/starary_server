@@ -21,6 +21,7 @@ export const enRuntime = {
     removeCustomAvatar: "Remove custom avatar",
     systemAvatar: "System avatar",
     uploadAvatar: "Upload",
+    avatarAuthorCredit: "Avatar author: Ao Yingjun",
     pageNavigation: "Page navigation",
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
