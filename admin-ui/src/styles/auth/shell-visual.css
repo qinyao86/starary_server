@@ -6,6 +6,29 @@
   background: #efefed;
 }
 
+.app-loading-screen {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100%;
+  background: #efefed;
+}
+
+.app-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(37, 99, 235, 0.18);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: app-loading-spin 0.82s linear infinite;
+}
+
+@keyframes app-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .auth-frame {
   display: grid;
   grid-template-columns: 1fr;

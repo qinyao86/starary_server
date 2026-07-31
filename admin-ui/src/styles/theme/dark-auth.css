@@ -4,6 +4,15 @@
     linear-gradient(180deg, #111113 0%, #111113 100%);
 }
 
+.theme-dark .app-loading-screen {
+  background: #111113;
+}
+
+.theme-dark .app-loading-spinner {
+  border-color: rgba(96, 165, 250, 0.2);
+  border-top-color: #93c5fd;
+}
+
 .theme-dark .auth-frame {
   border-color: #2f2f33;
   background: #18181b;

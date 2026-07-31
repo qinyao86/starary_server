@@ -230,7 +230,7 @@ export function App() {
   };
 
   if (apiState === "loading" && needsOwner === null) {
-    return withDesktopFrame(<AuthShell t={t} language={language} setLanguage={updateLanguage} title={t("loading")} colorTheme={effectiveColorTheme} />);
+    return withDesktopFrame(<LoadingScreen label={t("loading")} />);
   }
 
   if (apiState === "unavailable" && !previewMode) {
@@ -272,7 +272,7 @@ export function App() {
   }
 
   if (!authChecked) {
-    return withDesktopFrame(<AuthShell t={t} language={language} setLanguage={updateLanguage} title={t("loading")} colorTheme={effectiveColorTheme} />);
+    return withDesktopFrame(<LoadingScreen label={t("loading")} />);
   }
 
   if (!signedIn) {
@@ -341,6 +341,14 @@ export function App() {
       {renderSection(activeSection, context)}
     </AdminShell>,
     true
+  );
+}
+
+function LoadingScreen({ label }: { label: string }) {
+  return (
+    <div className="app-loading-screen" role="status" aria-label={label}>
+      <div className="app-loading-spinner" />
+    </div>
   );
 }
 
