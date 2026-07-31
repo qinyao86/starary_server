@@ -81,7 +81,7 @@ export const enFeatures = {
     replaceAssetTags: "Replace asset tag sets",
     viewTrashAssets: "View trashed assets",
     emptyTrash: "Empty trash",
-    viewDuplicateAssets: "View duplicate results",
+    viewDuplicateAssets: "Merge and edit duplicate results",
     editAssetBasicInfo: "Edit asset details",
     organizeAssetFolders: "Change asset folders",
     organizeAssetTags: "Change asset tags",

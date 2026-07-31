@@ -81,7 +81,7 @@ export const zhFeatures = {
     replaceAssetTags: "替换资源的标签集合",
     viewTrashAssets: "查看垃圾桶资源",
     emptyTrash: "清空垃圾桶",
-    viewDuplicateAssets: "查看重复资源结果",
+    viewDuplicateAssets: "合并编辑重复资源结果",
     editAssetBasicInfo: "\u7f16\u8f91\u8d44\u6e90\u57fa\u7840\u4fe1\u606f",
     organizeAssetFolders: "\u8c03\u6574\u8d44\u6e90\u6240\u5c5e\u76ee\u5f55",
     organizeAssetTags: "\u8c03\u6574\u8d44\u6e90\u6807\u7b7e",
