@@ -79,13 +79,12 @@ export function TasksPage({ t, token, currentUser, setMessage }: PageContext) {
         title={`${t("taskList")} (${summary})`}
         icon={RefreshCw}
         className="span-12 tasks-panel"
-        action={<span className="tasks-auto-refresh">{t("taskAutoRefresh")}</span>}
       >
         <div className="table-wrap tasks-table-wrap">
           <table className="data-table tasks-table">
             <thead>
               <tr>
-                <th>{t("name")}</th>
+                <th>{t("taskType")}</th>
                 <th>{t("taskProgress")}</th>
                 <th>{t("taskOwner")}</th>
                 <th>{t("taskLibrary")}</th>
@@ -102,9 +101,8 @@ export function TasksPage({ t, token, currentUser, setMessage }: PageContext) {
                 <tr key={task.id}>
                   <td>
                     <div className="task-name-cell">
-                      <strong>{task.title}</strong>
-                      <span>{task.jobType} · {task.id}</span>
-                      {task.message && <em>{task.message}</em>}
+                      <strong>{taskTypeLabel(t, task)}</strong>
+                      <span>{task.id}</span>
                     </div>
                   </td>
                   <td>
@@ -148,6 +146,23 @@ export function TasksPage({ t, token, currentUser, setMessage }: PageContext) {
       </Panel>
     </PageFrame>
   );
+}
+
+function taskTypeLabel(t: PageContext["t"], task: ServerTask) {
+  switch (task.jobType) {
+    case "import_assets":
+      return t("taskTypeImportAssets");
+    case "resource_export":
+      return t("taskTypeResourceExport");
+    case "rebuild_thumbnails":
+      return t("taskTypeRebuildThumbnails");
+    case "library_transfer":
+      return t("taskTypeLibraryTransfer");
+    case "library_merge":
+      return t("taskTypeLibraryMerge");
+    default:
+      return task.jobType || task.title;
+  }
 }
 
 function taskStatusLabel(t: PageContext["t"], task: ServerTask) {
