@@ -143,7 +143,7 @@ export const libraryPermissions = [
   { category: "permissionCategoryTransfer", action: "copyFoldersAcrossLibraries", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
   { category: "permissionCategoryTransfer", action: "copyBetweenPersonalAndTeam", scope: "own", target: "permissionTargetOwnAssets", manager: true, editor: true, viewer: false, verified: true },
   { category: "permissionCategoryTransfer", action: "copyBetweenPersonalAndTeam", scope: "all", target: "permissionTargetAllAssets", manager: true, editor: false, viewer: false, verified: true },
-  { category: "permissionCategoryTransfer", action: "exportAssets", scope: "all", manager: true, editor: true, viewer: true, verified: false },
+  { category: "permissionCategoryTransfer", action: "exportAssets", scope: "all", manager: true, editor: true, viewer: true, verified: true },
   { category: "permissionCategoryFolders", action: "createRootFolders", scope: "create", manager: true, editor: true, viewer: false, verified: true },
   { category: "permissionCategoryFolders", action: "createChildFolders", scope: "own", target: "permissionTargetOwnFolders", manager: true, editor: true, viewer: false, verified: true },
   { category: "permissionCategoryFolders", action: "createChildFolders", scope: "all", target: "permissionTargetAllFolders", manager: true, editor: false, viewer: false, verified: true },
