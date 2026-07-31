@@ -68,6 +68,7 @@ export const enFeatures = {
     rateAssets: "Rate assets",
     editAssetViewerSettings: "Edit asset viewer settings",
     editTextAssetContent: "Edit text asset content",
+    convertAssetImportMode: "Convert import mode",
     rebuildAssetThumbnails: "Rebuild asset thumbnails",
     setCustomAssetThumbnails: "Set custom thumbnails",
     editImageSequences: "Edit image sequence frames and ranges",

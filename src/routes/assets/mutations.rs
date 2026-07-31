@@ -52,6 +52,13 @@ pub struct UpdateAssetsViewerRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConvertAssetsImportModeRequest {
+    pub asset_ids: Vec<String>,
+    pub target_mode: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SetAssetFoldersRequest {
     pub asset_ids: Vec<String>,
     #[serde(default = "default_relation_mode")]
@@ -113,6 +120,17 @@ struct RenamePlan {
     old_path: PathBuf,
     new_path: PathBuf,
     relative_path: String,
+}
+
+#[derive(Debug)]
+struct ImportModeConversionPlan {
+    asset_id: String,
+    previous_relative_path: Option<String>,
+    next_relative_path: String,
+    next_storage_key: Option<String>,
+    source_path: Option<PathBuf>,
+    target_path: Option<PathBuf>,
+    metadata: Value,
 }
 
 pub async fn check_asset_mutation_access(
@@ -476,6 +494,219 @@ pub async fn update_assets_viewer(
         "assets.viewer_updated",
     )
     .await
+}
+
+pub async fn convert_assets_import_mode(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+    Json(request): Json<ConvertAssetsImportModeRequest>,
+) -> AppResult<Json<AssetMutationResponse>> {
+    let target_mode = normalize_conversion_target_mode(&request.target_mode)?;
+    let asset_ids = normalize_ids(request.asset_ids, "assets")?;
+    ensure_library_asset_mutation_access(&state, &user, &library_id, &asset_ids).await?;
+
+    let rows = sqlx::query(
+        r#"
+        SELECT id, name, asset_kind, import_mode, storage_root_id, relative_path, storage_key, metadata
+        FROM assets
+        WHERE library_id = $1 AND id = ANY($2) AND deleted_at IS NULL
+        "#,
+    )
+    .bind(&library_id)
+    .bind(&asset_ids)
+    .fetch_all(&state.pool)
+    .await?;
+    if rows.len() != asset_ids.len() {
+        return Err(AppError::BadRequest(
+            "one or more assets were not found".to_string(),
+        ));
+    }
+
+    let mut plans = Vec::new();
+    for row in rows {
+        let asset_id: String = row.try_get("id")?;
+        let import_mode: String = row.try_get("import_mode")?;
+        if import_mode == target_mode {
+            continue;
+        }
+        if import_mode != "copy" && import_mode != "reference" {
+            return Err(AppError::BadRequest(format!(
+                "{asset_id} has an unsupported import mode"
+            )));
+        }
+
+        let asset_kind: String = row.try_get("asset_kind")?;
+        let metadata: Value = row.try_get("metadata")?;
+        validate_convertible_asset_kind(&asset_id, &asset_kind, &metadata)?;
+
+        let storage_root_id: Uuid = row
+            .try_get::<Option<Uuid>, _>("storage_root_id")?
+            .ok_or_else(|| AppError::BadRequest(format!("{asset_id} has no workspace")))?;
+        let base_path =
+            storage_root_write_base_path(&state, storage_root_id, Some(&library_id)).await?;
+        let current_relative_path = row.try_get::<Option<String>, _>("relative_path")?;
+        let current_relative_path = current_relative_path
+            .as_deref()
+            .map(normalize_readable_storage_file_relative_path)
+            .transpose()?;
+        let mut next_metadata = metadata;
+        let (next_relative_path, next_storage_key, source_path, target_path) =
+            if target_mode == "copy" {
+                let source_relative_path = current_relative_path.as_deref().ok_or_else(|| {
+                    AppError::BadRequest(format!("{asset_id} has no source path"))
+                })?;
+                let source_path = join_safe_relative_path(&base_path, source_relative_path);
+                if !source_path.is_file() {
+                    return Err(AppError::BadRequest(format!(
+                        "{asset_id} source file was not found"
+                    )));
+                }
+                let name: String = row.try_get("name")?;
+                let target_relative_path = normalize_readable_storage_file_relative_path(
+                    &format!("assets/{asset_id}/{}", validate_asset_name(&name)?),
+                )?;
+                let target_path = join_safe_relative_path(&base_path, &target_relative_path);
+                if source_path != target_path {
+                    if let Some(parent) = target_path.parent() {
+                        fs::create_dir_all(parent).map_err(|error| {
+                            AppError::BadRequest(format!("could not prepare asset folder: {error}"))
+                        })?;
+                    }
+                    if target_path.exists() {
+                        return Err(AppError::Conflict(format!(
+                            "{asset_id} target file already exists"
+                        )));
+                    }
+                }
+                (
+                    target_relative_path.clone(),
+                    Some(target_relative_path),
+                    Some(source_path),
+                    Some(target_path),
+                )
+            } else {
+                let relative_path = current_relative_path
+                    .clone()
+                    .or_else(|| {
+                        row.try_get::<Option<String>, _>("storage_key")
+                            .ok()
+                            .flatten()
+                    })
+                    .ok_or_else(|| AppError::BadRequest(format!("{asset_id} has no file path")))?;
+                let normalized = normalize_readable_storage_file_relative_path(&relative_path)?;
+                let source_path = join_safe_relative_path(&base_path, &normalized);
+                if !source_path.is_file() {
+                    return Err(AppError::BadRequest(format!(
+                        "{asset_id} source file was not found"
+                    )));
+                }
+                (normalized, None, None, None)
+            };
+
+        update_import_mode_metadata(&mut next_metadata, &target_mode, &next_relative_path)?;
+        plans.push(ImportModeConversionPlan {
+            asset_id,
+            previous_relative_path: current_relative_path,
+            next_relative_path,
+            next_storage_key,
+            source_path,
+            target_path,
+            metadata: next_metadata,
+        });
+    }
+
+    if plans.is_empty() {
+        return Ok(Json(
+            mutation_response(&state, &library_id, user.id, Vec::new()).await?,
+        ));
+    }
+
+    let mut copied_targets = Vec::new();
+    for plan in &plans {
+        if let (Some(source_path), Some(target_path)) = (&plan.source_path, &plan.target_path) {
+            if source_path != target_path {
+                fs::copy(source_path, target_path).map_err(|error| {
+                    AppError::BadRequest(format!("could not copy asset file: {error}"))
+                })?;
+                copied_targets.push(target_path.clone());
+            }
+        }
+    }
+
+    let mut tx = state.pool.begin().await?;
+    let mut converted_ids = Vec::with_capacity(plans.len());
+    for plan in &plans {
+        sqlx::query(
+            r#"
+            UPDATE assets
+            SET import_mode = $3,
+                relative_path = $4,
+                storage_key = $5,
+                metadata = $6,
+                updated_by_user_id = $7,
+                updated_at = NOW()
+            WHERE library_id = $1 AND id = $2 AND deleted_at IS NULL
+            "#,
+        )
+        .bind(&library_id)
+        .bind(&plan.asset_id)
+        .bind(&target_mode)
+        .bind(&plan.next_relative_path)
+        .bind(&plan.next_storage_key)
+        .bind(&plan.metadata)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| {
+            for target in &copied_targets {
+                let _ = fs::remove_file(target);
+            }
+            error
+        })?;
+        converted_ids.push(plan.asset_id.clone());
+    }
+    insert_activity_tx(
+        &mut tx,
+        &library_id,
+        user.id,
+        "assets.import_mode_converted",
+        &converted_ids,
+    )
+    .await?;
+    tx.commit().await?;
+
+    if target_mode == "reference" {
+        for plan in &plans {
+            if let Some(previous_relative_path) = plan.previous_relative_path.as_deref() {
+                if previous_relative_path.starts_with(&format!("assets/{}/", plan.asset_id))
+                    && previous_relative_path != plan.next_relative_path
+                {
+                    if let Some(root_id) = sqlx::query_scalar::<_, Option<Uuid>>(
+                        "SELECT storage_root_id FROM assets WHERE library_id = $1 AND id = $2",
+                    )
+                    .bind(&library_id)
+                    .bind(&plan.asset_id)
+                    .fetch_optional(&state.pool)
+                    .await?
+                    .flatten()
+                    {
+                        let base_path =
+                            storage_root_write_base_path(&state, root_id, Some(&library_id))
+                                .await?;
+                        let _ = fs::remove_file(join_safe_relative_path(
+                            &base_path,
+                            previous_relative_path,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(Json(
+        mutation_response(&state, &library_id, user.id, converted_ids).await?,
+    ))
 }
 
 pub async fn set_asset_folders(
@@ -942,6 +1173,55 @@ fn normalize_ids_unbounded(values: Vec<String>) -> Vec<String> {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty() && seen.insert(value.clone()))
         .collect()
+}
+
+fn normalize_conversion_target_mode(value: &str) -> AppResult<String> {
+    match value.trim() {
+        "copy" => Ok("copy".to_string()),
+        "reference" => Ok("reference".to_string()),
+        _ => Err(AppError::BadRequest("import mode is invalid".to_string())),
+    }
+}
+
+fn validate_convertible_asset_kind(
+    asset_id: &str,
+    asset_kind: &str,
+    metadata: &Value,
+) -> AppResult<()> {
+    if asset_kind == "link" {
+        return Err(AppError::BadRequest(format!(
+            "{asset_id} links cannot be converted"
+        )));
+    }
+    if asset_kind == "package" {
+        return Err(AppError::BadRequest(format!(
+            "{asset_id} package assets cannot be converted yet"
+        )));
+    }
+    if metadata
+        .get("subtype")
+        .and_then(Value::as_str)
+        .is_some_and(|value| value == "sequence")
+    {
+        return Err(AppError::BadRequest(format!(
+            "{asset_id} image sequences cannot be converted yet"
+        )));
+    }
+    Ok(())
+}
+
+fn update_import_mode_metadata(
+    metadata: &mut Value,
+    import_mode: &str,
+    relative_path: &str,
+) -> AppResult<()> {
+    let object = metadata
+        .as_object_mut()
+        .ok_or_else(|| AppError::BadRequest("asset metadata must be an object".to_string()))?;
+    object.insert("importMode".to_string(), json!(import_mode));
+    object.insert("sourcePath".to_string(), json!(relative_path));
+    object.insert("storedPath".to_string(), json!(relative_path));
+    Ok(())
 }
 
 fn validate_asset_name(value: &str) -> AppResult<String> {

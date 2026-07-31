@@ -229,6 +229,10 @@ pub fn router(state: AppState) -> Router {
             patch(assets::update_assets_viewer),
         )
         .route(
+            "/api/v1/libraries/:library_id/assets/import-mode",
+            patch(assets::convert_assets_import_mode),
+        )
+        .route(
             "/api/v1/libraries/:library_id/assets/folders",
             patch(assets::set_asset_folders),
         )

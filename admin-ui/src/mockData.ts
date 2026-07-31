@@ -119,6 +119,7 @@ export const libraryPermissions = [
   ...scopedRows("permissionCategoryAssetDetails", "rateAssets", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
   ...scopedRows("permissionCategoryAssetDetails", "editAssetViewerSettings", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
   ...scopedRows("permissionCategoryAssetDetails", "editTextAssetContent", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
+  ...scopedRows("permissionCategoryAssetDetails", "convertAssetImportMode", "permissionTargetOwnAssets", "permissionTargetAllAssets", false),
   ...scopedRows("permissionCategoryAssetOrganization", "rebuildAssetThumbnails", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
   ...scopedRows("permissionCategoryAssetOrganization", "setCustomAssetThumbnails", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),
   ...scopedRows("permissionCategoryAssetOrganization", "editImageSequences", "permissionTargetOwnAssets", "permissionTargetAllAssets", true),

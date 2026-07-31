@@ -68,6 +68,7 @@ export const zhFeatures = {
     rateAssets: "修改资源评分",
     editAssetViewerSettings: "修改资源查看器设置",
     editTextAssetContent: "修改文本资源内容",
+    convertAssetImportMode: "转换导入方式",
     rebuildAssetThumbnails: "重构资源缩略图",
     setCustomAssetThumbnails: "设置自定义缩略图",
     editImageSequences: "修改图片序列帧号和范围",
