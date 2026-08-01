@@ -15,7 +15,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{Postgres, Row, Transaction};
-use std::{collections::HashSet, fs, path::PathBuf};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path as StdPath, PathBuf},
+};
 use uuid::Uuid;
 
 const MAX_MUTATION_ASSETS: usize = 500;
@@ -126,11 +130,33 @@ struct RenamePlan {
 struct ImportModeConversionPlan {
     asset_id: String,
     previous_relative_path: Option<String>,
+    previous_package_root_relative_path: Option<String>,
     next_relative_path: String,
     next_storage_key: Option<String>,
-    source_path: Option<PathBuf>,
-    target_path: Option<PathBuf>,
+    storage_action: ImportModeConversionStorageAction,
     metadata: Value,
+}
+
+#[derive(Debug)]
+enum ImportModeConversionStorageAction {
+    None,
+    CopyFile {
+        source_path: PathBuf,
+        target_path: PathBuf,
+    },
+    CopyPackage {
+        source_root: PathBuf,
+        target_root: PathBuf,
+    },
+}
+
+#[derive(Debug)]
+enum ImportModeConversionRollback {
+    File(PathBuf),
+    PackageCopy {
+        source_root: PathBuf,
+        target_root: PathBuf,
+    },
 }
 
 pub async fn check_asset_mutation_access(
@@ -551,67 +577,140 @@ pub async fn convert_assets_import_mode(
             .map(normalize_readable_storage_file_relative_path)
             .transpose()?;
         let mut next_metadata = metadata;
-        let (next_relative_path, next_storage_key, source_path, target_path) =
+        let previous_package_root_relative_path = if asset_kind == "package" {
+            let main_relative_path =
+                metadata_package_main_relative_path(&next_metadata, &asset_id)?;
+            current_relative_path
+                .as_deref()
+                .and_then(|value| {
+                    package_root_relative_path_from_main_path(value, &main_relative_path)
+                })
+                .or_else(|| metadata_package_string(&next_metadata, "storedDirectory"))
+        } else {
+            None
+        };
+        let (next_relative_path, next_storage_key, storage_action) = if asset_kind == "package" {
+            let main_relative_path =
+                metadata_package_main_relative_path(&next_metadata, &asset_id)?;
+            let source_relative_path = current_relative_path
+                .clone()
+                .or_else(|| {
+                    row.try_get::<Option<String>, _>("storage_key")
+                        .ok()
+                        .flatten()
+                })
+                .ok_or_else(|| AppError::BadRequest(format!("{asset_id} has no source path")))?;
+            let normalized_source_relative_path =
+                normalize_readable_storage_file_relative_path(&source_relative_path)?;
+            let source_root_relative_path = package_root_relative_path(
+                &next_metadata,
+                &normalized_source_relative_path,
+                &main_relative_path,
+            )?;
+            let source_root = join_safe_relative_path(&base_path, &source_root_relative_path);
+            let source_main = source_root.join(&main_relative_path);
+            if !source_main.is_file() {
+                return Err(AppError::BadRequest(format!(
+                    "{asset_id} package main file was not found"
+                )));
+            }
             if target_mode == "copy" {
-                let source_relative_path = current_relative_path.as_deref().ok_or_else(|| {
-                    AppError::BadRequest(format!("{asset_id} has no source path"))
-                })?;
-                let source_path = join_safe_relative_path(&base_path, source_relative_path);
-                if !source_path.is_file() {
-                    return Err(AppError::BadRequest(format!(
-                        "{asset_id} source file was not found"
-                    )));
-                }
-                let name: String = row.try_get("name")?;
+                let target_root_relative_path =
+                    normalize_readable_storage_file_relative_path(&format!("assets/{asset_id}"))?;
                 let target_relative_path = normalize_readable_storage_file_relative_path(
-                    &format!("assets/{asset_id}/{}", validate_asset_name(&name)?),
+                    &format!("{target_root_relative_path}/{main_relative_path}"),
                 )?;
-                let target_path = join_safe_relative_path(&base_path, &target_relative_path);
-                if source_path != target_path {
-                    if let Some(parent) = target_path.parent() {
-                        fs::create_dir_all(parent).map_err(|error| {
-                            AppError::BadRequest(format!("could not prepare asset folder: {error}"))
-                        })?;
-                    }
-                    if target_path.exists() {
-                        return Err(AppError::Conflict(format!(
-                            "{asset_id} target file already exists"
-                        )));
-                    }
-                }
+                let target_root = join_safe_relative_path(&base_path, &target_root_relative_path);
+                update_team_package_import_mode_metadata(
+                    &mut next_metadata,
+                    &asset_id,
+                    "copy",
+                    &source_root_relative_path,
+                )?;
                 (
                     target_relative_path.clone(),
                     Some(target_relative_path),
-                    Some(source_path),
-                    Some(target_path),
+                    ImportModeConversionStorageAction::CopyPackage {
+                        source_root,
+                        target_root,
+                    },
                 )
             } else {
-                let relative_path = current_relative_path
-                    .clone()
-                    .or_else(|| {
-                        row.try_get::<Option<String>, _>("storage_key")
-                            .ok()
-                            .flatten()
-                    })
-                    .ok_or_else(|| AppError::BadRequest(format!("{asset_id} has no file path")))?;
-                let normalized = normalize_readable_storage_file_relative_path(&relative_path)?;
-                let source_path = join_safe_relative_path(&base_path, &normalized);
-                if !source_path.is_file() {
-                    return Err(AppError::BadRequest(format!(
-                        "{asset_id} source file was not found"
+                update_team_package_import_mode_metadata(
+                    &mut next_metadata,
+                    &asset_id,
+                    "reference",
+                    &source_root_relative_path,
+                )?;
+                (
+                    normalized_source_relative_path,
+                    None,
+                    ImportModeConversionStorageAction::None,
+                )
+            }
+        } else if target_mode == "copy" {
+            let source_relative_path = current_relative_path
+                .as_deref()
+                .ok_or_else(|| AppError::BadRequest(format!("{asset_id} has no source path")))?;
+            let source_path = join_safe_relative_path(&base_path, source_relative_path);
+            if !source_path.is_file() {
+                return Err(AppError::BadRequest(format!(
+                    "{asset_id} source file was not found"
+                )));
+            }
+            let name: String = row.try_get("name")?;
+            let target_relative_path = normalize_readable_storage_file_relative_path(&format!(
+                "assets/{asset_id}/{}",
+                validate_asset_name(&name)?
+            ))?;
+            let target_path = join_safe_relative_path(&base_path, &target_relative_path);
+            if source_path != target_path {
+                if let Some(parent) = target_path.parent() {
+                    fs::create_dir_all(parent).map_err(|error| {
+                        AppError::BadRequest(format!("could not prepare asset folder: {error}"))
+                    })?;
+                }
+                if target_path.exists() {
+                    return Err(AppError::Conflict(format!(
+                        "{asset_id} target file already exists"
                     )));
                 }
-                (normalized, None, None, None)
-            };
+            }
+            (
+                target_relative_path.clone(),
+                Some(target_relative_path),
+                ImportModeConversionStorageAction::CopyFile {
+                    source_path,
+                    target_path,
+                },
+            )
+        } else {
+            let relative_path = current_relative_path
+                .clone()
+                .or_else(|| {
+                    row.try_get::<Option<String>, _>("storage_key")
+                        .ok()
+                        .flatten()
+                })
+                .ok_or_else(|| AppError::BadRequest(format!("{asset_id} has no file path")))?;
+            let normalized = normalize_readable_storage_file_relative_path(&relative_path)?;
+            let source_path = join_safe_relative_path(&base_path, &normalized);
+            if !source_path.is_file() {
+                return Err(AppError::BadRequest(format!(
+                    "{asset_id} source file was not found"
+                )));
+            }
+            (normalized, None, ImportModeConversionStorageAction::None)
+        };
 
         update_import_mode_metadata(&mut next_metadata, &target_mode, &next_relative_path)?;
         plans.push(ImportModeConversionPlan {
             asset_id,
             previous_relative_path: current_relative_path,
+            previous_package_root_relative_path,
             next_relative_path,
             next_storage_key,
-            source_path,
-            target_path,
+            storage_action,
             metadata: next_metadata,
         });
     }
@@ -622,14 +721,30 @@ pub async fn convert_assets_import_mode(
         ));
     }
 
-    let mut copied_targets = Vec::new();
+    let mut rollbacks = Vec::new();
     for plan in &plans {
-        if let (Some(source_path), Some(target_path)) = (&plan.source_path, &plan.target_path) {
-            if source_path != target_path {
-                fs::copy(source_path, target_path).map_err(|error| {
-                    AppError::BadRequest(format!("could not copy asset file: {error}"))
-                })?;
-                copied_targets.push(target_path.clone());
+        match &plan.storage_action {
+            ImportModeConversionStorageAction::None => {}
+            ImportModeConversionStorageAction::CopyFile {
+                source_path,
+                target_path,
+            } => {
+                if source_path != target_path {
+                    fs::copy(source_path, target_path).map_err(|error| {
+                        AppError::BadRequest(format!("could not copy asset file: {error}"))
+                    })?;
+                    rollbacks.push(ImportModeConversionRollback::File(target_path.clone()));
+                }
+            }
+            ImportModeConversionStorageAction::CopyPackage {
+                source_root,
+                target_root,
+            } => {
+                copy_dir_recursive(source_root, target_root)?;
+                rollbacks.push(ImportModeConversionRollback::PackageCopy {
+                    source_root: source_root.clone(),
+                    target_root: target_root.clone(),
+                });
             }
         }
     }
@@ -659,9 +774,7 @@ pub async fn convert_assets_import_mode(
         .execute(&mut *tx)
         .await
         .map_err(|error| {
-            for target in &copied_targets {
-                let _ = fs::remove_file(target);
-            }
+            cleanup_import_mode_conversion_rollbacks(&rollbacks);
             error
         })?;
         converted_ids.push(plan.asset_id.clone());
@@ -674,7 +787,10 @@ pub async fn convert_assets_import_mode(
         &converted_ids,
     )
     .await?;
-    tx.commit().await?;
+    tx.commit().await.map_err(|error| {
+        cleanup_import_mode_conversion_rollbacks(&rollbacks);
+        error
+    })?;
 
     if target_mode == "reference" {
         for plan in &plans {
@@ -694,10 +810,19 @@ pub async fn convert_assets_import_mode(
                         let base_path =
                             storage_root_write_base_path(&state, root_id, Some(&library_id))
                                 .await?;
-                        let _ = fs::remove_file(join_safe_relative_path(
-                            &base_path,
-                            previous_relative_path,
-                        ));
+                        if let Some(package_root_relative_path) =
+                            plan.previous_package_root_relative_path.as_deref()
+                        {
+                            remove_package_storage_except_reference(&join_safe_relative_path(
+                                &base_path,
+                                package_root_relative_path,
+                            ));
+                        } else {
+                            let _ = fs::remove_file(join_safe_relative_path(
+                                &base_path,
+                                previous_relative_path,
+                            ));
+                        }
                     }
                 }
             }
@@ -1193,11 +1318,6 @@ fn validate_convertible_asset_kind(
             "{asset_id} links cannot be converted"
         )));
     }
-    if asset_kind == "package" {
-        return Err(AppError::BadRequest(format!(
-            "{asset_id} package assets cannot be converted yet"
-        )));
-    }
     if metadata
         .get("subtype")
         .and_then(Value::as_str)
@@ -1208,6 +1328,214 @@ fn validate_convertible_asset_kind(
         )));
     }
     Ok(())
+}
+
+fn metadata_package_string(metadata: &Value, key: &str) -> Option<String> {
+    metadata
+        .get("package")
+        .and_then(Value::as_object)
+        .and_then(|package| package.get(key))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.replace('\\', "/"))
+}
+
+fn metadata_package_main_relative_path(metadata: &Value, asset_id: &str) -> AppResult<String> {
+    let value = metadata
+        .get("package")
+        .and_then(|package| package.get("mainFile"))
+        .and_then(Value::as_object)
+        .and_then(|main_file| main_file.get("relativePath"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| AppError::BadRequest(format!("{asset_id} package main file is missing")))?;
+    normalize_readable_storage_file_relative_path(value)
+}
+
+fn package_root_relative_path_from_main_path(
+    main_path: &str,
+    main_relative_path: &str,
+) -> Option<String> {
+    let main_path = main_path.replace('\\', "/");
+    let main_relative_path = main_relative_path.replace('\\', "/");
+    main_path
+        .strip_suffix(&main_relative_path)
+        .map(|value| value.trim_end_matches('/').to_string())
+}
+
+fn package_root_relative_path(
+    metadata: &Value,
+    main_path: &str,
+    main_relative_path: &str,
+) -> AppResult<String> {
+    let candidates = [
+        metadata_package_string(metadata, "referenceDirectory"),
+        metadata_package_string(metadata, "rootSourcePath"),
+        metadata_package_string(metadata, "storedDirectory"),
+        package_root_relative_path_from_main_path(main_path, main_relative_path),
+    ];
+    for candidate in candidates.into_iter().flatten() {
+        if let Ok(relative_path) = normalize_readable_storage_file_relative_path(&candidate) {
+            return Ok(relative_path);
+        }
+    }
+    Err(AppError::BadRequest(
+        "package root path is missing".to_string(),
+    ))
+}
+
+fn update_team_package_import_mode_metadata(
+    metadata: &mut Value,
+    asset_id: &str,
+    import_mode: &str,
+    root_relative_path: &str,
+) -> AppResult<()> {
+    let package = metadata
+        .get_mut("package")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| AppError::BadRequest("package metadata is missing".to_string()))?;
+    if import_mode == "copy" {
+        package.insert(
+            "storedDirectory".to_string(),
+            json!(format!("assets/{asset_id}")),
+        );
+        package.insert("referenceDirectory".to_string(), Value::Null);
+    } else {
+        package.insert("storedDirectory".to_string(), Value::Null);
+        package.insert("referenceDirectory".to_string(), json!(root_relative_path));
+    }
+    package.insert("rootSourcePath".to_string(), json!(root_relative_path));
+
+    let next_root = if import_mode == "copy" {
+        format!("assets/{asset_id}")
+    } else {
+        root_relative_path.to_string()
+    };
+    for key in ["textureMaps", "modelPackage"] {
+        if let Some(object) = metadata.get_mut(key).and_then(Value::as_object_mut) {
+            object.insert("rootRelativePath".to_string(), json!(next_root.clone()));
+        }
+    }
+    Ok(())
+}
+
+fn copy_dir_recursive(source: &StdPath, target: &StdPath) -> AppResult<()> {
+    if !source.is_dir() {
+        return Err(AppError::BadRequest(
+            "package source folder was not found".to_string(),
+        ));
+    }
+    fs::create_dir_all(target).map_err(|error| {
+        AppError::BadRequest(format!("could not prepare package folder: {error}"))
+    })?;
+    for entry in fs::read_dir(source)
+        .map_err(|error| AppError::BadRequest(format!("could not read package folder: {error}")))?
+    {
+        let entry = entry.map_err(|error| {
+            AppError::BadRequest(format!("could not read package folder: {error}"))
+        })?;
+        let file_type = entry.file_type().map_err(|error| {
+            AppError::BadRequest(format!("could not read package entry: {error}"))
+        })?;
+        let source_path = entry.path();
+        let target_path = target.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&source_path, &target_path)?;
+        } else if file_type.is_file() {
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent).map_err(|error| {
+                    AppError::BadRequest(format!("could not prepare package folder: {error}"))
+                })?;
+            }
+            fs::copy(&source_path, &target_path).map_err(|error| {
+                AppError::BadRequest(format!("could not copy package file: {error}"))
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn collect_files_and_dirs(root: &StdPath) -> AppResult<(Vec<PathBuf>, Vec<PathBuf>)> {
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    fn visit(path: &StdPath, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) -> AppResult<()> {
+        for entry in fs::read_dir(path).map_err(|error| {
+            AppError::BadRequest(format!("could not read package folder: {error}"))
+        })? {
+            let entry = entry.map_err(|error| {
+                AppError::BadRequest(format!("could not read package folder: {error}"))
+            })?;
+            let entry_path = entry.path();
+            let file_type = entry.file_type().map_err(|error| {
+                AppError::BadRequest(format!("could not read package entry: {error}"))
+            })?;
+            if file_type.is_dir() {
+                visit(&entry_path, files, dirs)?;
+                dirs.push(entry_path);
+            } else if file_type.is_file() {
+                files.push(entry_path);
+            }
+        }
+        Ok(())
+    }
+    if root.is_dir() {
+        visit(root, &mut files, &mut dirs)?;
+    }
+    Ok((files, dirs))
+}
+
+fn cleanup_package_copy(source_root: &StdPath, target_root: &StdPath) {
+    let Ok((source_files, source_dirs)) = collect_files_and_dirs(source_root) else {
+        return;
+    };
+    for source_file in source_files {
+        if let Ok(relative_path) = source_file.strip_prefix(source_root) {
+            let _ = fs::remove_file(target_root.join(relative_path));
+        }
+    }
+    let mut source_dirs = source_dirs;
+    source_dirs.sort_by_key(|path| std::cmp::Reverse(path.components().count()));
+    for source_dir in source_dirs {
+        if let Ok(relative_path) = source_dir.strip_prefix(source_root) {
+            let _ = fs::remove_dir(target_root.join(relative_path));
+        }
+    }
+    let _ = fs::remove_dir(target_root);
+}
+
+fn cleanup_import_mode_conversion_rollbacks(rollbacks: &[ImportModeConversionRollback]) {
+    for rollback in rollbacks {
+        match rollback {
+            ImportModeConversionRollback::File(path) => {
+                let _ = fs::remove_file(path);
+            }
+            ImportModeConversionRollback::PackageCopy {
+                source_root,
+                target_root,
+            } => cleanup_package_copy(source_root, target_root),
+        }
+    }
+}
+
+fn remove_package_storage_except_reference(package_root: &StdPath) {
+    let Ok(entries) = fs::read_dir(package_root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_reference_manifest = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("reference.json"));
+        if is_reference_manifest {
+            continue;
+        }
+        if path.is_dir() {
+            let _ = fs::remove_dir_all(path);
+        } else {
+            let _ = fs::remove_file(path);
+        }
+    }
 }
 
 fn update_import_mode_metadata(
