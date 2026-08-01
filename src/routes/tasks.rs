@@ -84,6 +84,7 @@ pub async fn list_tasks(
     Query(query): Query<ListTasksQuery>,
 ) -> AppResult<Json<TaskListResponse>> {
     ensure_server_task_admin(&user)?;
+    cleanup_server_tasks(&state).await?;
     let limit = query.limit.clamp(1, 500);
     let offset = query.offset.max(0);
     let items = sqlx::query_as::<_, ServerTaskRecord>(&task_select_sql(
@@ -107,6 +108,7 @@ pub async fn report_task(
     Path(task_id): Path<String>,
     Json(payload): Json<ReportTaskRequest>,
 ) -> AppResult<Json<ReportTaskResponse>> {
+    cleanup_server_tasks(&state).await?;
     if task_id.trim().is_empty() {
         return Err(AppError::BadRequest("task id is required".to_string()));
     }
@@ -178,6 +180,7 @@ pub async fn delete_task(
     Path(task_id): Path<String>,
 ) -> AppResult<Json<ServerTaskRecord>> {
     ensure_server_task_admin(&user)?;
+    cleanup_server_tasks(&state).await?;
     let task = fetch_task(&state, &task_id).await?;
     let is_recent = Utc::now() - task.last_heartbeat_at < Duration::seconds(30);
     let is_active = matches!(
@@ -210,6 +213,26 @@ pub async fn delete_task(
         fetch_task(&state, &task_id).await?
     };
     Ok(Json(updated))
+}
+
+async fn cleanup_server_tasks(state: &AppState) -> AppResult<()> {
+    sqlx::query(
+        r#"
+        UPDATE server_tasks
+        SET deleted_at = NOW(), updated_at = NOW()
+        WHERE deleted_at IS NULL
+          AND (
+            (status = 'completed' AND updated_at < date_trunc('day', NOW()))
+            OR (
+              delete_requested_at IS NOT NULL
+              AND last_heartbeat_at < NOW() - INTERVAL '45 seconds'
+            )
+          )
+        "#,
+    )
+    .execute(&state.pool)
+    .await?;
+    Ok(())
 }
 
 fn ensure_server_task_admin(user: &AuthUser) -> AppResult<()> {
