@@ -1,4 +1,5 @@
 import { Languages, Monitor, Moon, PaintBucket, Settings, Sun } from "lucide-react";
+import { languageOptions, type Language } from "../i18n";
 import type { ColorTheme, PageContext } from "../types";
 import { PageFrame, Panel } from "../components/common";
 
@@ -23,9 +24,12 @@ export function SettingsPage({ t, language, setLanguage, colorTheme, setColorThe
                 <span>{t("interfaceLanguageHint")}</span>
               </div>
               <label className="settings-select-wrap">
-                <select aria-label={t("interfaceLanguage")} value={language} onChange={(event) => setLanguage(event.target.value === "en" ? "en" : "zh")}>
-                  <option value="zh">中文</option>
-                  <option value="en">English</option>
+                <select aria-label={t("interfaceLanguage")} value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
+                  {languageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>

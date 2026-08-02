@@ -5,7 +5,7 @@ import { AuthShell, FirstRunSetup, LoginForm } from "./components/auth";
 import { DesktopTitlebar } from "./components/desktop-titlebar";
 import { colorThemeStorageKey, historyMaxIndexStorageKey, languageStorageKey, sectionStorageKey, sidebarCollapsedStorageKey } from "./constants";
 import { useAdminRuntime } from "./hooks/use-admin-runtime";
-import { createTranslator, type Language } from "./i18n";
+import { createTranslator, normalizeLanguage, type Language } from "./i18n";
 import { canAccessSection, libraryIdFromPath, libraryPath, navItems, readStoredSection, sectionFromPath, sectionPath } from "./navigation";
 import { renderSection } from "./pages/render-section";
 import type { ColorTheme, PageContext, Section } from "./types";
@@ -14,7 +14,7 @@ import { buildPreviewLibraries, buildPreviewUsers, previewCurrentUser } from "./
 export function App() {
   const [language, setLanguage] = useState<Language>(() => {
     const stored = localStorage.getItem(languageStorageKey);
-    return stored === "en" ? "en" : "zh";
+    return normalizeLanguage(stored);
   });
   const [section, setSection] = useState<Section>(() => readStoredSection());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(sidebarCollapsedStorageKey) === "true");

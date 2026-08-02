@@ -5,7 +5,7 @@ import logoImage from "../assets/logo.png";
 import { api, ApiError, type CurrentUser } from "../api";
 import { rememberedLoginEmailStorageKey } from "../constants";
 import type { ColorTheme, TranslatorContext } from "../types";
-import type { Language } from "../i18n";
+import { languageOptions, type Language } from "../i18n";
 import { StatusDot, TextField } from "./common";
 import { StorageLocationFields } from "./storage/storage-location-fields";
 
@@ -150,26 +150,20 @@ export function FirstRunSetup({
                   <p>{t("setupWelcomeHint")}</p>
                 </div>
                 <div className="setup-language-setting">
-                  <div className="setup-language-options" role="radiogroup" aria-label={t("setupLanguageLabel")}>
-                    <button
-                      aria-checked={language === "zh"}
-                      className={language === "zh" ? "is-active" : ""}
-                      role="radio"
-                      type="button"
-                      onClick={() => setLanguage("zh")}
+                  <label className="setup-language-select">
+                    <Languages aria-hidden="true" size={15} />
+                    <select
+                      aria-label={t("setupLanguageLabel")}
+                      value={language}
+                      onChange={(event) => setLanguage(event.target.value as Language)}
                     >
-                      中文
-                    </button>
-                    <button
-                      aria-checked={language === "en"}
-                      className={language === "en" ? "is-active" : ""}
-                      role="radio"
-                      type="button"
-                      onClick={() => setLanguage("en")}
-                    >
-                      English
-                    </button>
-                  </div>
+                      {languageOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 <Button className="setup-start-button" size="lg" type="button" onClick={() => setStep(1)}>
                   <span>{t("startSetup")}</span>
@@ -341,10 +335,20 @@ export function AuthShell({
                 <div className="brand-subtitle">{t("admin")}</div>
               </div>
             </div>
-            <button className="select-button auth-language-button" type="button" onClick={() => setLanguage(language === "zh" ? "en" : "zh")}>
+            <label className="select-button auth-language-button">
               <Languages size={16} />
-              <span>{language === "zh" ? "\u4e2d\u6587" : "English"}</span>
-            </button>
+              <select
+                aria-label={t("setupLanguageLabel")}
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as Language)}
+              >
+                {languageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <div className="auth-header">
             <h1>{title}</h1>

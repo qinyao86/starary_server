@@ -128,31 +128,28 @@ body:has(.setup-shell) {
   margin-top: 18px;
 }
 
-.setup-language-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px;
-  padding: 3px;
+.setup-language-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
   border: 1px solid #d5dce5;
   border-radius: 8px;
-  background: #e9e9e6;
-}
-
-.setup-language-options button {
-  height: 31px;
-  border: 0;
-  border-radius: 5px;
-  color: #697586;
-  background: transparent;
-  font-size: 11px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.setup-language-options button.is-active {
-  color: #173d46;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(24, 32, 44, 0.13);
+  color: #526071;
+}
+
+.setup-language-select select {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: #253244;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
 }
 
 .setup-start-button {
@@ -221,19 +218,14 @@ body:has(.setup-shell) {
   color: #aeb7c2;
 }
 
-.theme-dark .setup-language-options {
+.theme-dark .setup-language-select {
   border-color: #3c434a;
   background: #171a1d;
-}
-
-.theme-dark .setup-language-options button {
   color: #9ca7b4;
 }
 
-.theme-dark .setup-language-options button.is-active {
+.theme-dark .setup-language-select select {
   color: #eef5f6;
-  background: #2a3035;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 @media (max-width: 680px) {
