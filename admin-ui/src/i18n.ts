@@ -1,9 +1,28 @@
-import { en } from "./i18n/en";
-import { zh } from "./i18n/zh";
+import { deMessages } from "./i18n/locales/de";
+import { enMessages } from "./i18n/locales/en";
+import { esMessages } from "./i18n/locales/es";
+import { jaMessages } from "./i18n/locales/ja";
+import { koMessages } from "./i18n/locales/ko";
+import { ruMessages } from "./i18n/locales/ru";
+import { zhCNMessages } from "./i18n/locales/zh-CN";
+import { zhTWMessages } from "./i18n/locales/zh-TW";
 
 export type Language = "en" | "es" | "de" | "ru" | "zh-TW" | "zh-CN" | "ja" | "ko";
 
-export const dictionaries = { en, "zh-CN": zh } as const;
+export type TranslationDictionary = {
+  [Key in keyof typeof zhCNMessages]: string;
+};
+
+export const dictionaries = {
+  en: enMessages,
+  es: esMessages,
+  de: deMessages,
+  ru: ruMessages,
+  "zh-TW": zhTWMessages,
+  "zh-CN": zhCNMessages,
+  ja: jaMessages,
+  ko: koMessages,
+} satisfies Record<Language, TranslationDictionary>;
 
 export const languageOptions: Array<{ value: Language; label: string }> = [
   { value: "en", label: "English" },
@@ -16,7 +35,7 @@ export const languageOptions: Array<{ value: Language; label: string }> = [
   { value: "ko", label: "한국어" },
 ];
 
-export type TranslationKey = keyof typeof en;
+export type TranslationKey = keyof TranslationDictionary;
 
 export function isLanguage(value: string | null): value is Language {
   return languageOptions.some((option) => option.value === value);
@@ -33,6 +52,6 @@ export function normalizeLanguage(value: string | null): Language {
 }
 
 export function createTranslator(language: Language) {
-  const dictionary = dictionaries[language as keyof typeof dictionaries] as Partial<Record<TranslationKey, string>> | undefined;
-  return (key: TranslationKey) => dictionary?.[key] ?? dictionaries.en[key];
+  const dictionary = dictionaries[language];
+  return (key: TranslationKey) => dictionary[key];
 }
