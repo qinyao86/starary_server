@@ -168,6 +168,19 @@ pub fn router(state: AppState) -> Router {
                 .delete(assets::delete_assets_permanently),
         )
         .route(
+            "/api/v1/libraries/:library_id/assets/uploads",
+            post(assets::create_asset_upload_session),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/uploads/:session_id/chunk",
+            put(assets::append_asset_upload_chunk)
+                .layer(DefaultBodyLimit::max(32usize * 1024 * 1024)),
+        )
+        .route(
+            "/api/v1/libraries/:library_id/assets/uploads/:session_id/complete",
+            post(assets::complete_asset_upload_session),
+        )
+        .route(
             "/api/v1/libraries/:library_id/assets/query",
             post(assets::query_assets),
         )

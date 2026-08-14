@@ -400,7 +400,14 @@ pub async fn update_asset_derived_files(
     )
     .await?;
     if !request.derived_files.is_empty() {
-        super::write_asset_derived_files(&state, storage_root_id, &request.derived_files).await?;
+        super::write_asset_derived_files(
+            &state,
+            &library_id,
+            user.id,
+            storage_root_id,
+            &request.derived_files,
+        )
+        .await?;
     }
 
     let mut tx = state.pool.begin().await?;

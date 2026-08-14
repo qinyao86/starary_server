@@ -7,7 +7,7 @@ use crate::{
     state::AppState,
 };
 use axum::{
-    body::Body,
+    body::{Body, Bytes},
     extract::{Path, Query, State},
     http::{header, HeaderMap, Response, StatusCode},
     Json,
@@ -19,12 +19,13 @@ use sqlx::Row;
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    io::SeekFrom,
+    io::{SeekFrom, Write},
     path::{Component, Path as StdPath, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     fs::File,
-    io::{AsyncReadExt, AsyncSeekExt},
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 use tokio_util::io::ReaderStream;
 use uuid::Uuid;
@@ -48,6 +49,9 @@ pub use text::{read_asset_text, update_asset_text};
 
 const MAX_DERIVED_FILE_BYTES: usize = 25 * 1024 * 1024;
 const MAX_SOURCE_FILE_BYTES: usize = 256 * 1024 * 1024;
+const MAX_ASSET_UPLOAD_SESSION_BYTES: u64 = 8 * 1024 * 1024 * 1024 * 1024;
+const MAX_ASSET_UPLOAD_CHUNK_BYTES: usize = 32 * 1024 * 1024;
+const ASSET_UPLOAD_SESSION_TTL_SECONDS: u64 = 24 * 60 * 60;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -122,9 +126,47 @@ pub struct ImportAssetTagGroupRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ImportAssetFileRequest {
     relative_path: String,
+    #[serde(default)]
     content_base64: String,
+    upload_session_id: Option<String>,
     content_type: Option<String>,
     size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAssetUploadSessionRequest {
+    relative_path: String,
+    size_bytes: u64,
+    content_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppendAssetUploadChunkQuery {
+    offset: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetUploadSessionResponse {
+    upload_session_id: String,
+    relative_path: String,
+    received_bytes: u64,
+    size_bytes: u64,
+    completed: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AssetUploadSessionMetadata {
+    library_id: String,
+    user_id: Uuid,
+    relative_path: String,
+    content_type: Option<String>,
+    size_bytes: u64,
+    created_at_unix_seconds: u64,
+    completed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -347,13 +389,30 @@ pub async fn import_assets(
             storage_was_used = true;
             ensure_storage_root_in_library(&mut tx, &library_id, root_id).await?;
             if let Some(source_file) = source_file.as_ref() {
-                write_asset_source_file(&state, root_id, &asset_id, source_file).await?;
+                write_asset_source_file(
+                    &state,
+                    &library_id,
+                    user.id,
+                    root_id,
+                    &asset_id,
+                    source_file,
+                )
+                .await?;
             }
             for additional_file in &additional_files {
-                write_asset_source_file(&state, root_id, &asset_id, additional_file).await?;
+                write_asset_source_file(
+                    &state,
+                    &library_id,
+                    user.id,
+                    root_id,
+                    &asset_id,
+                    additional_file,
+                )
+                .await?;
             }
             if !derived_files.is_empty() {
-                write_asset_derived_files(&state, root_id, &derived_files).await?;
+                write_asset_derived_files(&state, &library_id, user.id, root_id, &derived_files)
+                    .await?;
             }
         } else if source_file.is_some() || !additional_files.is_empty() || !derived_files.is_empty()
         {
@@ -472,6 +531,126 @@ pub async fn import_assets(
         total,
         items,
     }))
+}
+
+pub async fn create_asset_upload_session(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(library_id): Path<String>,
+    Json(request): Json<CreateAssetUploadSessionRequest>,
+) -> AppResult<Json<AssetUploadSessionResponse>> {
+    ensure_library_asset_import_access(&state, &user, &library_id).await?;
+    let relative_path = normalize_upload_relative_path(&request.relative_path)?;
+    if request.size_bytes > MAX_ASSET_UPLOAD_SESSION_BYTES {
+        return Err(AppError::BadRequest(
+            "asset upload size is invalid".to_string(),
+        ));
+    }
+    validate_upload_content_type(request.content_type.as_deref())?;
+    cleanup_old_asset_upload_sessions(&state);
+
+    let session_id = Uuid::new_v4().to_string();
+    let (session_dir, metadata_path, data_path) =
+        asset_upload_session_paths(&state, &library_id, &session_id)?;
+    fs::create_dir_all(&session_dir).map_err(|error| {
+        AppError::BadRequest(format!("could not create upload session: {error}"))
+    })?;
+    fs::File::create(&data_path)
+        .map_err(|error| AppError::BadRequest(format!("could not create upload file: {error}")))?;
+    let metadata = AssetUploadSessionMetadata {
+        library_id,
+        user_id: user.id,
+        relative_path,
+        content_type: request.content_type,
+        size_bytes: request.size_bytes,
+        created_at_unix_seconds: unix_seconds_now(),
+        completed: false,
+    };
+    write_upload_session_metadata(&metadata_path, &metadata)?;
+    Ok(Json(asset_upload_session_response(session_id, metadata, 0)))
+}
+
+pub async fn append_asset_upload_chunk(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((library_id, session_id)): Path<(String, String)>,
+    Query(query): Query<AppendAssetUploadChunkQuery>,
+    body: Bytes,
+) -> AppResult<Json<AssetUploadSessionResponse>> {
+    ensure_library_asset_import_access(&state, &user, &library_id).await?;
+    if body.is_empty() || body.len() > MAX_ASSET_UPLOAD_CHUNK_BYTES {
+        return Err(AppError::BadRequest(
+            "asset upload chunk size is invalid".to_string(),
+        ));
+    }
+    let (_session_dir, metadata_path, data_path) =
+        asset_upload_session_paths(&state, &library_id, &session_id)?;
+    let metadata = read_upload_session_metadata(&metadata_path)?;
+    ensure_upload_session_owner(&metadata, &library_id, user.id)?;
+    if metadata.completed {
+        return Err(AppError::Conflict(
+            "asset upload session is already completed".to_string(),
+        ));
+    }
+    let current_size = fs::metadata(&data_path)
+        .map_err(|_| AppError::NotFound("asset upload session not found".to_string()))?
+        .len();
+    if current_size != query.offset {
+        return Err(AppError::Conflict(format!(
+            "asset upload chunk offset mismatch: expected {current_size}",
+        )));
+    }
+    let next_size = current_size
+        .checked_add(body.len() as u64)
+        .ok_or_else(|| AppError::BadRequest("asset upload size is invalid".to_string()))?;
+    if next_size > metadata.size_bytes {
+        return Err(AppError::BadRequest(
+            "asset upload exceeds the declared file size".to_string(),
+        ));
+    }
+    let mut file = tokio::fs::OpenOptions::new()
+        .append(true)
+        .open(&data_path)
+        .await
+        .map_err(|error| AppError::BadRequest(format!("could not open upload file: {error}")))?;
+    file.write_all(&body)
+        .await
+        .map_err(|error| AppError::BadRequest(format!("could not write upload chunk: {error}")))?;
+    file.flush()
+        .await
+        .map_err(|error| AppError::BadRequest(format!("could not flush upload chunk: {error}")))?;
+
+    Ok(Json(asset_upload_session_response(
+        session_id, metadata, next_size,
+    )))
+}
+
+pub async fn complete_asset_upload_session(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((library_id, session_id)): Path<(String, String)>,
+) -> AppResult<Json<AssetUploadSessionResponse>> {
+    ensure_library_asset_import_access(&state, &user, &library_id).await?;
+    let (_session_dir, metadata_path, data_path) =
+        asset_upload_session_paths(&state, &library_id, &session_id)?;
+    let mut metadata = read_upload_session_metadata(&metadata_path)?;
+    ensure_upload_session_owner(&metadata, &library_id, user.id)?;
+    let current_size = fs::metadata(&data_path)
+        .map_err(|_| AppError::NotFound("asset upload session not found".to_string()))?
+        .len();
+    if current_size != metadata.size_bytes {
+        return Err(AppError::BadRequest(format!(
+            "asset upload is incomplete: {current_size}/{} bytes",
+            metadata.size_bytes
+        )));
+    }
+    metadata.completed = true;
+    write_upload_session_metadata(&metadata_path, &metadata)?;
+    Ok(Json(asset_upload_session_response(
+        session_id,
+        metadata,
+        current_size,
+    )))
 }
 
 async fn ensure_import_tag_structure_access(
@@ -1305,30 +1484,239 @@ async fn ensure_folder_in_library(
         .ok_or_else(|| AppError::BadRequest("folder not found".to_string()))
 }
 
+fn unix_seconds_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn validate_upload_content_type(content_type: Option<&str>) -> AppResult<()> {
+    if content_type.is_some_and(|value| value.len() > 128) {
+        return Err(AppError::BadRequest(
+            "asset upload content type is invalid".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn normalize_upload_relative_path(value: &str) -> AppResult<String> {
+    let normalized = normalize_safe_relative_path(value)?;
+    if normalized.starts_with("assets/")
+        || normalized.starts_with(".starary/thumbs/")
+        || normalized.starts_with(".starary/previews/")
+    {
+        return Ok(normalized);
+    }
+    Err(AppError::BadRequest(
+        "asset upload path is outside importable asset areas".to_string(),
+    ))
+}
+
+fn sanitize_upload_segment(value: &str, label: &str) -> AppResult<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty()
+        || trimmed.contains("..")
+        || !trimmed.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.')
+        })
+    {
+        return Err(AppError::BadRequest(format!("{label} is invalid")));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn asset_upload_root(state: &AppState) -> PathBuf {
+    state
+        .config
+        .storage_dir
+        .join(".starary")
+        .join("asset-upload-sessions")
+}
+
+fn asset_upload_session_paths(
+    state: &AppState,
+    library_id: &str,
+    session_id: &str,
+) -> AppResult<(PathBuf, PathBuf, PathBuf)> {
+    let library_segment = sanitize_upload_segment(library_id, "library id")?;
+    let session_uuid = Uuid::parse_str(session_id)
+        .map_err(|_| AppError::BadRequest("upload session id is invalid".to_string()))?;
+    let session_segment = session_uuid.to_string();
+    let session_dir = asset_upload_root(state)
+        .join(library_segment)
+        .join(session_segment);
+    Ok((
+        session_dir.clone(),
+        session_dir.join("metadata.json"),
+        session_dir.join("content.part"),
+    ))
+}
+
+fn write_upload_session_metadata(
+    metadata_path: &StdPath,
+    metadata: &AssetUploadSessionMetadata,
+) -> AppResult<()> {
+    if let Some(parent) = metadata_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            AppError::BadRequest(format!(
+                "could not create upload metadata directory: {error}"
+            ))
+        })?;
+    }
+    let bytes = serde_json::to_vec(metadata)?;
+    fs::write(metadata_path, bytes)
+        .map_err(|error| AppError::BadRequest(format!("could not write upload metadata: {error}")))
+}
+
+fn read_upload_session_metadata(metadata_path: &StdPath) -> AppResult<AssetUploadSessionMetadata> {
+    let bytes = fs::read(metadata_path)
+        .map_err(|_| AppError::NotFound("asset upload session not found".to_string()))?;
+    serde_json::from_slice(&bytes)
+        .map_err(|_| AppError::BadRequest("asset upload metadata is invalid".to_string()))
+}
+
+fn ensure_upload_session_owner(
+    metadata: &AssetUploadSessionMetadata,
+    library_id: &str,
+    user_id: Uuid,
+) -> AppResult<()> {
+    if metadata.library_id != library_id || metadata.user_id != user_id {
+        return Err(AppError::NotFound(
+            "asset upload session not found".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn asset_upload_session_response(
+    upload_session_id: String,
+    metadata: AssetUploadSessionMetadata,
+    received_bytes: u64,
+) -> AssetUploadSessionResponse {
+    AssetUploadSessionResponse {
+        upload_session_id,
+        relative_path: metadata.relative_path,
+        received_bytes,
+        size_bytes: metadata.size_bytes,
+        completed: metadata.completed,
+    }
+}
+
+fn cleanup_old_asset_upload_sessions(state: &AppState) {
+    let root = asset_upload_root(state);
+    let now = unix_seconds_now();
+    let Ok(libraries) = fs::read_dir(root) else {
+        return;
+    };
+    for library in libraries.flatten().filter(|entry| entry.path().is_dir()) {
+        let Ok(sessions) = fs::read_dir(library.path()) else {
+            continue;
+        };
+        for session in sessions.flatten().filter(|entry| entry.path().is_dir()) {
+            let metadata_path = session.path().join("metadata.json");
+            let should_remove = read_upload_session_metadata(&metadata_path)
+                .map(|metadata| {
+                    now.saturating_sub(metadata.created_at_unix_seconds)
+                        > ASSET_UPLOAD_SESSION_TTL_SECONDS
+                })
+                .unwrap_or(true);
+            if should_remove {
+                let _ = fs::remove_dir_all(session.path());
+            }
+        }
+    }
+}
+
+fn consume_upload_session_file(
+    state: &AppState,
+    library_id: &str,
+    user_id: Uuid,
+    upload_session_id: &str,
+    expected_relative_path: &str,
+    expected_size_bytes: Option<u64>,
+) -> AppResult<PathBuf> {
+    let (_session_dir, metadata_path, data_path) =
+        asset_upload_session_paths(state, library_id, upload_session_id)?;
+    let metadata = read_upload_session_metadata(&metadata_path)?;
+    ensure_upload_session_owner(&metadata, library_id, user_id)?;
+    if !metadata.completed {
+        return Err(AppError::BadRequest(
+            "asset upload session is not completed".to_string(),
+        ));
+    }
+    if metadata.relative_path != expected_relative_path {
+        return Err(AppError::BadRequest(
+            "asset upload path does not match the import file".to_string(),
+        ));
+    }
+    if expected_size_bytes.is_some_and(|size| size != metadata.size_bytes) {
+        return Err(AppError::BadRequest(
+            "asset upload size does not match the import file".to_string(),
+        ));
+    }
+    let current_size = fs::metadata(&data_path)
+        .map_err(|_| AppError::NotFound("asset upload session not found".to_string()))?
+        .len();
+    if current_size != metadata.size_bytes {
+        return Err(AppError::BadRequest(
+            "asset upload file size does not match the completed session".to_string(),
+        ));
+    }
+    Ok(data_path)
+}
+
 async fn write_asset_source_file(
     state: &AppState,
+    library_id: &str,
+    user_id: Uuid,
     root_id: Uuid,
     asset_id: &str,
     file: &ImportAssetFileRequest,
 ) -> AppResult<()> {
     let base_path = storage_root_write_base_path(state, root_id, None).await?;
     let relative_path = normalize_source_file_relative_path(&file.relative_path, asset_id)?;
-    let decoded = decode_import_file("source", file, MAX_SOURCE_FILE_BYTES)?;
     let target_path = join_safe_relative_path(&base_path, &relative_path);
+    if let Some(upload_session_id) = file.upload_session_id.as_deref() {
+        let upload_path = consume_upload_session_file(
+            state,
+            library_id,
+            user_id,
+            upload_session_id,
+            &relative_path,
+            file.size_bytes,
+        )?;
+        return move_file_atomic(&upload_path, &target_path);
+    }
+    let decoded = decode_import_file("source", file, MAX_SOURCE_FILE_BYTES)?;
     write_file_atomic(&target_path, &decoded)
 }
 
 pub(super) async fn write_asset_derived_files(
     state: &AppState,
+    library_id: &str,
+    user_id: Uuid,
     root_id: Uuid,
     files: &[ImportAssetDerivedFileRequest],
 ) -> AppResult<()> {
     let base_path = storage_root_write_base_path(state, root_id, None).await?;
     for file in files {
         let relative_path = normalize_derived_file_relative_path(&file.file.relative_path)?;
-        let decoded = decode_import_file(&file.kind, &file.file, MAX_DERIVED_FILE_BYTES)?;
         let target_path = join_safe_relative_path(&base_path, &relative_path);
-        write_file_atomic(&target_path, &decoded)?;
+        if let Some(upload_session_id) = file.file.upload_session_id.as_deref() {
+            let upload_path = consume_upload_session_file(
+                state,
+                library_id,
+                user_id,
+                upload_session_id,
+                &relative_path,
+                file.file.size_bytes,
+            )?;
+            move_file_atomic(&upload_path, &target_path)?;
+        } else {
+            let decoded = decode_import_file(&file.kind, &file.file, MAX_DERIVED_FILE_BYTES)?;
+            write_file_atomic(&target_path, &decoded)?;
+        }
     }
 
     Ok(())
@@ -1398,6 +1786,11 @@ fn decode_import_file(
         .map(|(_, payload)| payload)
         .unwrap_or(file.content_base64.as_str())
         .trim();
+    if encoded.is_empty() && file.size_bytes != Some(0) {
+        return Err(AppError::BadRequest(format!(
+            "import file '{kind}' is missing its payload"
+        )));
+    }
     let decoded = general_purpose::STANDARD
         .decode(encoded)
         .map_err(|_| AppError::BadRequest(format!("import file '{kind}' is not valid base64")))?;
@@ -1508,6 +1901,51 @@ pub(super) fn write_file_atomic(target_path: &StdPath, bytes: &[u8]) -> AppResul
     fs::rename(&temporary_path, target_path).map_err(|error| {
         AppError::BadRequest(format!("could not finalize derived file: {error}"))
     })?;
+    Ok(())
+}
+
+pub(super) fn move_file_atomic(source_path: &StdPath, target_path: &StdPath) -> AppResult<()> {
+    let parent = target_path
+        .parent()
+        .ok_or_else(|| AppError::BadRequest("derived file path is invalid".to_string()))?;
+    fs::create_dir_all(parent).map_err(|error| {
+        AppError::BadRequest(format!("could not create derived file directory: {error}"))
+    })?;
+
+    let temporary_path = target_path.with_extension(format!(
+        "{}.tmp",
+        target_path
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("file")
+    ));
+    let copy_result = (|| -> AppResult<()> {
+        let mut input = fs::File::open(source_path).map_err(|error| {
+            AppError::BadRequest(format!("could not open upload file: {error}"))
+        })?;
+        let mut output = fs::File::create(&temporary_path).map_err(|error| {
+            AppError::BadRequest(format!("could not create derived file: {error}"))
+        })?;
+        std::io::copy(&mut input, &mut output).map_err(|error| {
+            AppError::BadRequest(format!("could not write derived file: {error}"))
+        })?;
+        output.flush().map_err(|error| {
+            AppError::BadRequest(format!("could not flush derived file: {error}"))
+        })?;
+        Ok(())
+    })();
+    if let Err(error) = copy_result {
+        let _ = fs::remove_file(&temporary_path);
+        return Err(error);
+    }
+    fs::rename(&temporary_path, target_path).map_err(|error| {
+        let _ = fs::remove_file(&temporary_path);
+        AppError::BadRequest(format!("could not finalize derived file: {error}"))
+    })?;
+    let _ = fs::remove_file(source_path);
+    if let Some(session_dir) = source_path.parent() {
+        let _ = fs::remove_dir_all(session_dir);
+    }
     Ok(())
 }
 
