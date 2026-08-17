@@ -167,6 +167,10 @@ struct AssetUploadSessionMetadata {
     size_bytes: u64,
     created_at_unix_seconds: u64,
     completed: bool,
+    /// Absolute upload-session root for this library storage volume.
+    /// When present, completed uploads can be renamed into final storage without a second full write.
+    #[serde(default)]
+    session_root: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -547,11 +551,11 @@ pub async fn create_asset_upload_session(
         ));
     }
     validate_upload_content_type(request.content_type.as_deref())?;
-    cleanup_old_asset_upload_sessions(&state);
+    cleanup_old_asset_upload_sessions(&state).await;
 
     let session_id = Uuid::new_v4().to_string();
-    let (session_dir, metadata_path, data_path) =
-        asset_upload_session_paths(&state, &library_id, &session_id)?;
+    let (session_dir, metadata_path, data_path, session_root) =
+        asset_upload_session_paths(&state, &library_id, &session_id).await?;
     fs::create_dir_all(&session_dir).map_err(|error| {
         AppError::BadRequest(format!("could not create upload session: {error}"))
     })?;
@@ -565,6 +569,7 @@ pub async fn create_asset_upload_session(
         size_bytes: request.size_bytes,
         created_at_unix_seconds: unix_seconds_now(),
         completed: false,
+        session_root: Some(session_root),
     };
     write_upload_session_metadata(&metadata_path, &metadata)?;
     Ok(Json(asset_upload_session_response(session_id, metadata, 0)))
@@ -583,8 +588,8 @@ pub async fn append_asset_upload_chunk(
             "asset upload chunk size is invalid".to_string(),
         ));
     }
-    let (_session_dir, metadata_path, data_path) =
-        asset_upload_session_paths(&state, &library_id, &session_id)?;
+    let (_session_dir, metadata_path, data_path, _session_root) =
+        asset_upload_session_paths(&state, &library_id, &session_id).await?;
     let metadata = read_upload_session_metadata(&metadata_path)?;
     ensure_upload_session_owner(&metadata, &library_id, user.id)?;
     if metadata.completed {
@@ -631,8 +636,8 @@ pub async fn complete_asset_upload_session(
     Path((library_id, session_id)): Path<(String, String)>,
 ) -> AppResult<Json<AssetUploadSessionResponse>> {
     ensure_library_asset_import_access(&state, &user, &library_id).await?;
-    let (_session_dir, metadata_path, data_path) =
-        asset_upload_session_paths(&state, &library_id, &session_id)?;
+    let (_session_dir, metadata_path, data_path, _session_root) =
+        asset_upload_session_paths(&state, &library_id, &session_id).await?;
     let mut metadata = read_upload_session_metadata(&metadata_path)?;
     ensure_upload_session_owner(&metadata, &library_id, user.id)?;
     let current_size = fs::metadata(&data_path)
@@ -1534,22 +1539,113 @@ fn asset_upload_root(state: &AppState) -> PathBuf {
         .join("asset-upload-sessions")
 }
 
-fn asset_upload_session_paths(
+fn asset_upload_root_under_storage_base(storage_base: &StdPath) -> PathBuf {
+    storage_base
+        .join(".starary")
+        .join("asset-upload-sessions")
+}
+
+async fn resolve_library_upload_session_root(
+    state: &AppState,
+    library_id: &str,
+) -> PathBuf {
+    if let Ok(Some(root_id)) = find_default_storage_root_id(state, library_id).await {
+        if let Ok(base_path) = storage_root_write_base_path(state, root_id, Some(library_id)).await {
+            return asset_upload_root_under_storage_base(&base_path);
+        }
+    }
+    asset_upload_root(state)
+}
+
+async fn list_upload_session_roots(state: &AppState, library_id: &str) -> Vec<PathBuf> {
+    let mut roots = vec![resolve_library_upload_session_root(state, library_id).await];
+    let global_root = asset_upload_root(state);
+    if !roots.iter().any(|existing| existing == &global_root) {
+        roots.push(global_root);
+    }
+
+    if let Ok(rows) = sqlx::query(
+        r#"
+        SELECT kind, canonical_uri, windows_unc_path
+        FROM storage_roots
+        WHERE library_id = $1 AND enabled = TRUE
+        "#,
+    )
+    .bind(library_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        for row in rows {
+            let Ok(kind_value) = row.try_get::<String, _>("kind") else {
+                continue;
+            };
+            let Ok(kind) = kind_value.parse::<StorageRootKind>() else {
+                continue;
+            };
+            let Ok(canonical_uri) = row.try_get::<String, _>("canonical_uri") else {
+                continue;
+            };
+            let windows_unc_path: Option<String> = row.try_get("windows_unc_path").ok().flatten();
+            let base_path = match kind {
+                StorageRootKind::ServerFilesystem => Some(PathBuf::from(canonical_uri)),
+                StorageRootKind::Smb if cfg!(windows) => windows_unc_path.map(PathBuf::from),
+                _ => None,
+            };
+            if let Some(base_path) = base_path {
+                let candidate = asset_upload_root_under_storage_base(&base_path);
+                if !roots.iter().any(|existing| existing == &candidate) {
+                    roots.push(candidate);
+                }
+            }
+        }
+    }
+
+    roots
+}
+
+async fn asset_upload_session_paths(
     state: &AppState,
     library_id: &str,
     session_id: &str,
-) -> AppResult<(PathBuf, PathBuf, PathBuf)> {
+) -> AppResult<(PathBuf, PathBuf, PathBuf, String)> {
     let library_segment = sanitize_upload_segment(library_id, "library id")?;
     let session_uuid = Uuid::parse_str(session_id)
         .map_err(|_| AppError::BadRequest("upload session id is invalid".to_string()))?;
     let session_segment = session_uuid.to_string();
-    let session_dir = asset_upload_root(state)
+
+    // Prefer the session_root recorded at create time so later chunk/commit operations
+    // stay on the original volume even if the library's default storage root changes.
+    let candidates = list_upload_session_roots(state, library_id).await;
+    let mut discovered_root: Option<PathBuf> = None;
+    for candidate in &candidates {
+        let metadata_path = candidate
+            .join(&library_segment)
+            .join(&session_segment)
+            .join("metadata.json");
+        if let Ok(metadata) = read_upload_session_metadata(&metadata_path) {
+            if let Some(session_root) = metadata
+                .session_root
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                discovered_root = Some(PathBuf::from(session_root));
+            } else {
+                discovered_root = Some(candidate.clone());
+            }
+            break;
+        }
+    }
+
+    let session_root = discovered_root.unwrap_or_else(|| candidates[0].clone());
+    let session_dir = session_root
         .join(library_segment)
         .join(session_segment);
     Ok((
         session_dir.clone(),
         session_dir.join("metadata.json"),
         session_dir.join("content.part"),
+        session_root.to_string_lossy().into_owned(),
     ))
 }
 
@@ -1603,9 +1699,50 @@ fn asset_upload_session_response(
     }
 }
 
-fn cleanup_old_asset_upload_sessions(state: &AppState) {
-    let root = asset_upload_root(state);
+async fn cleanup_old_asset_upload_sessions(state: &AppState) {
     let now = unix_seconds_now();
+    let mut roots = vec![asset_upload_root(state)];
+
+    if let Ok(rows) = sqlx::query(
+        r#"
+        SELECT kind, canonical_uri, windows_unc_path
+        FROM storage_roots
+        WHERE enabled = TRUE
+        "#,
+    )
+    .fetch_all(&state.pool)
+    .await
+    {
+        for row in rows {
+            let Ok(kind_value) = row.try_get::<String, _>("kind") else {
+                continue;
+            };
+            let Ok(kind) = kind_value.parse::<StorageRootKind>() else {
+                continue;
+            };
+            let Ok(canonical_uri) = row.try_get::<String, _>("canonical_uri") else {
+                continue;
+            };
+            let windows_unc_path: Option<String> = row.try_get("windows_unc_path").ok().flatten();
+            let base_path = match kind {
+                StorageRootKind::ServerFilesystem => Some(PathBuf::from(canonical_uri)),
+                StorageRootKind::Smb if cfg!(windows) => windows_unc_path.map(PathBuf::from),
+                _ => None,
+            };
+            if let Some(base_path) = base_path {
+                roots.push(asset_upload_root_under_storage_base(&base_path));
+            }
+        }
+    }
+
+    roots.sort();
+    roots.dedup();
+    for root in roots {
+        cleanup_old_asset_upload_sessions_under(&root, now);
+    }
+}
+
+fn cleanup_old_asset_upload_sessions_under(root: &StdPath, now: u64) {
     let Ok(libraries) = fs::read_dir(root) else {
         return;
     };
@@ -1628,7 +1765,7 @@ fn cleanup_old_asset_upload_sessions(state: &AppState) {
     }
 }
 
-fn consume_upload_session_file(
+async fn consume_upload_session_file(
     state: &AppState,
     library_id: &str,
     user_id: Uuid,
@@ -1636,8 +1773,8 @@ fn consume_upload_session_file(
     expected_relative_path: &str,
     expected_size_bytes: Option<u64>,
 ) -> AppResult<PathBuf> {
-    let (_session_dir, metadata_path, data_path) =
-        asset_upload_session_paths(state, library_id, upload_session_id)?;
+    let (_session_dir, metadata_path, data_path, _session_root) =
+        asset_upload_session_paths(state, library_id, upload_session_id).await?;
     let metadata = read_upload_session_metadata(&metadata_path)?;
     ensure_upload_session_owner(&metadata, library_id, user_id)?;
     if !metadata.completed {
@@ -1685,7 +1822,8 @@ async fn write_asset_source_file(
             upload_session_id,
             &relative_path,
             file.size_bytes,
-        )?;
+        )
+        .await?;
         return move_file_atomic(&upload_path, &target_path);
     }
     let decoded = decode_import_file("source", file, MAX_SOURCE_FILE_BYTES)?;
@@ -1711,7 +1849,8 @@ pub(super) async fn write_asset_derived_files(
                 upload_session_id,
                 &relative_path,
                 file.file.size_bytes,
-            )?;
+            )
+            .await?;
             move_file_atomic(&upload_path, &target_path)?;
         } else {
             let decoded = decode_import_file(&file.kind, &file.file, MAX_DERIVED_FILE_BYTES)?;
@@ -1919,6 +2058,22 @@ pub(super) fn move_file_atomic(source_path: &StdPath, target_path: &StdPath) -> 
             .and_then(|value| value.to_str())
             .unwrap_or("file")
     ));
+    let _ = fs::remove_file(&temporary_path);
+
+    // Same-volume uploads should finalize with rename only, avoiding a second full disk write.
+    if fs::rename(source_path, &temporary_path).is_ok() {
+        if let Err(error) = fs::rename(&temporary_path, target_path) {
+            // Best-effort recovery: leave the payload next to the target so cleanup can still find it.
+            let _ = fs::rename(&temporary_path, source_path);
+            let _ = fs::remove_file(&temporary_path);
+            return Err(AppError::BadRequest(format!(
+                "could not finalize derived file: {error}"
+            )));
+        }
+        cleanup_upload_session_dir(source_path);
+        return Ok(());
+    }
+
     let copy_result = (|| -> AppResult<()> {
         let mut input = fs::File::open(source_path).map_err(|error| {
             AppError::BadRequest(format!("could not open upload file: {error}"))
@@ -1942,11 +2097,16 @@ pub(super) fn move_file_atomic(source_path: &StdPath, target_path: &StdPath) -> 
         let _ = fs::remove_file(&temporary_path);
         AppError::BadRequest(format!("could not finalize derived file: {error}"))
     })?;
-    let _ = fs::remove_file(source_path);
+    cleanup_upload_session_dir(source_path);
+    Ok(())
+}
+
+fn cleanup_upload_session_dir(source_path: &StdPath) {
     if let Some(session_dir) = source_path.parent() {
         let _ = fs::remove_dir_all(session_dir);
+    } else {
+        let _ = fs::remove_file(source_path);
     }
-    Ok(())
 }
 
 fn content_type_for_path(path: &str) -> &'static str {
