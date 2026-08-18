@@ -12,7 +12,9 @@ New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 $env:CARGO_TARGET_DIR = $buildTarget
 Push-Location (Join-Path $root "desktop")
 try {
-  npm ci
+  if (-not (Test-Path (Join-Path (Get-Location) "node_modules\@tauri-apps\cli\tauri.js"))) {
+    npm install --no-fund --no-audit
+  }
   npm run tauri -- build
 } finally {
   Pop-Location
