@@ -80,6 +80,10 @@ export const translations = {
     currentVersion: "当前版本",
     checkNow: "检查",
     updateCheckPlaceholderToast: "检查更新功能将在后续版本开放",
+    updateCheckingToast: "正在检查更新…",
+    updateUpToDateToast: "已是最新版本 {version}",
+    updateAvailableToast: "发现新版本 {version}",
+    updateCheckFailedToast: "检查更新失败，请稍后重试",
     serviceStartedToast: "服务已启动",
     serviceStoppedToast: "服务已停止",
     serviceRestartedToast: "服务已重新启动",
@@ -168,6 +172,10 @@ export const translations = {
     currentVersion: "Current version",
     checkNow: "Check",
     updateCheckPlaceholderToast: "Update checking will be available in a future version",
+    updateCheckingToast: "Checking for updates…",
+    updateUpToDateToast: "You are up to date ({version})",
+    updateAvailableToast: "Update available: {version}",
+    updateCheckFailedToast: "Could not check for updates. Try again later.",
     serviceStartedToast: "Service started",
     serviceStoppedToast: "Service stopped",
     serviceRestartedToast: "Service restarted",
@@ -232,3 +240,4 @@ export function localizeBackendMessage(message, language) {
   }
   return text;
 }
+

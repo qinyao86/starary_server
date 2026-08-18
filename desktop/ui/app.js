@@ -1,4 +1,5 @@
 import { detectLanguage, localizeBackendMessage, persistLanguage, translate } from "./i18n.js";
+import { APP_VERSION, checkForServerUpdate, DEFAULT_RELEASE_URL } from "./updateChecker.js";
 
 const invoke = window.__TAURI__.core.invoke;
 const appWindow = window.__TAURI__.window.getCurrentWindow();
@@ -49,8 +50,16 @@ function applyLanguage() {
   });
   elements["language-select"].value = language;
   applyTheme();
+  applyVersion();
   if (status) render(status);
   invoke("set_control_center_language", { language }).catch(() => {});
+}
+
+
+function applyVersion() {
+  document.querySelectorAll(".version-value").forEach((node) => {
+    node.textContent = APP_VERSION;
+  });
 }
 
 function showToast(message) {
@@ -183,7 +192,38 @@ elements["copy-url"].addEventListener("click", async () => {
   }
 });
 elements["open-log"].addEventListener("click", () => invoke("open_log").catch(showError));
-elements["check-updates"].addEventListener("click", () => showToast(t("updateCheckPlaceholderToast")));
+let updateCheckBusy = false;
+elements["check-updates"].addEventListener("click", async () => {
+  if (updateCheckBusy) return;
+  updateCheckBusy = true;
+  const button = elements["check-updates"];
+  button.disabled = true;
+  showToast(t("updateCheckingToast"));
+  try {
+    const result = await checkForServerUpdate({ language });
+    if (result.isUpdateAvailable) {
+      showToast(t("updateAvailableToast", { version: result.latestVersion }));
+      const releaseUrl = result.releaseUrl || DEFAULT_RELEASE_URL;
+      try {
+        if (window.__TAURI__?.opener?.openUrl) {
+          await window.__TAURI__.opener.openUrl(releaseUrl);
+        } else {
+          await invoke("plugin:opener|open_url", { url: releaseUrl });
+        }
+      } catch (openError) {
+        showError(openError);
+      }
+    } else {
+      showToast(t("updateUpToDateToast", { version: result.latestVersion }));
+    }
+  } catch (error) {
+    showToast(t("updateCheckFailedToast"));
+    console.error(error);
+  } finally {
+    updateCheckBusy = false;
+    button.disabled = false;
+  }
+});
 elements["device-management"].addEventListener("click", () => showToast(t("deviceManagementPlanned")));
 document.querySelectorAll("[data-panel-target]").forEach((button) => {
   button.addEventListener("click", () => setActivePanel(button.dataset.panelTarget));
@@ -201,6 +241,10 @@ document.querySelectorAll("[data-window-action]").forEach((button) => {
 
 applyTheme();
 applyLanguage();
+applyVersion();
 setActivePanel(activePanel);
 refresh(false);
 setInterval(() => { if (!busy) refresh(); }, 2500);
+
+
+
